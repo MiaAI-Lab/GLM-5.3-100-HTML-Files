@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RISO PRESS — two-color poster maker</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background:#26241f; color:#e8e4d8; overflow-x:hidden;
+  }
+  body::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:50; opacity:.35;
+    background-image: radial-gradient(rgba(0,0,0,.5) 1px, transparent 1.4px);
+    background-size: 5px 5px;
+  }
+  .studio { display:grid; grid-template-columns:1fr 320px; min-height:100vh; }
+  @media (max-width:860px) { .studio { grid-template-columns:1fr; } }
+
+  /* ---------- press area ---------- */
+  .press {
+    display:flex; align-items:center; justify-content:center; padding:40px 24px;
+    background:
+      radial-gradient(ellipse at 50% 30%, rgba(255,250,235,.06), transparent 60%),
+      repeating-linear-gradient(0deg, #2b2823 0 26px, #26241f 26px 28px);
+    position:relative;
+  }
+  /* the poster */
+  .poster {
+    width:min(480px, 92vw); aspect-ratio:1/1.36; position:relative;
+    background:#f5f2e9;
+    box-shadow:0 30px 70px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.06);
+    overflow:hidden; transform:rotate(-0.4deg);
+  }
+  .poster .stock {
+    position:absolute; inset:0; opacity:.5; pointer-events:none;
+    background-image:
+      radial-gradient(rgba(160,150,130,.12) 1px, transparent 1.4px),
+      radial-gradient(rgba(160,150,130,.09) 1px, transparent 1.4px);
+    background-size:4px 4px, 7px 7px;
+  }
+  .layer { position:absolute; inset:0; mix-blend-mode:multiply; transition:transform .5s cubic-bezier(.2,.9,.3,1); }
+  .layer.l2 { mix-blend-mode:multiply; }
+  .layer svg { width:100%; height:100%; }
+  .grain {
+    position:absolute; inset:0; pointer-events:none; mix-blend-mode:multiply; opacity:var(--grain,0.5);
+  }
+  .printing-bar {
+    position:absolute; left:0; right:0; top:0; height:26%; z-index:9; display:none;
+    background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(38,36,31,.16) 100%), rgba(245,242,233,.55);
+    border-bottom:3px solid rgba(38,36,31,.5);
+    backdrop-filter:blur(1px);
+  }
+  .poster.printing .printing-bar { display:block; animation:roll 1.6s linear; }
+  @keyframes roll { from { top:-30%; } to { top:105%; } }
+  .poster.shake { animation:pshake .18s linear infinite; }
+  @keyframes pshake { 0%{transform:rotate(-0.4deg) translate(0,0)} 50%{transform:rotate(-0.35deg) translate(0.7px,-0.5px)} 100%{transform:rotate(-0.45deg) translate(-0.6px,0.4px)} }
+
+  /* ---------- controls ---------- */
+  aside {
+    background:#1d1b17; border-left:1px solid #32302a;
+    padding:26px 22px; overflow-y:auto; display:flex; flex-direction:column; gap:20px;
+  }
+  h1 { font-size:17px; letter-spacing:.3em; text-transform:uppercase; font-weight:800; }
+  h1 small { display:block; font-size:9px; color:#9a9484; letter-spacing:.2em; margin-top:4px; font-weight:400; }
+  .grp label { display:flex; justify-content:space-between; font-size:9px; letter-spacing:.22em; text-transform:uppercase; color:#9a9484; margin-bottom:8px; }
+  .grp label output { color:#e8e4d8; }
+  input[type=text] {
+    width:100%; background:#141310; border:1px solid #32302a; color:#f5f2e9;
+    font:inherit; font-size:17px; padding:10px 14px; border-radius:8px; outline:none; letter-spacing:.04em;
+  }
+  input[type=text]:focus { border-color:#8f8a76; }
+  .inks { display:flex; gap:8px; }
+  .inks button {
+    flex:1; height:34px; border:none; cursor:pointer; border-radius:6px;
+    border:2px solid transparent; transition:all .15s; position:relative;
+  }
+  .inks button.on { border-color:#f5f2e9; transform:translateY(-2px); }
+  .inks button span { position:absolute; bottom:-18px; left:50%; transform:translateX(-50%); font-size:7.5px; letter-spacing:.1em; color:#9a9484; white-space:nowrap; }
+  .shapes { display:flex; gap:8px; flex-wrap:wrap; }
+  .shapes button {
+    flex:1; min-width:56px; background:#26241f; color:#cfc9b8; border:1px solid #3a372f; border-radius:8px;
+    font:inherit; font-size:10px; letter-spacing:.12em; text-transform:uppercase; padding:9px 4px; cursor:pointer; transition:all .15s;
+  }
+  .shapes button.on { background:#f5f2e9; color:#1d1b17; border-color:#f5f2e9; }
+  .shapes button:hover { border-color:#8f8a76; }
+  input[type=range] {
+    -webkit-appearance:none; appearance:none; width:100%; height:3px; background:#3a372f; border-radius:99px; outline:none; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:15px; height:15px; border-radius:50%; background:#f5f2e9; border:3px solid #1d1b17; cursor:grab; }
+  input[type=range]::-moz-range-thumb { width:9px; height:9px; border-radius:50%; background:#f5f2e9; border:3px solid #1d1b17; }
+  .btnrow { display:flex; gap:10px; flex-wrap:wrap; }
+  .btn {
+    flex:1; min-width:100px; background:#f5f2e9; color:#1d1b17; border:none; border-radius:9px;
+    font:inherit; font-size:11px; font-weight:700; letter-spacing:.16em; text-transform:uppercase;
+    padding:12px 10px; cursor:pointer; transition:all .15s;
+  }
+  .btn:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,.4); }
+  .btn.ghost { background:transparent; color:#e8e4d8; border:1px solid #4a473d; }
+  .btn.ghost:hover { border-color:#8f8a76; }
+  .note { font-size:10px; line-height:1.7; color:#8a8474; letter-spacing:.05em; }
+  .note b { color:#cfc9b8; }
+  .meta { font-size:9px; letter-spacing:.2em; color:#6a6558; text-transform:uppercase; margin-top:auto; padding-top:14px; border-top:1px solid #32302a; }
+  .toast {
+    position:fixed; top:20px; left:50%; transform:translate(-50%,-80px); z-index:70;
+    background:#f5f2e9; color:#1d1b17; border-radius:999px; padding:10px 20px;
+    font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+    transition:transform .35s cubic-bezier(.2,1.4,.4,1);
+  }
+  .toast.show { transform:translate(-50%,0); }
+  @media (prefers-reduced-motion: reduce) {
+    .poster.printing .printing-bar { animation:none; display:none; }
+    .poster.shake { animation:none; }
+    .layer { transition:none; }
+  }
+</style>
+</head>
+<body>
+<div class="studio">
+  <div class="press">
+    <div class="poster" id="poster">
+      <div class="layer l1" id="layer1"></div>
+      <div class="layer l2" id="layer2"></div>
+      <div class="stock"></div>
+      <div class="grain" id="grain"></div>
+      <div class="printing-bar"></div>
+    </div>
+  </div>
+
+  <aside>
+    <h1>Riso Press<small>two-color · misregistration studio</small></h1>
+
+    <div class="grp">
+      <label>headline</label>
+      <input type="text" id="headline" maxlength="18" value="SLOW NEWS" autocomplete="off" spellcheck="false">
+    </div>
+
+    <div class="grp">
+      <label>Ink 1 <output id="ink1name">fluoro pink</output></label>
+      <div class="inks" id="inks1">
+        <button data-c="#ff48b0" data-n="fluoro pink" class="on" style="background:#ff48b0"></button>
+        <button data-c="#ff6c2f" data-n="orange" style="background:#ff6c2f"></button>
+        <button data-c="#0078bf" data-n="blue" style="background:#0078bf"></button>
+        <button data-c="#ffe800" data-n="yellow" style="background:#ffe800"></button>
+      </div>
+    </div>
+    <div class="grp" style="margin-top:14px">
+      <label>Ink 2 <output id="ink2name">medium blue</output></label>
+      <div class="inks" id="inks2">
+        <button data-c="#3255a4" data-n="medium blue" class="on" style="background:#3255a4"></button>
+        <button data-c="#00a95c" data-n="green" style="background:#00a95c"></button>
+        <button data-c="#ff6c2f" data-n="orange" style="background:#ff6c2f"></button>
+        <button data-c="#765ba7" data-n="violet" style="background:#765ba7"></button>
+      </div>
+    </div>
+
+    <div class="grp" style="margin-top:14px">
+      <label>mark</label>
+      <div class="shapes" id="shapes">
+        <button data-s="sun" class="on">sun</button>
+        <button data-s="wave">wave</button>
+        <button data-s="arch">arch</button>
+        <button data-s="eye">eye</button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <label>misregistration <output id="misregOut">6</output></label>
+      <input type="range" id="misreg" min="0" max="20" value="6">
+    </div>
+    <div class="grp">
+      <label>grain <output id="grainOut">50%</output></label>
+      <input type="range" id="grainR" min="0" max="100" value="50">
+    </div>
+
+    <div class="btnrow">
+      <button class="btn" id="rollPrint">roll print</button>
+      <button class="btn ghost" id="exportPng">export png</button>
+    </div>
+
+    <p class="note">
+      <b>Drum print, two passes.</b> Ink layers multiply like real riso —
+      orange over blue makes a muddy plum, yellow over pink makes fire.
+      Drag <b>misregistration</b> to let the second pass drift off its mark,
+      exactly like the machine does on a Friday afternoon.
+    </p>
+
+    <div class="meta" id="meta">edition 1/1 · a3 · 300gsm bunboro · soy ink</div>
+  </aside>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const NS = "http://www.w3.org/2000/svg";
+  const poster = $("poster");
+  const st = { head:"SLOW NEWS", c1:"#ff48b0", c2:"#3255a4", s1:"fluoro pink", s2:"medium blue", shape:"sun", misreg:6, grain:50 };
+
+  /* ---------- shape library (SVG paths, hand-authored) ---------- */
+  function shapeSVG(shape, color) {
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 480 650");
+    svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
+    const mk = (d, fill, extra) => {
+      const p = document.createElementNS(NS, "path");
+      p.setAttribute("d", d); p.setAttribute("fill", fill);
+      if (extra) Object.entries(extra).forEach(([k, v]) => p.setAttribute(k, v));
+      svg.appendChild(p); return p;
+    };
+    if (shape === "sun") {
+      mk("M240 210 m-110 0 a110 110 0 1 0 220 0 a110 110 0 1 0 -220 0", color);
+      for (let i = 0; i < 12; i++) {
+        const a = (Math.PI * 2 * i) / 12;
+        const x1 = 240 + Math.cos(a) * 128, y1 = 210 + Math.sin(a) * 128;
+        const x2 = 240 + Math.cos(a) * 168, y2 = 210 + Math.sin(a) * 168;
+        const ln = document.createElementNS(NS, "line");
+        ln.setAttribute("x1", x1); ln.setAttribute("y1", y1);
+        ln.setAttribute("x2", x2); ln.setAttribute("y2", y2);
+        ln.setAttribute("stroke", color); ln.setAttribute("stroke-width", "14");
+        ln.setAttribute("stroke-linecap", "round");
+        svg.appendChild(ln);
+      }
+    } else if (shape === "wave") {
+      mk("M0 300 C 120 240, 200 380, 320 310 C 400 262, 460 320, 480 300 L480 650 L0 650 Z", color);
+      mk("M0 380 C 120 320, 200 460, 320 390 C 400 342, 460 400, 480 380 L480 650 L0 650 Z", color, { opacity: "0.6" });
+      mk("M0 460 C 120 400, 200 540, 320 470 C 400 422, 460 480, 480 460 L480 650 L0 650 Z", color, { opacity: "0.3" });
+    } else if (shape === "arch") {
+      mk("M60 650 L60 330 A180 180 0 0 1 420 330 L420 650 Z", color);
+      mk("M150 650 L150 340 A90 90 0 0 1 330 340 L330 650 Z", "#f5f2e9");
+      mk("M205 650 L205 345 A35 35 0 0 1 275 345 L275 650 Z", color, { opacity: "0.85" });
+    } else if (shape === "eye") {
+      mk("M40 330 Q240 170 440 330 Q240 490 40 330 Z", color);
+      mk("M170 330 a70 70 0 1 0 140 0 a70 70 0 1 0 -140 0", "#f5f2e9");
+      mk("M215 330 a25 25 0 1 0 50 0 a25 25 0 1 0 -50 0", color);
+    }
+    return svg;
+  }
+
+  /* ---------- text layer ---------- */
+  function textSVG(head, color, scaleY) {
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 480 650");
+    svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
+    /* wrap text manually into lines of ~9 chars */
+    const words = head.toUpperCase().split(" ");
+    const lines = []; let cur = "";
+    words.forEach(w => {
+      if ((cur + " " + w).trim().length > 9) { lines.push(cur.trim()); cur = w; }
+      else cur += " " + w;
+    });
+    if (cur.trim()) lines.push(cur.trim());
+    const fs = 92;
+    lines.forEach((ln, i) => {
+      const t = document.createElementNS(NS, "text");
+      t.setAttribute("x", "240");
+      t.setAttribute("y", String(120 + i * (fs + 6)));
+      t.setAttribute("text-anchor", "middle");
+      t.setAttribute("font-family", "Arial Black, Arial, sans-serif");
+      t.setAttribute("font-weight", "900");
+      t.setAttribute("font-size", String(fs));
+      t.setAttribute("fill", color);
+      t.textContent = ln;
+      svg.appendChild(t);
+    });
+    /* date line */
+    const d = document.createElementNS(NS, "text");
+    d.setAttribute("x", "240"); d.setAttribute("y", "610");
+    d.setAttribute("text-anchor", "middle");
+    d.setAttribute("font-family", "Arial, sans-serif");
+    d.setAttribute("font-size", "20");
+    d.setAttribute("letter-spacing", "6");
+    d.setAttribute("fill", color);
+    d.textContent = "— RISO PRESS · NO. 048 —";
+    svg.appendChild(d);
+    return svg;
+  }
+
+  /* ---------- grain (generated noise) ---------- */
+  function makeGrain() {
+    const c = document.createElement("canvas");
+    c.width = 240; c.height = 326;
+    const x = c.getContext("2d");
+    const img = x.createImageData(240, 326);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const v = Math.random() < 0.5 ? 255 : 200;
+      const alpha = Math.random() * 90;
+      img.data[i] = v; img.data[i + 1] = v; img.data[i + 2] = v;
+      img.data[i + 3] = alpha;
+    }
+    x.putImageData(img, 0, 0);
+    $("grain").style.background = "url(" + c.toDataURL() + ")";
+    $("grain").style.backgroundSize = "240px 326px";
+  }
+
+  /* ---------- compose ---------- */
+  function render() {
+    const l1 = $("layer1"), l2 = $("layer2");
+    l1.innerHTML = ""; l2.innerHTML = "";
+    /* pass 1: shape in ink1 */
+    l1.appendChild(shapeSVG(st.shape, st.c1));
+    /* pass 2: text in ink2 (misregistered) */
+    l2.appendChild(textSVG(st.head, st.c2));
+    const m = st.misreg;
+    l2.style.transform = "translate(" + (m * 0.7) + "px," + (m * 0.5) + "px) rotate(" + (m * 0.08) + "deg)";
+    l1.style.transform = "translate(" + (-m * 0.3) + "px," + (-m * 0.2) + "px)";
+    $("grain").style.opacity = (st.grain / 100) * 0.85;
+    $("meta").textContent = "edition 1/1 · a3 · " + st.s1 + " / " + st.s2 + " · misreg " + st.misreg + "px";
+  }
+
+  /* ---------- controls ---------- */
+  $("headline").addEventListener("input", (e) => { st.head = e.target.value || "…"; render(); });
+  function inkRow(id, cKey, nKey, outId) {
+    $(id).querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      $(id).querySelectorAll("button").forEach(x => x.classList.remove("on"));
+      b.classList.add("on");
+      st[cKey] = b.dataset.c; st[nKey] = b.dataset.n;
+      $(outId).textContent = b.dataset.n;
+      render();
+    }));
+  }
+  inkRow("inks1", "c1", "s1", "ink1name");
+  inkRow("inks2", "c2", "s2", "ink2name");
+  $("shapes").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    $("shapes").querySelectorAll("button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on"); st.shape = b.dataset.s; render();
+  }));
+  $("misreg").addEventListener("input", (e) => {
+    st.misreg = parseInt(e.target.value, 10);
+    $("misregOut").textContent = st.misreg; render();
+  });
+  $("grainR").addEventListener("input", (e) => {
+    st.grain = parseInt(e.target.value, 10);
+    $("grainOut").textContent = st.grain + "%"; render();
+  });
+
+  /* ---------- roll print ---------- */
+  let audio = null;
+  function ensureAudio() {
+    if (!audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; } }
+    if (audio && audio.state === "suspended") audio.resume().catch(() => {});
+    return audio;
+  }
+  $("rollPrint").addEventListener("click", () => {
+    poster.classList.add("printing", "shake");
+    const c = ensureAudio();
+    if (c) {
+      try {
+        /* roller rumble */
+        const dur = 1.7;
+        const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate);
+        const dta = buf.getChannelData(0);
+        for (let i = 0; i < dta.length; i++) dta[i] = (Math.random() * 2 - 1) * (1 - i / dta.length);
+        const src = c.createBufferSource(); src.buffer = buf;
+        const f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 260;
+        const gn = c.createGain(); gn.gain.value = 0.06;
+        src.connect(f); f.connect(gn); gn.connect(c.destination);
+        src.start();
+      } catch (e) {}
+    }
+    setTimeout(() => {
+      poster.classList.remove("printing", "shake");
+      toastMsg("print complete · 2 passes · slight drift");
+    }, 1700);
+  });
+
+  /* ---------- export ---------- */
+  $("exportPng").addEventListener("click", () => {
+    try {
+      const a = document.createElement("a");
+      a.download = "riso-poster-" + Date.now() + ".png";
+      /* serialize the poster's SVGs into one canvas */
+      const c = document.createElement("canvas");
+      c.width = 480; c.height = 650;
+      const x = c.getContext("2d");
+      x.fillStyle = "#f5f2e9"; x.fillRect(0, 0, 480, 650);
+      Promise.resolve().then(async () => {
+        for (const id of ["layer1", "layer2"]) {
+          const svg = $(id).querySelector("svg");
+          const ser = new XMLSerializer().serializeToString(svg);
+          const img = new Image();
+          await new Promise(res => {
+            img.onload = res; img.onerror = res;
+            img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(ser);
+          });
+          x.globalCompositeOperation = "multiply";
+          const off = id === "layer2" ? st.misreg : 0;
+          x.drawImage(img, off * 0.7, off * 0.5);
+        }
+        a.href = c.toDataURL("image/png");
+        a.click();
+        toastMsg("poster exported ↓");
+      });
+    } catch (e) { toastMsg("export blocked by browser"); }
+  });
+
+  /* ---------- toast ---------- */
+  let toastTimer = null;
+  function toastMsg(m) {
+    const t = $("toast");
+    t.textContent = m; t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 1900);
+  }
+
+  makeGrain(); render();
+})();
+</script>
+</body>
+</html>

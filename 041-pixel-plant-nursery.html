@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPROUT STREET — pixel plant nursery</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family:"Courier New", Courier, monospace;
+    background:#2a1f30; color:#e8d8f0;
+    display:flex; align-items:center; justify-content:center; padding:14px;
+    image-rendering:pixelated; user-select:none; -webkit-user-select:none;
+  }
+  .game { display:flex; gap:22px; align-items:stretch; flex-wrap:wrap; justify-content:center; }
+  /* shelf */
+  .shelfbox {
+    background:#3a2a40; border:4px solid #1c1420; border-radius:8px;
+    padding:16px; display:flex; flex-direction:column; gap:12px;
+    box-shadow:0 14px 40px rgba(0,0,0,.5);
+  }
+  .topbar { display:flex; justify-content:space-between; font-size:11px; }
+  .topbar b { color:#ffe08a; }
+  .pots { display:flex; gap:14px; }
+  .pot { text-align:center; cursor:pointer; }
+  .pot canvas { display:block; background:#1c1420; border:3px solid #4a3a50; border-radius:4px; }
+  .pot:hover canvas { border-color:#8a6a90; }
+  .pot .nm { font-size:9px; margin-top:5px; color:#b8a0c0; letter-spacing:.06em; }
+  .msg { font-size:10px; color:#9a86a4; min-height:26px; line-height:1.6; }
+  /* shop */
+  .shop { display:flex; flex-direction:column; gap:10px; min-width:190px; }
+  .shop h3 { font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:#b8a0c0; }
+  .shop button {
+    text-align:left; font:inherit; font-size:11px; background:#4a3a50; color:#e8d8f0;
+    border:2px solid #6a5a70; border-radius:6px; padding:9px 12px; cursor:pointer; transition:all .12s;
+  }
+  .shop button:hover:not(:disabled) { background:#5f4b66; border-color:#9a7aa0; }
+  .shop button:disabled { opacity:.4; cursor:not-allowed; }
+  .cat { text-align:center; font-size:16px; margin:4px 0; }
+  @media (max-width:640px) { .game { flex-direction:column; align-items:center; } }
+</style>
+</head>
+<body>
+  <div class="game">
+    <div class="shelfbox">
+      <div class="topbar">
+        <span>day <b id="dayV">1</b></span>
+        <span>coins <b id="coinV">20</b></span>
+      </div>
+      <div class="pots" id="pots"></div>
+      <div class="msg" id="msg">welcome to sprout street. water your seedlings — they grow on their own time.</div>
+    </div>
+
+    <div class="shop">
+      <div class="cat" aria-hidden="true">(=^･ω･^=)</div>
+      <h3>shopkeeper cat</h3>
+      <button id="seedBtn">buy seed · 10¢</button>
+      <button id="waterBtn">water all</button>
+      <button id="sellBtn">sell bloom · +15¢</button>
+      <h3>sleep</h3>
+      <button id="nightBtn">next morning →</button>
+      <div class="msg" id="catMsg">"mrow. the ferns like thursdays."</div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById($id(id));
+  function $id(id) { return id; }
+  const POT_N = 5;
+  const SIZE = 84, SCALE = 2;
+  let coins = 20, day = 1;
+  let pots = [];
+
+  const SPECIES = [
+    { name: "daisy", petal: "#ffe08a", core: "#c9884a", leaf: "#5aa04a" },
+    { name: "bell", petal: "#8ab4ff", core: "#4a6ac9", leaf: "#4a8a5a" },
+    { name: "ember", petal: "#ff8a5a", core: "#c94a2e", leaf: "#6a9a4a" },
+    { name: "moon", petal: "#e8d8ff", core: "#8a6ac9", leaf: "#5a8a6a" },
+  ];
+
+  function makePot(i) {
+    return {
+      i,
+      planted: false,
+      stage: 0,          /* 0 seed 1 sprout 2 bud 3 bloom 4 wilt */
+      water: 2,
+      species: null,
+      growT: 0,
+    };
+  }
+  for (let i = 0; i < POT_N; i++) pots.push(makePot(i));
+
+  /* build canvases */
+  const potEls = [];
+  const potsBox = $("pots");
+  pots.forEach(p => {
+    const d = document.createElement("div");
+    d.className = "pot";
+    const c = document.createElement("canvas");
+    c.width = SIZE; c.height = SIZE;
+    c.style.width = SIZE * SCALE + "px";
+    c.style.height = SIZE * SCALE + "px";
+    d.appendChild(c);
+    const nm = document.createElement("div");
+    nm.className = "nm";
+    d.appendChild(nm);
+    d.addEventListener("click", () => tapPot(p));
+    potsBox.appendChild(d);
+    potEls.push({ el: d, cv: c, nm });
+  });
+
+  function tapPot(p) {
+    if (!p.planted) {
+      say("this pot is empty. buy a seed from the cat.");
+      return;
+    }
+    if (p.stage === 4) {
+      /* clear wilted */
+      p.planted = false; p.stage = 0;
+      say("cleared the wilted one. rest well, little plant.");
+      return;
+    }
+    p.water = Math.min(6, p.water + 2);
+    say("*plip* watered the " + (p.species ? p.species.name : "seed") + ".");
+    meow(700);
+  }
+
+  /* ---------- pixel painting ---------- */
+  function drawPot(p, idx) {
+    const g = potEls[idx].cv.getContext("2d");
+    g.clearRect(0, 0, SIZE, SIZE);
+    /* dirt */
+    g.fillStyle = "#5a3a2a";
+    g.fillRect(8, SIZE - 22, SIZE - 16, 16);
+    g.fillStyle = p.water > 1 ? "#42301f" : "#6a503a";
+    g.fillRect(8, SIZE - 22, SIZE - 16, 5);
+    /* terracotta pot */
+    g.fillStyle = "#c96a3a";
+    g.fillRect(12, SIZE - 12, SIZE - 24, 10);
+    g.fillStyle = "#a84e28";
+    g.fillRect(10, SIZE - 14, SIZE - 20, 4);
+
+    if (!p.planted) {
+      potEls[idx].nm.textContent = "empty";
+      return;
+    }
+    const sp = p.species;
+    const cx = SIZE / 2;
+    if (p.stage === 0) {
+      /* seed */
+      g.fillStyle = "#8a6a3a";
+      g.fillRect(cx - 2, SIZE - 28, 5, 4);
+      potEls[idx].nm.textContent = "seed";
+    } else if (p.stage === 1) {
+      /* sprout */
+      g.fillStyle = sp.leaf;
+      g.fillRect(cx - 1, SIZE - 40, 3, 20);
+      g.fillRect(cx - 6, SIZE - 40, 5, 3);
+      g.fillRect(cx + 2, SIZE - 36, 5, 3);
+      potEls[idx].nm.textContent = "sprout";
+    } else if (p.stage === 2) {
+      /* lumpy bud */
+      g.fillStyle = sp.leaf;
+      g.fillRect(cx - 1, SIZE - 48, 3, 28);
+      g.fillRect(cx - 8, SIZE - 44, 6, 3);
+      g.fillRect(cx + 3, SIZE - 40, 6, 3);
+      g.fillStyle = sp.petal;
+      g.fillRect(cx - 4, SIZE - 56, 9, 9);
+      potEls[idx].nm.textContent = "bud";
+    } else if (p.stage === 3) {
+      /* bloom */
+      g.fillStyle = sp.leaf;
+      g.fillRect(cx - 1, SIZE - 52, 3, 32);
+      g.fillRect(cx - 10, SIZE - 48, 7, 3);
+      g.fillRect(cx + 4, SIZE - 42, 7, 3);
+      /* petals: plus shape */
+      g.fillStyle = sp.petal;
+      g.fillRect(cx - 4, SIZE - 68, 9, 9);
+      g.fillRect(cx - 10, SIZE - 62, 21, 9);
+      g.fillRect(cx - 4, SIZE - 56, 9, 9);
+      g.fillStyle = sp.core;
+      g.fillRect(cx - 2, SIZE - 60, 5, 5);
+      /* sparkle */
+      g.fillStyle = "#fff";
+      g.fillRect(cx + 5, SIZE - 66, 2, 2);
+      potEls[idx].nm.textContent = sp.name + " ✿";
+    } else {
+      /* wilted */
+      g.fillStyle = "#6a5a4a";
+      g.fillRect(cx - 1, SIZE - 40, 3, 20);
+      g.fillRect(cx - 7, SIZE - 34, 6, 3);
+      g.fillRect(cx + 3, SIZE - 40, 6, 3);
+      g.fillStyle = "#8a7a6a";
+      g.fillRect(cx - 4, SIZE - 48, 9, 7);
+      potEls[idx].nm.textContent = "wilted ✝";
+    }
+  }
+
+  /* ---------- game clock ---------- */
+  function tick() {
+    pots.forEach(p => {
+      if (!p.planted) return;
+      /* thirst */
+      if (Math.random() < 0.3) p.water = Math.max(0, p.water - 1);
+      /* growth with water */
+      if (p.water > 0 && p.stage < 3) {
+        p.growT += p.water * 0.4;
+        if (p.growT > 12) { p.growT = 0; p.stage++; if (p.stage === 3) say("a " + p.species.name + " bloomed! the cat approves."); }
+      } else if (p.water === 0 && p.stage < 4 && Math.random() < 0.2) {
+        p.stage = 4;
+        say("oh no — the " + p.species.name + " wilted. click it to clear.");
+      }
+    });
+    render();
+  }
+  function render() {
+    $("dayV").textContent = day;
+    $("coinV").textContent = coins;
+    pots.forEach((p, i) => drawPot(p, i));
+  }
+  render();
+  setInterval(() => { if (!document.hidden) tick(); }, 3200);
+
+  /* ---------- shop ---------- */
+  $("seedBtn").addEventListener("click", () => {
+    if (coins < 10) { say("not enough coins — sell a bloom first."); return; }
+    const empty = pots.find(p => !p.planted);
+    if (!empty) { say("no empty pots. sell or clear one."); return; }
+    coins -= 10;
+    empty.planted = true;
+    empty.stage = 0;
+    empty.water = 3;
+    empty.species = SPECIES[Math.floor(Math.random() * SPECIES.length)];
+    empty.growT = 0;
+    say("planted a " + empty.species.name + " seed.");
+    meow(880);
+    render();
+  });
+  $("waterBtn").addEventListener("click", () => {
+    pots.forEach(p => { if (p.planted && p.stage < 4) p.water = Math.min(6, p.water + 3); });
+    say("*plip plip* everyone gets a drink.");
+    meow(600);
+    render();
+  });
+  $("sellBtn").addEventListener("click", () => {
+    const bloom = pots.find(p => p.stage === 3);
+    if (!bloom) { say("no blooms to sell yet. patience, grower."); return; }
+    coins += 15;
+    bloom.planted = false; bloom.stage = 0;
+    say("sold a " + bloom.species.name + " for 15¢. cha-ching!");
+    chaching();
+    render();
+  });
+  $("nightBtn").addEventListener("click", () => {
+    day++;
+    /* night: plants grow a bit, cat moves */
+    pots.forEach(p => {
+      if (p.planted && p.stage < 3 && p.water > 0) { p.growT += 4; if (p.growT > 12) { p.growT = 0; p.stage++; } }
+    });
+    const catLines = [
+      "mrow. the ferns like thursdays.",
+      "*pads along the shelf*",
+      "the moon variety sells best. just saying.",
+      "*blinks slowly at pot №3*",
+      "water them before noon. this is wisdom.",
+      "did you know: buds dream of being sold.",
+    ];
+    $("catMsg").textContent = "“" + catLines[Math.floor(Math.random() * catLines.length)] + "”";
+    render();
+  });
+
+  function say(m) { $("msg").textContent = m; }
+
+  /* ---------- tiny synth ---------- */
+  let AC = null;
+  function ac() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+    return AC;
+  }
+  function blip(f, dur, type, vol) {
+    const c = ac(); if (!c) return;
+    try {
+      const t0 = c.currentTime;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type || "square"; o.frequency.value = f;
+      g.gain.setValueAtTime(vol || 0.03, t0);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + (dur || 0.1));
+      o.connect(g); g.connect(c.destination);
+      o.start(t0); o.stop(t0 + (dur || 0.1) + 0.02);
+    } catch (e) {}
+  }
+  function meow(f) {
+    blip(f, 0.14, "sawtooth", 0.02);
+    setTimeout(() => blip(f * 0.8, 0.18, "sawtooth", 0.02), 120);
+  }
+  function chaching() {
+    blip(988, 0.07, "square", 0.03);
+    setTimeout(() => blip(1319, 0.16, "square", 0.03), 80);
+  }
+})();
+</script>
+</body>
+</html>

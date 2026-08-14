@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEON BONSAI — a living tree instrument</title>
+<style>
+:root{--ui:#9be8ff;--season:#4dd8ff}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:"Segoe UI",system-ui,sans-serif; background:#050608; color:#cfe9f5;
+  overflow:hidden; display:flex; flex-direction:column; user-select:none; -webkit-user-select:none;
+}
+canvas{display:block; width:100%; height:100%; touch-action:none; cursor:crosshair}
+header{
+  position:fixed; top:0; left:0; right:0; z-index:10; pointer-events:none;
+  padding:clamp(12px,2.2vh,22px) clamp(16px,3vw,36px);
+  display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+}
+header h1{font-size:clamp(14px,2vw,19px); font-weight:600; letter-spacing:.42em;
+  color:#fff; text-shadow:0 0 18px var(--season)}
+header p{font-size:clamp(9px,1.2vw,11.5px); letter-spacing:.26em; color:#7fa2b5}
+footer{
+  position:fixed; bottom:0; left:0; right:0; z-index:10;
+  display:flex; align-items:center; justify-content:center; gap:clamp(10px,2.4vw,26px);
+  padding:clamp(10px,2vh,18px) clamp(14px,3vw,36px);
+  flex-wrap:wrap; background:linear-gradient(180deg,transparent,#050608f0 40%);
+}
+button.chip, .lab{
+  font:inherit; font-size:clamp(10px,1.4vw,12px); letter-spacing:.22em;
+  color:#a8cbd9; background:#0d141bcc; border:1px solid #22455a; border-radius:999px;
+  padding:9px 16px; cursor:pointer; transition:all .25s; backdrop-filter:blur(4px);
+}
+button.chip:hover{color:#fff; border-color:var(--ui); box-shadow:0 0 14px #2aa8d855}
+button.chip.on{color:#04141c; background:var(--season); border-color:var(--season);
+  box-shadow:0 0 18px var(--season)}
+button.chip.grow{color:#ffe9a8; border-color:#8a6d2f}
+button.chip.grow:hover{box-shadow:0 0 14px #d8a83a55}
+.windbox{display:flex; align-items:center; gap:10px; font-size:10px; letter-spacing:.24em; color:#7fa2b5}
+input[type=range]{-webkit-appearance:none; appearance:none; width:clamp(96px,14vw,150px); height:20px; background:transparent; cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:3px; border-radius:2px; background:linear-gradient(90deg,#123,#2aa8d8)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; margin-top:-5.5px; background:#0a0e12; border:2px solid var(--ui); box-shadow:0 0 10px var(--ui)}
+input[type=range]::-moz-range-track{height:3px; border-radius:2px; background:linear-gradient(90deg,#123,#2aa8d8)}
+input[type=range]::-moz-range-thumb{width:11px; height:11px; border-radius:50%; background:#0a0e12; border:2px solid var(--ui)}
+.seasonchips{display:flex; gap:8px; align-items:center}
+.hint{
+  position:fixed; right:clamp(14px,3vw,34px); bottom:clamp(78px,13vh,110px); z-index:10;
+  font-size:10px; letter-spacing:.22em; color:#41616f; text-align:right; line-height:2; pointer-events:none;
+}
+@media (max-width:620px){ .hint{display:none} }
+@media (prefers-reduced-motion:reduce){ *{transition-duration:.01s !important} }
+</style>
+</head>
+<body>
+<header>
+  <h1>NEON BONSAI</h1>
+  <p>LIVING TREE INSTRUMENT · 盆栽</p>
+</header>
+<canvas id="cv" aria-label="Interactive neon bonsai tree"></canvas>
+<p class="hint">CLICK A BRANCH — PRUNE ✂<br>WATCH THE POOL REFLECT</p>
+<footer>
+  <button class="chip grow" id="growBtn">GROW</button>
+  <div class="windbox">
+    <span>WIND</span>
+    <input type="range" id="wind" min="0" max="100" value="24" aria-label="Wind strength">
+  </div>
+  <div class="seasonchips" id="seasons">
+    <button class="chip on" data-s="spring">SPRING</button>
+    <button class="chip" data-s="summer">SUMMER</button>
+    <button class="chip" data-s="autumn">AUTUMN</button>
+    <button class="chip" data-s="winter">WINTER</button>
+  </div>
+</footer>
+<script>
+"use strict";
+const cv=document.getElementById("cv"), ctx=cv.getContext("2d");
+const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+let W=0,H=0,DPR=1;
+function resize(){
+  DPR=Math.min(2,devicePixelRatio||1);
+  W=cv.clientWidth; H=cv.clientHeight;
+  cv.width=W*DPR; cv.height=H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+addEventListener("resize",resize); resize();
+
+/* ---------- seasons ---------- */
+const SEASONS={
+  spring:{leaf:"#ff9ec7", leaf2:"#ffd3e5", tip:"#7df0ff", trunkA:"#ff3d9a", trunkB:"#00e0ff", snow:false},
+  summer:{leaf:"#41ffc3", leaf2:"#a8ffe9", tip:"#6ff3ff", trunkA:"#d63dff", trunkB:"#19f0ff", snow:false},
+  autumn:{leaf:"#ffb03d", leaf2:"#ff5c3d", tip:"#ffd98a", trunkA:"#ff6a00", trunkB:"#ffc83d", snow:false},
+  winter:{leaf:"#bfd9e8", leaf2:"#eef7ff", tip:"#9fd8ff", trunkA:"#c04adf", trunkB:"#3dd6ff", snow:true},
+};
+let season="spring", S=SEASONS.spring;
+const root=document.documentElement;
+function setSeason(s){
+  season=s; S=SEASONS[s];
+  root.style.setProperty("--season",S.trunkB);
+  document.querySelectorAll("#seasons .chip").forEach(b=>b.classList.toggle("on",b.dataset.s===s));
+}
+document.getElementById("seasons").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  setSeason(b.dataset.s); regrow();
+});
+
+/* ---------- deterministic RNG ---------- */
+function RNG(seed){let s=seed>>>0; return()=>{s=(s*1664525+1013904223)>>>0; return s/4294967296}}
+
+/* ---------- tree model ---------- */
+let branches=[], leaves=[], fireflies=[], ripples=[];
+let growth=1, growthTarget=1;
+
+function buildTree(seed){
+  const rnd=RNG(seed);
+  branches=[]; leaves=[];
+  const baseX=W*0.5, baseY=H*0.82, unit=Math.min(W,H)*0.16;
+  function grow(x,y,ang,len,wid,depth){
+    const b={x1:x,y1:y,ang,len,wid,depth,wave:rnd()*Math.PI*2,
+      sway:0.5+rnd()*0.9, born:1-depth/9, pruned:false,
+      tx:0,ty:0,ex:0,ey:0};
+    branches.push(b);
+    const x2=x+Math.cos(ang)*len, y2=y+Math.sin(ang)*len;
+    b.ex=x2; b.ey=y2;
+    if(depth>=7||len<unit*0.16){
+      for(let i=0;i<5;i++){
+        leaves.push({x:x2+(rnd()-.5)*10, y:y2+(rnd()-.5)*10,
+          r:1.6+rnd()*2.6, ph:rnd()*Math.PI*2, sp:.6+rnd()*1.2, b});
+      }
+      return;
+    }
+    const n=depth<2?2:(rnd()<.75?2:3);
+    for(let i=0;i<n;i++){
+      const spread=.42+rnd()*.5;
+      const na=ang+(i-(n-1)/2)*spread+(rnd()-.5)*.22;
+      grow(x2,y2,na,len*(0.68+rnd()*.16),wid*0.68,depth+1);
+    }
+  }
+  grow(baseX,baseY,-Math.PI/2+0.03,unit,Math.min(W,H)*0.03,0);
+  // fireflies
+  fireflies=[];
+  for(let i=0;i<16;i++) fireflies.push({
+    cx:W*(.2+rnd()*.6), cy:H*(.3+rnd()*.4), r:18+rnd()*46,
+    a:rnd()*Math.PI*2, sp:.15+rnd()*.3, ph:rnd()*Math.PI*2});
+}
+
+function regrow(){
+  buildTree((Math.random()*1e9)|0);
+  growth=0; growthTarget=1;
+  chimeGrow();
+}
+
+/* ---------- wind ---------- */
+let windK=0.24;
+const windEl=document.getElementById("wind");
+windEl.addEventListener("input",()=>windK=windEl.value/100);
+function windAt(t,ph){ return windK*(Math.sin(t*.0011+ph)+.5*Math.sin(t*.0027+ph*1.7)+.25*Math.sin(t*.0064+ph*2.3))/1.75 }
+
+/* ---------- branch positions with sway ---------- */
+function branchPose(b,t){
+  const g=easeOutCubic(Math.max(0,Math.min(1,(growth-b.born)*1.6)));
+  if(g<=0){b.tx=b.x1;b.ty=b.y1;return g}
+  const sway=windAt(t,b.wave)*b.sway*(b.depth*.14+0.1)*Math.PI*0.5;
+  const a=b.ang+sway;
+  b.tx=b.x1; b.ty=b.y1;
+  b.ex=b.x1+Math.cos(a)*b.len*g;
+  b.ey=b.y1+Math.sin(a)*b.len*g;
+  return g;
+}
+function easeOutCubic(x){return 1-Math.pow(1-x,3)}
+
+/* ---------- draw helpers ---------- */
+function lerpC(c1,c2,k){
+  const p=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+  const a=p(c1),b=p(c2);
+  return `rgb(${a.map((v,i)=>Math.round(v+(b[i]-v)*k)).join(",")})`;
+}
+function drawBranch(b){
+  const k=Math.min(1,b.depth/7);
+  const col=lerpC(S.trunkA,S.trunkB,k);
+  ctx.strokeStyle=col;
+  ctx.lineWidth=Math.max(0.6,b.wid*(1-b.depth*.08));
+  ctx.lineCap="round";
+  ctx.shadowColor=col; ctx.shadowBlur=10*(1-k*.5);
+  ctx.beginPath(); ctx.moveTo(b.tx,b.ty); ctx.lineTo(b.ex,b.ey); ctx.stroke();
+  ctx.shadowBlur=0;
+}
+function drawLeaves(t){
+  for(const L of leaves){
+    if(L.dead) continue;
+    if(S.snow && Math.sin(L.ph)>-0.3) continue; /* winter: sparse, bare */
+    const g=Math.max(0,Math.min(1,(growth-0.55)*2.2));
+    if(g<=0) continue;
+    const x=L.x+(L.x-(L.b?L.b.ex:L.x))*0+ (L.b? L.ex_||0:0);
+    const bx=L.b?L.b.ex:L.x, by=L.b?L.b.ey:L.y;
+    const wob=Math.sin(t*.002*L.sp+L.ph)*2.4;
+    const r=L.r*(0.8+0.4*Math.sin(t*.0015*L.sp+L.ph))*g;
+    ctx.fillStyle=lerpC(S.leaf,S.leaf2,(Math.sin(L.ph)+1)/2);
+    ctx.shadowColor=S.leaf; ctx.shadowBlur=8;
+    ctx.beginPath(); ctx.arc(bx+wob,by+wob*.6,r,0,7); ctx.fill();
+  }
+  ctx.shadowBlur=0;
+}
+/* ---------- render ---------- */
+const poolY=()=>H*0.86;
+let snips=[];
+function frame(now){
+  const t=now;
+  // growth easing
+  growth+=(growthTarget-growth)*.03;
+  ctx.clearRect(0,0,W,H);
+  // night sky glow
+  let g=ctx.createRadialGradient(W/2,H*.34,10,W/2,H*.34,Math.max(W,H)*.62);
+  g.addColorStop(0,"#0a1420"); g.addColorStop(1,"#050608");
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // branches (parents first = lower depth)
+  for(const b of branches) branchPose(b,t);
+  for(const b of branches) if(!b.pruned) drawBranch(b);
+  drawLeaves(t);
+  drawFireflies(t);
+  if(S.snow) drawSnow(t);
+  drawSnips(t);
+  // pool
+  drawPool(t);
+  requestAnimationFrame(frame);
+}
+function drawFireflies(t){
+  for(const f of fireflies){
+    f.a+=f.sp*.008;
+    const x=f.cx+Math.cos(f.a)*f.r, y=f.cy+Math.sin(f.a*1.3)*f.r*.5;
+    const tw=.5+.5*Math.sin(t*.003+f.ph);
+    ctx.fillStyle=`rgba(255,220,120,${.35+.55*tw})`;
+    ctx.shadowColor="#ffd76b"; ctx.shadowBlur=14;
+    ctx.beginPath(); ctx.arc(x,y,1.4+tw*1.2,0,7); ctx.fill();
+  }
+  ctx.shadowBlur=0;
+}
+let flakes=[];
+function drawSnow(t){
+  if(!flakes.length) for(let i=0;i<70;i++) flakes.push({x:Math.random(),y:Math.random(),v:.15+Math.random()*.4,ph:Math.random()*7,r:.7+Math.random()*1.6});
+  ctx.fillStyle="#eaf6ff";
+  for(const f of flakes){
+    f.y+=f.v*.004; if(f.y>1) f.y=0;
+    const x=f.x*W+Math.sin(t*.001+f.ph)*14;
+    ctx.globalAlpha=.5;
+    ctx.beginPath(); ctx.arc(x,f.y*H,f.r,0,7); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+function drawSnips(t){
+  snips=snips.filter(s=>t-s.t0<600);
+  for(const s of snips){
+    const p=(t-s.t0)/600;
+    ctx.strokeStyle=`rgba(255,255,255,${1-p})`;
+    ctx.lineWidth=1.4;
+    ctx.beginPath();
+    ctx.arc(s.x,s.y,6+p*22,0,7); ctx.stroke();
+  }
+}
+/* ---------- pool reflection with ripple distortion ---------- */
+function drawPool(t){
+  const py=poolY();
+  ctx.save();
+  // water base
+  let g=ctx.createLinearGradient(0,py,0,H);
+  g.addColorStop(0,"#0a1a26"); g.addColorStop(1,"#04070c");
+  ctx.fillStyle=g; ctx.fillRect(0,py,W,H-py);
+  // reflected tree
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0,py,W,H-py); ctx.clip();
+  ctx.globalAlpha=.30;
+  ctx.translate(0,2*py); ctx.scale(1,-1);
+  const bands=26, bandH=(H-py)/bands;
+  for(let i=0;i<bands;i++){
+    const y=py+i*bandH;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0,y,W,bandH); ctx.clip();
+    const off=Math.sin(t*.0026+i*.9)* (2+i*.55) * (0.4+windK);
+    ctx.translate(off,0);
+    for(const b of branches) if(!b.pruned) drawBranch(b);
+    ctx.restore();
+  }
+  ctx.restore();
+  // surface line + shimmer
+  ctx.strokeStyle="rgba(120,220,255,.35)"; ctx.lineWidth=1;
+  ctx.beginPath();
+  for(let x=0;x<=W;x+=8){
+    const y=py+Math.sin(x*.02+t*.002)*1.4;
+    x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  // ripples
+  ripples=ripples.filter(r=>(t-r.t0)<1800);
+  for(const r of ripples){
+    const p=(t-r.t0)/1800;
+    ctx.strokeStyle=`rgba(140,230,255,${.4*(1-p)})`;
+    ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.ellipse(r.x,py,10+p*90,(10+p*90)*.22,0,0,7); ctx.stroke();
+  }
+  ctx.restore();
+}
+/* ---------- audio: gesture-gated growth chime ---------- */
+let AC=null;
+function chimeGrow(){
+  try{
+    if(!AC) return;
+    const t0=AC.currentTime;
+    const notes=[392,523.25,659.25,783.99];
+    notes.forEach((f,i)=>{
+      const o=AC.createOscillator(), gn=AC.createGain();
+      o.type="sine"; o.frequency.value=f;
+      gn.gain.setValueAtTime(0.0001,t0+i*.1);
+      gn.gain.exponentialRampToValueAtTime(0.05,t0+i*.1+.03);
+      gn.gain.exponentialRampToValueAtTime(0.0001,t0+i*.1+1.8);
+      o.connect(gn).connect(AC.destination);
+      o.start(t0+i*.1); o.stop(t0+i*.1+1.9);
+    });
+  }catch(e){}
+}
+addEventListener("pointerdown",e=>{
+  try{
+    if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==="suspended") AC.resume();
+  }catch(err){}
+},{once:false});
+/* ---------- prune ---------- */
+cv.addEventListener("pointerdown",e=>{
+  const r=cv.getBoundingClientRect();
+  const x=e.clientX-r.left, y=e.clientY-r.top;
+  if(y>poolY()) { ripples.push({x, t0:performance.now()}); return; }
+  let best=null, bd=1e9;
+  for(const b of branches){
+    if(b.pruned||b.depth<1) continue;
+    const d=distToSeg(x,y,b.tx,b.ty,b.ex,b.ey);
+    if(d<bd){bd=d;best=b}
+  }
+  if(best&&bd<26){
+    best.pruned=true;
+    for(const L of leaves) if(L.b===best) L.dead=true;
+    snips.push({x,y,t0:performance.now()});
+    regrowLater();
+  }
+});
+function regrowLater(){
+  // regrow a replacement shoot from a random parent after pruning
+  setTimeout(()=>{
+    const cands=branches.filter(b=>!b.pruned&&b.depth>=1&&b.depth<6);
+    if(!cands.length) return;
+    const p=cands[(Math.random()*cands.length)|0];
+    const rnd=RNG((Math.random()*1e9)|0);
+    const na=p.ang+(rnd()-.5)*1.2;
+    function add(x,y,ang,len,wid,depth){
+      if(depth>7) return;
+      const b={x1:x,y1:y,ang,len,wid,depth,wave:rnd()*7,sway:.5+rnd()*.9,
+        born:1,pruned:false,tx:x,ty:y,ex:x,ey:y};
+      b.born=(growth*0.9+0.1);
+      branches.push(b);
+      const x2=x+Math.cos(ang)*len, y2=y+Math.sin(ang)*len;
+      if(depth>=6){
+        for(let i=0;i<5;i++) leaves.push({x:x2,y:y2,r:1.6+rnd()*2.6,ph:rnd()*7,sp:.6+rnd(),b});
+      } else { add(x2,y2,ang+(rnd()-.5)*.5,len*.72,wid*.7,depth+1); add(x2,y2,ang+(rnd()-.5)*.5,len*.72,wid*.7,depth+1); }
+    }
+    add(p.ex,p.ey,na,Math.min(W,H)*.05,Math.max(1.4,p.wid*.6),p.depth+1);
+    chimeGrow();
+  },600);
+}
+function distToSeg(px,py,x1,y1,x2,y2){
+  const dx=x2-x1, dy=y2-y1;
+  const l2=dx*dx+dy*dy; if(l2===0) return Math.hypot(px-x1,py-y1);
+  let u=((px-x1)*dx+(py-y1)*dy)/l2; u=Math.max(0,Math.min(1,u));
+  return Math.hypot(px-(x1+u*dx), py-(y1+u*dy));
+}
+/* ---------- go ---------- */
+document.getElementById("growBtn").addEventListener("click",regrow);
+buildTree(20260814);
+growth=0;
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

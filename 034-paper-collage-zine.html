@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CUT &amp; PASTE — a paper-collage zine</title>
+<style>
+:root{
+  --cream:#f2e8d5; --paper:#faf3e3; --tomato:#e04a2a; --pool:#2e7fa4;
+  --ink:#1b1512; --tape:#d9c9a3; --shadow:rgba(27,21,18,.28);
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --marker:"Segoe UI Black","Arial Black",Impact,sans-serif;
+  --mono:ui-monospace,"Courier New",Courier,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  min-height:100vh;color:var(--ink);
+  font-family:var(--serif);overflow-x:hidden;
+  background-color:var(--cream);
+  background-image:
+    radial-gradient(rgba(27,21,18,.055) 1px,transparent 1.4px),
+    radial-gradient(rgba(46,127,164,.07) 1px,transparent 1.4px),
+    repeating-linear-gradient(0deg,transparent 0 27px,rgba(46,127,164,.16) 27px 28px),
+    repeating-linear-gradient(90deg,transparent 0 27px,rgba(46,127,164,.16) 27px 28px),
+    linear-gradient(180deg,#f6eedd 0%,#efe3c8 55%,#e9dcbc 100%);
+  background-size:9px 9px,13px 13px,auto,auto,auto;
+  background-attachment:fixed;
+}
+/* ---------- header / ransom title ---------- */
+header{position:relative;padding:clamp(28px,6vw,72px) clamp(14px,4vw,64px) 8px;text-align:center}
+.ransom{line-height:.86;user-select:none}
+.ransom span{display:inline-block;white-space:pre}
+.rs{font-family:var(--marker);font-weight:900;letter-spacing:-.02em}
+.rf{font-family:var(--serif);font-style:italic}
+.rm{font-family:var(--mono);font-weight:700}
+.c-tom{color:var(--tomato)} .c-pool{color:var(--pool)} .c-ink{color:var(--ink)}
+.rs.shadowed{text-shadow:3px 3px 0 var(--tomato),6px 6px 0 var(--paper)}
+.tagline{
+  font-family:var(--mono);font-size:clamp(11px,1.5vw,15px);letter-spacing:.28em;
+  text-transform:uppercase;margin-top:18px;color:#5d5244;
+}
+.tagline b{color:var(--tomato)}
+/* ---------- ISSUE 01 stamp ---------- */
+.stamp{
+  position:absolute;top:clamp(10px,3vw,30px);right:clamp(8px,4vw,48px);
+  font-family:var(--marker);font-weight:900;color:var(--tomato);
+  border:5px solid var(--tomato);border-radius:10px;
+  padding:.32em .5em;font-size:clamp(15px,2.4vw,26px);letter-spacing:.06em;
+  transform:rotate(8deg) scale(1);mix-blend-mode:multiply;
+  box-shadow:inset 0 0 0 2px rgba(224,74,42,.35);
+  opacity:.92;background:rgba(250,243,227,.4);
+}
+body.ready .stamp{animation:thunk .55s cubic-bezier(.22,1.9,.36,1) both}
+@keyframes thunk{
+  0%{transform:rotate(-24deg) scale(3.4);opacity:0}
+  55%{transform:rotate(10deg) scale(.94);opacity:.95}
+  75%{transform:rotate(6deg) scale(1.04)}
+  100%{transform:rotate(8deg) scale(1);opacity:.92}
+}
+body.thudded .board{animation:jolt .28s ease-out}
+@keyframes jolt{0%{transform:translateY(0)}30%{transform:translateY(3px)}100%{transform:translateY(0)}}
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:26px 0 6px}
+.btn{
+  font-family:var(--marker);font-weight:900;font-size:clamp(12px,1.6vw,16px);
+  letter-spacing:.05em;text-transform:uppercase;cursor:pointer;
+  border:3px solid var(--ink);background:var(--paper);color:var(--ink);
+  padding:.5em .95em;border-radius:4px;box-shadow:4px 4px 0 var(--ink);
+  transition:transform .12s ease,box-shadow .12s ease,background .12s;
+}
+.btn:hover{transform:translate(-1px,-2px);box-shadow:6px 7px 0 var(--ink)}
+.btn:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--ink)}
+.btn.on{background:var(--tomato);color:var(--paper);border-color:var(--ink)}
+.btn small{font-family:var(--mono);font-weight:400;font-size:.6em;letter-spacing:.2em}
+/* ---------- collage board ---------- */
+.board{
+  position:relative;max-width:1240px;margin:22px auto 40px;
+  padding:clamp(10px,3vw,36px);
+  display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(18px,3.5vw,44px);
+}
+.card{
+  --r:0deg;position:relative;background:var(--paper);
+  padding:26px 22px 22px;width:min(92vw,340px);
+  transform:rotate(var(--r));
+  box-shadow:3px 5px 14px var(--shadow),1px 2px 4px var(--shadow);
+  transition:transform .22s cubic-bezier(.3,1.4,.4,1),box-shadow .22s ease,opacity .5s;
+  scroll-margin-top:20px;
+}
+.card:nth-child(1){--r:-2.2deg}
+.card:nth-child(2){--r:1.6deg}
+.card:nth-child(3){--r:-1.2deg}
+.card:nth-child(4){--r:2.4deg}
+.card:nth-child(5){--r:-2.8deg}
+.card:hover{
+  transform:rotate(var(--r)) translateY(-10px) scale(1.025);
+  box-shadow:6px 10px 12px var(--shadow),18px 30px 34px rgba(27,21,18,.22),2px 3px 5px var(--shadow);
+  z-index:5;
+}
+.card.peek{opacity:0;transform:rotate(var(--r)) translateY(26px)}
+body.ready .card.peek{opacity:1;transform:rotate(var(--r))}
+/* torn edges — jagged clip paths */
+.t1{clip-path:polygon(0 6%,3% 0,9% 4%,15% 0,22% 5%,31% 1%,38% 6%,47% 0,55% 5%,63% 1%,71% 6%,79% 0,86% 5%,93% 1%,100% 6%,98% 14%,100% 24%,96% 34%,100% 45%,97% 56%,100% 66%,95% 76%,100% 87%,97% 94%,100% 100%,90% 97%,80% 100%,70% 96%,59% 100%,48% 96%,37% 100%,26% 97%,15% 100%,6% 97%,0 100%,2% 88%,0 77%,4% 66%,0 55%,3% 44%,0 33%,4% 22%,0 12%)}
+.t2{clip-path:polygon(1% 3%,7% 0,13% 5%,21% 0,29% 4%,36% 0,44% 5%,52% 0,60% 4%,68% 0,76% 5%,84% 0,92% 4%,100% 1%,99% 12%,100% 23%,98% 35%,100% 47%,98% 58%,100% 70%,98% 81%,100% 92%,98% 100%,88% 98%,77% 100%,66% 97%,54% 100%,43% 97%,31% 100%,20% 97%,9% 100%,0 98%,2% 86%,0 73%,3% 60%,0 47%,2% 34%,0 20%)}
+.t3{clip-path:polygon(0 4%,5% 0,12% 4%,19% 0,27% 5%,35% 1%,43% 5%,50% 0,58% 5%,66% 1%,74% 5%,82% 0,90% 5%,97% 1%,100% 7%,98% 18%,100% 30%,97% 41%,100% 53%,97% 64%,100% 76%,98% 88%,100% 96%,91% 100%,80% 97%,69% 100%,57% 96%,46% 100%,34% 96%,23% 100%,11% 97%,2% 100%,0 90%,3% 78%,0 64%,2% 50%,0 36%,3% 22%)}
+/* washi tape strips */
+.tape{
+  position:absolute;width:96px;height:27px;top:-13px;left:50%;cursor:pointer;
+  transform:translateX(-50%) rotate(var(--tr,-4deg));
+  background:
+    repeating-linear-gradient(45deg,rgba(255,255,255,.28) 0 6px,transparent 6px 12px),
+    linear-gradient(180deg,rgba(233,214,166,.9),rgba(214,192,138,.88));
+  box-shadow:0 2px 4px rgba(27,21,18,.25);
+  border-left:2px dashed rgba(255,255,255,.5);border-right:2px dashed rgba(255,255,255,.5);
+  transition:transform .55s cubic-bezier(.3,1.6,.4,1),opacity .55s ease;
+  z-index:6;
+}
+.tape.tl{left:12%;--tr:-12deg}
+.tape.tr{left:auto;right:8%;--tr:9deg}
+.tape.blue{background:
+  repeating-linear-gradient(-45deg,rgba(255,255,255,.3) 0 6px,transparent 6px 12px),
+  linear-gradient(180deg,rgba(122,180,207,.85),rgba(86,148,180,.85))}
+.tape.red{background:
+  repeating-linear-gradient(45deg,rgba(255,255,255,.3) 0 5px,transparent 5px 11px),
+  linear-gradient(180deg,rgba(238,133,102,.88),rgba(219,90,54,.86))}
+.tape:hover{filter:brightness(1.08)}
+.tape.peeled{transform:translateX(-50%) rotate(calc(var(--tr,-4deg) - 26deg)) translateY(-30px) scale(.7);opacity:.1}
+/* pins for red-string mode */
+.pin{
+  position:absolute;top:-9px;left:50%;width:17px;height:17px;margin-left:-8.5px;
+  border-radius:50%;background:radial-gradient(circle at 35% 30%,#ff8f6e,var(--tomato) 60%,#8d2410);
+  box-shadow:0 3px 4px rgba(27,21,18,.4),inset 0 -2px 3px rgba(0,0,0,.3);
+  opacity:0;transition:opacity .3s;z-index:7;
+}
+body.stringmode .pin{opacity:1}
+/* card typography */
+.card h2{
+  font-family:var(--marker);font-weight:900;font-size:clamp(19px,2.6vw,26px);
+  text-transform:uppercase;letter-spacing:.01em;margin-bottom:.55em;
+}
+.card h2 u{text-decoration:none;background:linear-gradient(transparent 62%,rgba(224,74,42,.5) 62%)}
+.card p,.card li{font-size:clamp(13px,1.6vw,15.5px);line-height:1.55}
+.card .scrap{font-family:var(--mono);font-size:.85em;background:#efe4c9;border:1px dashed #b9a97f;padding:.6em .7em;transform:rotate(-.6deg);display:inline-block;margin-top:.7em}
+.card ul{list-style:none}
+.card li{padding-left:1.25em;position:relative;margin:.3em 0}
+.card li::before{content:"✂";position:absolute;left:0;font-size:.8em;color:var(--tomato)}
+/* halftone duotone art panel */
+.halftone{
+  position:relative;height:190px;margin:4px 2px 14px;overflow:hidden;
+  background:
+    radial-gradient(circle at 68% 34%,#ffd9a8 0 14%,transparent 15%),
+    radial-gradient(circle,rgba(20,40,55,.85) 27%,transparent 29%),
+    radial-gradient(circle,rgba(224,74,42,.8) 26%,transparent 28%),
+    linear-gradient(115deg,var(--pool) 0 46%,var(--tomato) 46% 100%);
+  background-size:auto,7px 7px,7px 7px,auto;
+  background-position:0 0,0 0,3px 4px,0 0;
+  box-shadow:inset 0 0 0 3px var(--ink),inset 0 0 34px rgba(20,40,55,.45);
+}
+.halftone::after{
+  content:"01";position:absolute;right:8px;bottom:2px;
+  font-family:var(--marker);font-weight:900;font-size:64px;color:var(--paper);
+  opacity:.85;text-shadow:3px 3px 0 var(--ink);letter-spacing:-.04em;
+}
+.halftone .burst{
+  position:absolute;left:14%;top:16%;width:74px;height:74px;border-radius:50%;
+  background:radial-gradient(circle,#f8e6b8 0 18%,transparent 19%),
+  conic-gradient(from 20deg,#f6d98d 0 12deg,transparent 12deg 30deg);
+  filter:saturate(1.1);
+}
+.caption{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:#6b5c48}
+/* subscribe card bits */
+.price{font-family:var(--marker);font-weight:900;font-size:34px;color:var(--pool);text-shadow:2px 2px 0 var(--ink)}
+input.postcard{
+  width:100%;font-family:var(--mono);font-size:14px;padding:.5em .6em;margin:.6em 0;
+  border:2px solid var(--ink);background:#fffdf4;box-shadow:inset 2px 2px 0 rgba(27,21,18,.12);
+}
+input.postcard:focus{outline:3px solid var(--pool);outline-offset:1px}
+/* red string svg overlay */
+#strings{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:20;opacity:0;transition:opacity .5s}
+body.stringmode #strings{opacity:1}
+#strings path{
+  fill:none;stroke:var(--tomato);stroke-width:2.4;opacity:.9;
+  stroke-linecap:round;filter:drop-shadow(0 2px 2px rgba(27,21,18,.3));
+}
+body.stringmode #strings path{animation:draw .9s ease both}
+@keyframes draw{from{stroke-dashoffset:var(--len)}to{stroke-dashoffset:0}}
+body.stringmode .card{box-shadow:3px 5px 14px var(--shadow),0 0 0 2px rgba(224,74,42,.25)}
+/* newsprint footer strip */
+footer{
+  overflow:hidden;border-top:4px solid var(--ink);background:var(--ink);color:var(--paper);
+  padding:10px 0;margin-top:30px;
+}
+.rail{display:flex;width:max-content;animation:slide 26s linear infinite;font-family:var(--mono);letter-spacing:.3em;text-transform:uppercase;font-size:12.5px}
+.rail span{padding:0 26px;white-space:nowrap}
+.rail .dot{color:var(--tomato)}
+@keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.colophon{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-align:center;color:#6b5c48;padding:14px 10px 26px}
+/* reduced motion */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important}
+  html{scroll-behavior:auto}
+}
+@media (max-width:420px){
+  .stamp{position:static;display:inline-block;margin-top:14px}
+  .card{width:94vw}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="stamp" id="stamp">ISSUE 01<br>OUT NOW</div>
+  <h1 class="ransom" aria-label="CUT and PASTE">
+    <span class="rs c-tom shadowed" style="font-size:clamp(46px,11vw,124px)">CUT</span><span class="rf c-ink" style="font-size:clamp(30px,7vw,84px)">&nbsp;&amp;&nbsp;</span><span class="rs c-pool shadowed" style="font-size:clamp(46px,11vw,124px)">PASTE</span><br>
+    <span class="rm c-ink" style="font-size:clamp(15px,3vw,30px);letter-spacing:.5em">A PAPER-COLLAGE ZINE</span>
+  </h1>
+  <p class="tagline">HAND-CUT ✂ PHOTOCOPIED ✂ STAPLED ✂ <b>MADE OF SCRAPS</b> ✂ SINCE 2025</p>
+  <div class="toolbar">
+    <button class="btn" id="stringBtn" aria-pressed="false">🔴 Red string mode</button>
+    <button class="btn" id="shuffleBtn">🔀 Shuffle layout</button>
+    <button class="btn" id="muteBtn" aria-pressed="true"><small>SOUND</small> OFF</button>
+  </div>
+</header>
+
+<main class="board" id="board">
+  <article class="card t1 peek" data-card>
+    <div class="tape red tl" data-tape title="click to peel"></div><div class="pin"></div>
+    <div class="halftone"><div class="burst"></div></div>
+    <h2>ISSUE <u>№1</u> — “SCISSORHANDS”</h2>
+    <p>48 pages of ransom notes, pool-blue afternoons and glue-stick fumes. Every spread cut by hand, photocopied until the toner begged for mercy.</p>
+    <p class="scrap">“…the most joyful mess on paper.” — someone with a stapler</p>
+    <p class="caption">Fig. A — cover art, halftone duotone, 85 lpi</p>
+  </article>
+
+  <article class="card t2 peek" data-card>
+    <div class="tape blue tr" data-tape title="click to peel"></div><div class="pin"></div>
+    <h2>INSIDE THIS <u>ISSUE</u></h2>
+    <ul>
+      <li>Cut-out cities: a collage walk</li>
+      <li>Tape: a taxonomy (washi &amp; beyond)</li>
+      <li>Photocopy distortion experiments</li>
+      <li>Letters page, minus one letter</li>
+      <li>Centerfold: the great paste-up</li>
+      <li>Glue reviews — stick vs. liquid vs. hope</li>
+    </ul>
+  </article>
+
+  <article class="card t3 peek" data-card>
+    <div class="tape tl" data-tape title="click to peel"></div><div class="pin"></div>
+    <h2>SUBSCRIBE — <u>IT’S PAPER</u></h2>
+    <p>Four issues a year, delivered in an envelope that has clearly been through something.</p>
+    <p class="price">$4 / year</p>
+    <label class="caption" for="mail">Your mailing address, more or less:</label>
+    <input class="postcard" id="mail" type="text" placeholder="13 Halftone Lane, Apt 2">
+    <p><button class="btn" id="subBtn">Press here to subscribe</button></p>
+    <p class="scrap" id="subNote" hidden>STAMPED ✓ we’ll fire up the photocopier</p>
+  </article>
+
+  <article class="card t1 peek" data-card>
+    <div class="tape red" data-tape title="click to peel"></div><div class="pin"></div>
+    <h2>SEND US YOUR <u>SCRAPS</u></h2>
+    <p>Cut something out. Paste it down wrong. Mail it to us — the best mistakes get published, the worst get framed.</p>
+    <p class="scrap">DEADLINE: whenever the glue runs out</p>
+    <p class="caption">Contributor copies paid in tape</p>
+  </article>
+
+  <article class="card t2 peek" data-card>
+    <div class="tape blue tl" data-tape title="click to peel"></div><div class="pin"></div>
+    <h2>MAST<u>HEAD</u></h2>
+    <p><b>Editor:</b> a left-handed pair of scissors<br>
+    <b>Art dir.:</b> one (1) glue stick, nearly new<br>
+    <b>Fact-checker:</b> the toner levels<br>
+    <b>Printed:</b> on the good machine, after hours</p>
+    <p class="caption">No pixels were harmed. Several were ignored.</p>
+  </article>
+</main>
+
+<svg id="strings" aria-hidden="true"></svg>
+
+<footer aria-hidden="true">
+  <div class="rail" id="rail">
+    <span>CUT &amp; PASTE ✂ ISSUE 01 <span class="dot">●</span> RANSOM NOTES WELCOME <span class="dot">●</span> WASHI TAPE SUPPLY CRITICAL <span class="dot">●</span> GLUE STICK SOLIDARITY <span class="dot">●</span> PHOTOCOPY UNTIL IT STOPS <span class="dot">●</span> </span>
+  </div>
+</footer>
+<p class="colophon">© 2026 CUT &amp; PASTE zine — printed on scrap, held together with tape and opinions.</p>
+
+<script>
+(function(){
+"use strict";
+/* ---------------- tiny WebAudio sfx (gesture-gated, mutable) ---------------- */
+var AC=null, muted=true, master=null;
+function ac(){
+  if(muted) return null;
+  if(!AC){
+    try{
+      AC=new (window.AudioContext||window.webkitAudioContext)();
+      master=AC.createGain(); master.gain.value=.16; master.connect(AC.destination);
+    }catch(e){ return null; }
+  }
+  if(AC.state==="suspended"){ try{ AC.resume(); }catch(e){} }
+  return AC;
+}
+function tone(f,dur,type,vol,when){
+  var c=ac(); if(!c) return;
+  try{
+    var t=c.currentTime+(when||0);
+    var o=c.createOscillator(), g=c.createGain();
+    o.type=type||"triangle"; o.frequency.setValueAtTime(f,t);
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(vol||.5,t+.008);
+    g.gain.exponentialRampToValueAtTime(.001,t+dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t+dur+.05);
+  }catch(e){}
+}
+function noise(dur,vol,hp){
+  var c=ac(); if(!c) return;
+  try{
+    var n=c.sampleRate*dur, buf=c.createBuffer(1,n,c.sampleRate), d=buf.getChannelData(0);
+    for(var i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
+    var src=c.createBufferSource(); src.buffer=buf;
+    var f=c.createBiquadFilter(); f.type=hp?"highpass":"lowpass"; f.frequency.value=hp?1800:900;
+    var g=c.createGain(); g.gain.value=vol||.3;
+    src.connect(f); f.connect(g); g.connect(master); src.start();
+  }catch(e){}
+}
+var sfx={
+  thunk:function(){ tone(90,.22,"sine",.9); noise(.09,.5,true); },
+  peel:function(){ noise(.16,.35,true); tone(720,.08,"triangle",.18,.03); },
+  pin:function(){ tone(1200,.05,"square",.12); },
+  pluck:function(i){ tone(220+i*95,.3,"sine",.28); },
+  stamp:function(){ tone(520,.07,"square",.2,0); tone(660,.09,"square",.2,.09); },
+  shuffle:function(){ noise(.12,.28,false); noise(.12,.28,false); }
+};
+/* ---------------- boot: stagger cards, thunk stamp ---------------- */
+var cards=[].slice.call(document.querySelectorAll("[data-card]"));
+function boot(){
+  document.body.classList.add("ready");
+  cards.forEach(function(c,i){
+    setTimeout(function(){ c.classList.remove("peek"); },140+i*120);
+  });
+  setTimeout(function(){
+    document.body.classList.add("thudded");
+    sfx.thunk();
+    setTimeout(function(){ document.body.classList.remove("thudded"); },340);
+  },cards.length?140+cards.length*120:200);
+}
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",boot);
+else boot();
+/* ---------------- tape peeling ---------------- */
+document.querySelectorAll("[data-tape]").forEach(function(t){
+  t.addEventListener("click",function(ev){
+    ev.stopPropagation();
+    if(!t.classList.contains("peeled")){ t.classList.add("peeled"); sfx.peel(); }
+    else{ t.classList.remove("peeled"); sfx.pin(); }
+  });
+});
+/* ---------------- red string mode: pin cards, draw conspiracy lines ---------------- */
+var strings=document.getElementById("strings");
+var stringBtn=document.getElementById("stringBtn");
+var reduce=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function pinPos(card){
+  var pin=card.querySelector(".pin"), r=pin.getBoundingClientRect();
+  return {x:r.left+r.width/2, y:r.top+r.height/2};
+}
+function drawStrings(){
+  strings.innerHTML="";
+  var pts=cards.filter(function(c){return c.offsetParent!==null;}).map(pinPos);
+  var order=[0,2,4,1,3].filter(function(i){return i<pts.length;});
+  if(pts.length<2) return;
+  var d="";
+  order.forEach(function(i,k){
+    var a=pts[i], b=pts[order[(k+1)%order.length]];
+    var mx=(a.x+b.x)/2, my=Math.max(a.y,b.y)+70+Math.random()*40;
+    d+=(k===0?"M ":"")+"M "+a.x.toFixed(1)+" "+a.y.toFixed(1)+
+       " C "+(a.x-60)+" "+my+" "+(b.x+60)+" "+my+" "+b.x.toFixed(1)+" "+b.y.toFixed(1)+" ";
+  });
+  var p=document.createElementNS("http://www.w3.org/2000/svg","path");
+  p.setAttribute("d",d.replace(/^M | M /g,"M "));
+  strings.appendChild(p);
+  if(!reduce){
+    var len=p.getTotalLength();
+    p.style.strokeDasharray=len; p.style.setProperty("--len",len);
+  }
+  order.forEach(function(i,k){ setTimeout(function(){ sfx.pluck(k); },120*k); });
+}
+function stringMode(on){
+  document.body.classList.toggle("stringmode",on);
+  stringBtn.classList.toggle("on",on);
+  stringBtn.setAttribute("aria-pressed",String(on));
+  if(on){ requestAnimationFrame(drawStrings); }
+}
+stringBtn.addEventListener("click",function(){
+  var on=!document.body.classList.contains("stringmode");
+  stringMode(on);
+  if(on) sfx.pin();
+});
+/* re-draw on resize while active */
+var rT=null;
+window.addEventListener("resize",function(){
+  if(!document.body.classList.contains("stringmode")) return;
+  clearTimeout(rT); rT=setTimeout(drawStrings,160);
+});
+/* ---------------- shuffle: jauntier angles ---------------- */
+var baseR=[-2.2,1.6,-1.2,2.4,-2.8];
+document.getElementById("shuffleBtn").addEventListener("click",function(){
+  sfx.shuffle();
+  cards.forEach(function(c){
+    var r=(Math.random()*7-3.5).toFixed(2);
+    c.style.setProperty("--r",r+"deg");
+  });
+  if(document.body.classList.contains("stringmode")) setTimeout(drawStrings,420);
+});
+/* reset angles via dblclick on empty board space */
+document.getElementById("board").addEventListener("dblclick",function(e){
+  if(e.target.closest("[data-card]")) return;
+  cards.forEach(function(c,i){ c.style.setProperty("--r",baseR[i%5]+"deg"); });
+  if(document.body.classList.contains("stringmode")) setTimeout(drawStrings,420);
+});
+/* ---------------- mute / sound toggle ---------------- */
+var muteBtn=document.getElementById("muteBtn");
+muteBtn.addEventListener("click",function(){
+  muted=!muted;
+  muteBtn.innerHTML="<small>SOUND</small> "+(muted?"OFF":"ON");
+  muteBtn.setAttribute("aria-pressed",String(!muted));
+  muteBtn.classList.toggle("on",!muted);
+  if(!muted) sfx.stamp();
+});
+/* ---------------- subscribe stamp ---------------- */
+var subBtn=document.getElementById("subBtn"), subNote=document.getElementById("subNote");
+subBtn.addEventListener("click",function(){
+  var mail=document.getElementById("mail");
+  if(mail && mail.value.trim()===""){ mail.focus(); mail.placeholder="…an address helps!"; return; }
+  subNote.hidden=false; sfx.stamp();
+  subBtn.textContent="STAMPED ✓"; subBtn.disabled=true; subBtn.style.opacity=".6";
+});
+/* duplicate the footer rail so the marquee loops seamlessly */
+var rail=document.getElementById("rail");
+rail.appendChild(rail.firstElementChild.cloneNode(true));
+})();
+</script>
+</body>
+</html>

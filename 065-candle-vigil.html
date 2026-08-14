@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VIGIL — a quiet memorial of candlelight</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow-y:auto; overflow-x:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:#080609; color:#c9bdc9;
+  }
+  .chapel {
+    position:relative; min-height:100vh;
+    background:
+      radial-gradient(ellipse 70% 50% at 50% 100%, rgba(120,70,40,.14), transparent 60%),
+      linear-gradient(180deg, #0a070c 0%, #0d090f 60%, #120b0c 100%);
+    padding:60px 20px 120px;
+  }
+  header { text-align:center; margin-bottom:64px; }
+  header h1 { font-size:clamp(26px, 4.4vw, 44px); font-weight:300; letter-spacing:.6em; color:#d8c8d8; text-transform:uppercase; }
+  header p { font-family:system-ui, sans-serif; font-size:10px; letter-spacing:.36em; color:#6a5a6a; text-transform:uppercase; margin-top:12px; }
+
+  /* ledge */
+  .ledge {
+    max-width:900px; margin:0 auto; padding-top:26px;
+    border-top:1px solid rgba(200,160,140,.12);
+    position:relative;
+  }
+  .ledge::before {
+    content:""; position:absolute; top:0; left:0; right:0; height:10px;
+    background:linear-gradient(180deg, rgba(180,150,130,.16), transparent);
+  }
+  .candles {
+    display:flex; flex-wrap:wrap; gap:38px 46px; justify-content:center;
+  }
+  .candle { text-align:center; width:86px; position:relative; }
+  .candle .stick {
+    width:26px; height:74px; margin:0 auto; border-radius:4px 4px 2px 2px; position:relative;
+    background:linear-gradient(90deg, #d8c5a8, #f0e4cc 40%, #c9b896);
+    box-shadow:0 0 24px 6px rgba(255,170,90,.13);
+  }
+  .candle .stick::before { /* drips */
+    content:""; position:absolute; top:-2px; left:2px; width:5px; height:16px; border-radius:4px;
+    background:#f0e4cc; box-shadow:0 3px 0 rgba(0,0,0,.1);
+  }
+  .flame {
+    width:14px; height:24px; margin:0 auto -6px; border-radius:50% 50% 46% 54% / 62% 62% 38% 38%;
+    background:radial-gradient(ellipse at 50% 78%, #fff8e0 0%, #ffd27a 34%, #ff9a3c 62%, rgba(255,90,30,0) 82%);
+    box-shadow:0 0 22px 8px rgba(255,160,70,.42), 0 0 60px 24px rgba(255,120,40,.14);
+    animation:flick 2.6s ease-in-out infinite;
+    transform-origin:50% 100%;
+  }
+  @keyframes flick {
+    0%,100% { transform:scale(1) skewX(0deg); }
+    24% { transform:scale(1.06, 1.1) skewX(2deg); }
+    50% { transform:scale(.94, .96) skewX(-2deg); }
+    74% { transform:scale(1.03, 1.08) skewX(1deg); }
+  }
+  .candle .name {
+    margin-top:14px; font-style:italic; font-size:12.5px; color:#a89aa8;
+  }
+  .candle .date { font-family:system-ui, sans-serif; font-size:8.5px; letter-spacing:.18em; color:#5a4a5a; margin-top:3px; }
+  .candle:hover .name { color:#e0d0e0; }
+
+  /* light-a-candle form */
+  .lightform {
+    max-width:420px; margin:90px auto 0; text-align:center;
+  }
+  .lightform h2 { font-size:19px; font-weight:400; font-style:italic; color:#c9b8c9; margin-bottom:8px; }
+  .lightform p.sub { font-family:system-ui, sans-serif; font-size:9.5px; letter-spacing:.28em; color:#6a5a6a; text-transform:uppercase; margin-bottom:26px; }
+  .lightform input {
+    width:100%; background:rgba(200,170,160,.06); border:1px solid rgba(200,160,140,.24);
+    color:#e0d0d8; font:inherit; font-size:16px; padding:13px 18px; border-radius:99px; outline:none; text-align:center;
+  }
+  .lightform input:focus { border-color:rgba(255,180,120,.5); }
+  .lightform button {
+    margin-top:16px; background:linear-gradient(180deg, #e8a490, #c96a4a); border:none; color:#1c0e0a;
+    font-family:system-ui, sans-serif; font-weight:700; font-size:10px; letter-spacing:.3em; text-transform:uppercase;
+    padding:14px 34px; border-radius:99px; cursor:pointer; box-shadow:0 8px 24px rgba(200,90,50,.3); transition:all .2s;
+  }
+  .lightform button:hover { transform:translateY(-2px); box-shadow:0 12px 30px rgba(200,90,50,.4); }
+  .counter { text-align:center; margin-top:60px; font-family:system-ui, sans-serif; font-size:10px; letter-spacing:.32em; color:#6a5a6a; text-transform:uppercase; }
+  .counter b { display:block; font-size:30px; font-weight:300; color:#e8b88a; letter-spacing:.1em; margin-bottom:6px; font-variant-numeric:tabular-nums; }
+
+  /* controls */
+  .windrow {
+    position:fixed; right:20px; top:20px; z-index:30; display:flex; align-items:center; gap:10px;
+    background:rgba(10,7,10,.7); padding:10px 16px; border-radius:99px;
+    border:1px solid rgba(200,160,140,.16); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  }
+  .windrow .lab { font-family:system-ui, sans-serif; font-size:8.5px; letter-spacing:.22em; color:#6a5a6a; text-transform:uppercase; }
+  input[type=range] { -webkit-appearance:none; appearance:none; width:90px; height:3px; background:#3a2c32; border-radius:99px; outline:none; cursor:pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:13px; height:13px; border-radius:50%; background:#e8b88a; }
+  .windrow button {
+    background:none; border:1px solid rgba(200,160,140,.3); color:#c9a898; font-family:system-ui, sans-serif;
+    font-size:8.5px; letter-spacing:.16em; text-transform:uppercase; padding:7px 12px; border-radius:99px; cursor:pointer;
+  }
+  @media (prefers-reduced-motion: reduce) { .flame { animation:none; } }
+</style>
+</head>
+<body>
+  <div class="chapel">
+    <header>
+      <h1>Vigil</h1>
+      <p>a quiet memorial · light a candle</p>
+    </header>
+
+    <div class="windrow">
+      <span class="lab">wind</span>
+      <input type="range" id="windR" min="0" max="100" value="20" aria-label="wind">
+      <button id="blowBtn">blow out</button>
+    </div>
+
+    <div class="ledge"><div class="candles" id="candles"></div></div>
+
+    <div class="lightform">
+      <h2>For someone, with warmth</h2>
+      <p class="sub">names are kept only in your browser</p>
+      <input type="text" id="nameIn" maxlength="24" placeholder="a name to remember…" autocomplete="off">
+      <br>
+      <button id="lightBtn">🕯 light a candle</button>
+    </div>
+
+    <div class="counter">
+      <b id="countV">0</b>
+      candles lit
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  let wind = 0.2;
+  const candles = [];
+
+  const STARTERS = [
+    { name: "for ruth", date: "1931 – 2019" },
+    { name: "for emilio", date: "1958 – 2020" },
+    { name: "for grandpa joe", date: "always" },
+    { name: "for lisbeth", date: "1972 – 2018" },
+    { name: "for everyone's dog", date: "all of them" },
+  ];
+
+  function addCandle(name, date, animate) {
+    const el = document.createElement("div");
+    el.className = "candle";
+    el.innerHTML =
+      '<div class="flame"></div>' +
+      '<div class="stick"></div>' +
+      '<div class="name">' + escapeHtml(name) + "</div>" +
+      '<div class="date">' + escapeHtml(date) + "</div>";
+    $("candles").appendChild(el);
+    const c = { el, name, date, lit: true, seed: Math.random() * 6.28 };
+    candles.push(c);
+    $("countV").textContent = candles.length;
+    if (animate) {
+      /* ignition: ember grows into flame */
+      const fl = el.querySelector(".flame");
+      fl.style.transformOrigin = "50% 100%";
+      fl.style.transform = "scale(0)";
+      fl.style.transition = "transform 1.4s cubic-bezier(.2,1.4,.4,1)";
+      requestAnimationFrame(() => requestAnimationFrame(() => { fl.style.transform = "scale(1)"; }));
+      chime();
+    }
+    el.addEventListener("mouseenter", () => {
+      el.querySelector(".name").textContent = c.lit ? c.name + " · still burning" : c.name + " · relit?";
+    });
+    el.addEventListener("mouseleave", () => {
+      el.querySelector(".name").textContent = c.name;
+    });
+    return c;
+  }
+  function escapeHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  STARTERS.forEach(s => addCandle(s.name, s.date, false));
+
+  /* ---------- light a candle ---------- */
+  let yoursLit = false;
+  $("lightBtn").addEventListener("click", () => {
+    const name = $("nameIn").value.trim() || "for someone unnamed";
+    addCandle(name, "today", true);
+    $("nameIn").value = "";
+    yoursLit = true;
+    document.querySelectorAll(".candle").forEach(el => el.scrollIntoView({ behavior: "smooth", block: "center" }));
+  });
+  $("nameIn").addEventListener("keydown", (e) => { if (e.key === "Enter") $("lightBtn").click(); });
+
+  /* ---------- wind: flames lean & gutter ---------- */
+  setInterval(() => {
+    if (document.hidden) return;
+    candles.forEach(c => {
+      const fl = c.el.querySelector(".flame");
+      if (!c.lit) return;
+      const gust = Math.sin(Date.now() / 700 + c.seed) * wind;
+      const gutter = wind > 0.6 && Math.random() < 0.06;
+      fl.style.transformOrigin = "50% 100%";
+      fl.style.transform =
+        "skewX(" + (gust * 16) + "deg) scale(" + (1 - Math.abs(gust) * 0.16) + ", " + (1 - Math.abs(gust) * 0.08) + ")";
+      fl.style.opacity = gutter ? "0.4" : "1";
+    });
+  }, 120);
+  $("windR").addEventListener("input", (e) => { wind = parseInt(e.target.value, 10) / 100; });
+
+  /* ---------- blow out & relight yours ---------- */
+  $("blowBtn").addEventListener("click", () => {
+    const mine = candles.filter(c => c.lit);
+    if (!mine.length) return;
+    /* blow out a random third */
+    mine.sort(() => Math.random() - 0.5).slice(0, Math.max(1, Math.floor(mine.length / 3))).forEach(c => {
+      c.lit = false;
+      const fl = c.el.querySelector(".flame");
+      fl.style.transition = "opacity 1.6s, transform 1.6s";
+      fl.style.opacity = "0";
+      fl.style.transform = "scale(.2) translateY(-8px)";
+      /* smoke wisp */
+      const sm = document.createElement("div");
+      sm.style.cssText = "position:absolute;left:50%;top:-18px;width:6px;height:30px;border-radius:99px;background:linear-gradient(180deg,rgba(200,200,210,.0),rgba(200,200,210,.34),rgba(200,200,210,0));filter:blur(2px);animation:smoke 3s ease-out forwards;pointer-events:none;";
+      c.el.appendChild(sm);
+      setTimeout(() => sm.remove(), 3200);
+    });
+  });
+  /* relight on click of an unlit flame */
+  $("candles").addEventListener("click", (e) => {
+    const candleEl = e.target.closest(".candle");
+    if (!candleEl) return;
+    const c = candles.find(x => x.el === candleEl);
+    if (c && !c.lit) {
+      c.lit = true;
+      const fl = candleEl.querySelector(".flame");
+      fl.style.transition = "transform 1.2s cubic-bezier(.2,1.4,.4,1), opacity .6s";
+      fl.style.opacity = "1";
+      fl.style.transform = "scale(1)";
+      chime();
+    }
+  });
+
+  /* smoke keyframes injected */
+  const st = document.createElement("style");
+  st.textContent = "@keyframes smoke{0%{transform:translate(0,0) scaleY(.6);opacity:0}30%{opacity:.8}100%{transform:translate(-14px,-64px) scaleY(1.4);opacity:0}}";
+  document.head.appendChild(st);
+
+  /* ---------- soft chime ---------- */
+  let AC = null;
+  function chime() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      const t0 = AC.currentTime;
+      [523.25, 784].forEach((f, i) => {
+        const o = AC.createOscillator(), g = AC.createGain();
+        o.type = "sine"; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(0.03 / (i + 1), t0 + 0.04);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.2);
+        o.connect(g); g.connect(AC.destination);
+        o.start(t0); o.stop(t0 + 2.3);
+      });
+    } catch (e) {}
+  }
+})();
+</script>
+</body>
+</html>

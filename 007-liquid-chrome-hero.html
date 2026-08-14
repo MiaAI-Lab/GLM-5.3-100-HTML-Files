@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NOON — drink the daylight</title>
+<style>
+  :root{
+    --c1:#FFB23E;   /* mango */
+    --c2:#B892FF;   /* lilac */
+    --c3:#5EEAD4;   /* aqua */
+    --deep:#1B1230;
+    --ink:#221533;
+    --paper:#FFF9F0;
+    --blob-x:50vw;
+    --blob-y:44vh;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    overflow-x:hidden;
+  }
+
+  /* ═══════════ HERO ═══════════ */
+  .hero{
+    position:relative;
+    min-height:100svh;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    isolation:isolate;
+    background:
+      radial-gradient(120% 90% at 78% 8%, #FFF3E2 0%, transparent 55%),
+      radial-gradient(90% 80% at 12% 92%, #F3EAFF 0%, transparent 60%),
+      var(--paper);
+  }
+
+  /* molten mesh: five radial gradients as separate blobs, individually animated */
+  .molten{position:absolute;inset:0;z-index:0}
+  .molten i{
+    position:absolute;
+    border-radius:50%;
+    filter:blur(0px);
+    mix-blend-mode:multiply;
+    opacity:.85;
+    will-change:transform;
+  }
+  .molten i:nth-child(1){
+    width:56vmax;height:56vmax;left:8%;top:-12%;
+    background:radial-gradient(circle at 38% 38%, var(--c1) 0%, rgba(255,178,62,0) 66%);
+    animation:drift1 16s ease-in-out infinite alternate;
+  }
+  .molten i:nth-child(2){
+    width:50vmax;height:50vmax;right:-10%;top:6%;
+    background:radial-gradient(circle at 60% 42%, var(--c2) 0%, rgba(184,146,255,0) 66%);
+    animation:drift2 19s ease-in-out infinite alternate;
+  }
+  .molten i:nth-child(3){
+    width:44vmax;height:44vmax;left:-8%;bottom:-16%;
+    background:radial-gradient(circle at 50% 50%, var(--c3) 0%, rgba(94,234,212,0) 64%);
+    animation:drift3 14s ease-in-out infinite alternate;
+  }
+  .molten i:nth-child(4){
+    width:34vmax;height:34vmax;left:38%;top:34%;
+    background:radial-gradient(circle at 50% 50%, #FF6F91 0%, rgba(255,111,145,0) 62%);
+    animation:drift4 21s ease-in-out infinite alternate;
+    opacity:.6;
+  }
+  .molten i:nth-child(5){
+    width:26vmax;height:26vmax;right:16%;bottom:2%;
+    background:radial-gradient(circle at 50% 50%, #FFD166 0%, rgba(255,209,102,0) 62%);
+    animation:drift5 12s ease-in-out infinite alternate;
+    opacity:.7;
+  }
+  @keyframes drift1{from{transform:translate(0,0) scale(1)}to{transform:translate(9vw,7vh) scale(1.18)}}
+  @keyframes drift2{from{transform:translate(0,0) scale(1.1)}to{transform:translate(-11vw,9vh) scale(.92)}}
+  @keyframes drift3{from{transform:translate(0,0) scale(.95)}to{transform:translate(8vw,-9vh) scale(1.15)}}
+  @keyframes drift4{from{transform:translate(0,0) rotate(0deg)}to{transform:translate(-7vw,6vh) rotate(40deg) scale(1.12)}}
+  @keyframes drift5{from{transform:translate(0,0) scale(1.06)}to{transform:translate(6vw,-7vh) scale(.9)}}
+
+  /* pointer-following highlight blob (JS lerps --blob-x/--blob-y) */
+  .sheen{
+    position:absolute;inset:0;z-index:1;pointer-events:none;
+    background:radial-gradient(
+      38vmax 38vmax at var(--blob-x) var(--blob-y),
+      rgba(255,255,255,.75) 0%,
+      rgba(255,255,255,.22) 34%,
+      transparent 68%
+    );
+    mix-blend-mode:overlay;
+    transition:opacity .4s;
+  }
+  .molten-mask{
+    position:absolute;inset:0;z-index:1;pointer-events:none;
+    backdrop-filter:saturate(1.5) contrast(1.06);
+    -webkit-backdrop-filter:saturate(1.5) contrast(1.06);
+  }
+
+  .hero-inner{
+    position:relative;z-index:3;
+    flex:1;
+    display:grid;
+    grid-template-columns:1.25fr .75fr;
+    align-items:center;
+    gap:2vw;
+    width:min(1240px,100%);
+    margin:0 auto;
+    padding:96px clamp(20px,4vw,56px) 40px;
+  }
+  @media(max-width:900px){
+    .hero-inner{grid-template-columns:1fr;padding-top:110px}
+  }
+
+  nav.topbar{
+    position:absolute;top:0;left:0;right:0;z-index:5;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px clamp(20px,4vw,56px);
+    font-size:14px;font-weight:600;letter-spacing:.02em;
+  }
+  nav.topbar .logo{
+    display:flex;align-items:center;gap:10px;
+  }
+  nav.topbar .logo::before{
+    content:"";width:14px;height:14px;border-radius:50%;
+    background:radial-gradient(circle at 32% 30%, #fff 0%, var(--c1) 42%, var(--c2) 100%);
+    box-shadow:0 0 14px rgba(255,178,62,.8);
+  }
+  nav.topbar ul{display:flex;gap:26px;list-style:none}
+  nav.topbar a{color:inherit;text-decoration:none;opacity:.78;transition:opacity .2s}
+  nav.topbar a:hover{opacity:1}
+  nav.topbar .cta{
+    padding:9px 18px;border-radius:999px;
+    color:#fff;text-decoration:none;
+    background:linear-gradient(120deg,var(--c1),var(--c2));
+    box-shadow:0 6px 18px rgba(184,146,255,.45);
+    transition:transform .25s, box-shadow .25s;
+    display:inline-block;
+  }
+  nav.topbar .cta:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(255,178,62,.5)}
+  @media(max-width:640px){nav.topbar ul{display:none}}
+
+  /* enormous liquid-chrome NOON */
+  .wordblock h1{
+    font-size:clamp(96px,21vw,308px);
+    line-height:.82;
+    font-weight:900;
+    letter-spacing:-.045em;
+    background:linear-gradient(
+      178deg,
+      #ffffff 0%,
+      #ffe9c4 18%,
+      var(--c1) 38%,
+      #fff6e8 50%,
+      var(--c2) 66%,
+      var(--c3) 88%,
+      #ffffff 100%
+    );
+    background-size:100% 240%;
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    filter:drop-shadow(0 18px 34px rgba(120,70,160,.28));
+    animation:chromeFlow 9s ease-in-out infinite alternate;
+    user-select:none;
+  }
+  @keyframes chromeFlow{
+    from{background-position:50% 0%}
+    to{background-position:50% 100%}
+  }
+  .wordblock .tag{
+    margin-top:18px;
+    font-size:clamp(17px,2vw,24px);
+    font-weight:500;
+    max-width:24ch;
+    line-height:1.35;
+  }
+  .wordblock .tag b{
+    background:linear-gradient(90deg,var(--c1),var(--c2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    font-weight:800;
+  }
+  .wordblock .sub{
+    margin-top:14px;font-size:14px;opacity:.62;max-width:44ch;line-height:1.6;
+  }
+  .hero-actions{margin-top:30px;display:flex;gap:14px;flex-wrap:wrap}
+  .btn{
+    font:inherit;font-weight:700;font-size:15px;
+    padding:14px 26px;border-radius:999px;cursor:pointer;
+    border:none;text-decoration:none;display:inline-flex;align-items:center;gap:8px;
+    transition:transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s;
+  }
+  .btn.solid{
+    color:#231038;
+    background:linear-gradient(120deg,#fff 0%, #FFEBD1 55%, var(--c1) 130%);
+    box-shadow:0 8px 22px rgba(255,178,62,.4);
+  }
+  .btn.solid:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 14px 30px rgba(255,178,62,.55)}
+  .btn.ghost{
+    color:var(--ink);background:rgba(255,255,255,.45);
+    border:1.5px solid rgba(34,21,51,.22);
+    backdrop-filter:blur(6px);
+  }
+  .btn.ghost:hover{transform:translateY(-3px);background:rgba(255,255,255,.7)}
+
+  /* flavor chips */
+  .chips{
+    margin-top:34px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  }
+  .chips .label{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;opacity:.55}
+  .chip{
+    font:inherit;font-size:13px;font-weight:600;
+    padding:8px 16px;border-radius:999px;cursor:pointer;
+    border:1.5px solid rgba(34,21,51,.2);
+    background:rgba(255,255,255,.55);
+    display:inline-flex;align-items:center;gap:8px;
+    transition:transform .2s, border-color .3s, box-shadow .3s, background .3s;
+  }
+  .chip .dot{width:12px;height:12px;border-radius:50%;background:var(--sw1);box-shadow:0 0 0 2px #fff inset}
+  .chip:hover{transform:translateY(-2px)}
+  .chip[aria-pressed="true"]{
+    border-color:var(--sw1);
+    box-shadow:0 6px 16px color-mix(in srgb, var(--sw1) 45%, transparent);
+    background:#fff;
+  }
+
+  /* ═══════════ BOTTLE (pure gradients) ═══════════ */
+  .stage{
+    perspective:1100px;
+    display:flex;justify-content:center;
+  }
+  .bottle{
+    position:relative;
+    width:min(220px,52vw);
+    aspect-ratio:10/29;
+    transform-style:preserve-3d;
+    transition:transform .18s ease-out;
+    will-change:transform;
+    cursor:pointer;
+  }
+  .b-body{
+    position:absolute;left:9%;right:9%;top:16%;bottom:0;
+    border-radius:26% 26% 34% 34% / 12% 12% 8% 8%;
+    background:
+      linear-gradient(105deg,
+        rgba(255,255,255,.95) 0%,
+        rgba(255,255,255,.35) 14%,
+        rgba(255,255,255,0) 30%,
+        rgba(255,255,255,0) 66%,
+        rgba(255,255,255,.4) 84%,
+        rgba(255,255,255,.9) 100%),
+      linear-gradient(180deg, var(--c1), var(--c2) 58%, var(--c3));
+    box-shadow:
+      inset 0 -18px 30px rgba(255,255,255,.35),
+      inset 14px 0 26px rgba(255,255,255,.28),
+      0 30px 60px -18px rgba(90,50,140,.5);
+    overflow:hidden;
+  }
+  /* liquid inside with a wobbling meniscus */
+  .b-liquid{
+    position:absolute;left:6%;right:6%;top:14%;bottom:5%;
+    border-radius:inherit;
+    background:linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,0) 30%),
+      linear-gradient(190deg, var(--c1), var(--c2));
+    opacity:.85;
+  }
+  .b-liquid::before{
+    content:"";position:absolute;left:-25%;right:-25%;top:-9px;height:20px;
+    border-radius:50%;
+    background:rgba(255,255,255,.75);
+    animation:wobble 3.4s ease-in-out infinite;
+  }
+  @keyframes wobble{
+    0%,100%{transform:translateX(-6%) rotate(-2.5deg)}
+    50%{transform:translateX(6%) rotate(2.5deg)}
+  }
+  .b-neck{
+    position:absolute;left:36%;right:36%;top:2%;height:16%;
+    background:linear-gradient(90deg,
+      rgba(255,255,255,.9), rgba(255,255,255,.2) 26%,
+      rgba(255,255,255,0) 44%,
+      rgba(255,255,255,.32) 78%, rgba(255,255,255,.85)),
+      linear-gradient(180deg,#fff, #FFE9D2);
+    border-radius:18% 18% 4px 4px;
+  }
+  .b-cap{
+    position:absolute;left:33%;right:33%;top:-3.5%;height:7.5%;
+    border-radius:8px 8px 3px 3px;
+    background:linear-gradient(90deg,#3B2A55,#7A5FA8 30%,#3B2A55 60%,#8D72BD);
+    box-shadow:0 4px 10px rgba(59,42,85,.5);
+  }
+  .b-label{
+    position:absolute;left:16%;right:16%;top:46%;height:20%;
+    border-radius:8px;
+    background:rgba(255,255,255,.88);
+    box-shadow:0 4px 14px rgba(120,80,160,.25), inset 0 0 0 1px rgba(59,42,85,.12);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  }
+  .b-label .n{font-weight:900;font-size:clamp(18px,3vw,26px);letter-spacing:.06em;color:#2A1A40}
+  .b-label .s{font-size:8px;letter-spacing:.3em;font-weight:700;color:#8A6FBC;text-transform:uppercase}
+  .b-spark{
+    position:absolute;top:8%;left:20%;width:12%;height:52%;
+    border-radius:50%;
+    background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,255,255,0));
+    filter:blur(2px);
+    transform:rotate(14deg);
+  }
+  .b-spark.two{left:auto;right:18%;width:6%;top:22%;height:36%;transform:rotate(-10deg);opacity:.7}
+  .bubbles{position:absolute;inset:auto 0 0 0;top:16%;pointer-events:none}
+  .bubbles i{
+    position:absolute;bottom:-4%;
+    width:10px;height:10px;border-radius:50%;
+    border:1.5px solid rgba(255,255,255,.9);
+    background:radial-gradient(circle at 34% 30%, #fff, rgba(255,255,255,.1));
+    opacity:0;
+  }
+  .bottle:hover .bubbles i{animation:rise 2.6s ease-in infinite}
+  .bottle:hover .bubbles i:nth-child(1){left:22%;animation-delay:0s;width:9px;height:9px}
+  .bottle:hover .bubbles i:nth-child(2){left:38%;animation-delay:.5s;width:13px;height:13px}
+  .bottle:hover .bubbles i:nth-child(3){left:54%;animation-delay:1.1s;width:7px;height:7px}
+  .bottle:hover .bubbles i:nth-child(4){left:66%;animation-delay:.8s;width:11px;height:11px}
+  .bottle:hover .bubbles i:nth-child(5){left:47%;animation-delay:1.7s;width:8px;height:8px}
+  .bottle:hover .bubbles i:nth-child(6){left:30%;animation-delay:2.1s;width:12px;height:12px}
+  @keyframes rise{
+    0%{transform:translateY(0) scale(.6);opacity:0}
+    12%{opacity:1}
+    90%{opacity:.9}
+    100%{transform:translateY(-46vh) translateX(6px) scale(1.15);opacity:0}
+  }
+  .b-shadow{
+    position:absolute;left:6%;right:6%;bottom:-7%;height:8%;
+    border-radius:50%;
+    background:radial-gradient(50% 50% at 50% 50%, rgba(90,50,140,.4), transparent 70%);
+    filter:blur(6px);
+    animation:shadowBreathe 4s ease-in-out infinite alternate;
+  }
+  @keyframes shadowBreathe{from{transform:scaleX(1);opacity:.7}to{transform:scaleX(.82);opacity:.45}}
+
+  .scrollcue{
+    position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
+    z-index:4;font-size:11px;letter-spacing:.28em;text-transform:uppercase;
+    font-weight:700;opacity:.55;display:flex;flex-direction:column;align-items:center;gap:8px;
+  }
+  .scrollcue::after{
+    content:"";width:1.5px;height:34px;
+    background:linear-gradient(180deg,var(--ink),transparent);
+    animation:cueDrop 1.8s ease-in-out infinite;
+  }
+  @keyframes cueDrop{0%,100%{transform:scaleY(.4);transform-origin:top}50%{transform:scaleY(1)}}
+
+  /* ═══════════ TURBULENCE STRIP ═══════════ */
+  .strip{
+    position:relative;
+    padding:clamp(40px,6vw,84px) 0;
+    background:linear-gradient(100deg,var(--c3),var(--c1) 45%,var(--c2));
+    overflow:hidden;
+  }
+  .strip svg.distort{position:absolute;inset:0;width:100%;height:100%}
+  .strip .strip-content{
+    position:relative;z-index:2;text-align:center;color:#fff;
+    font-weight:900;font-size:clamp(30px,6.4vw,86px);
+    letter-spacing:-.02em;line-height:1.04;
+    text-shadow:0 6px 26px rgba(60,20,90,.4);
+  }
+  .strip .strip-content small{
+    display:block;margin-top:14px;font-size:clamp(12px,1.4vw,16px);
+    font-weight:600;letter-spacing:.24em;text-transform:uppercase;opacity:.9;
+  }
+
+  /* ═══════════ SECTIONS ═══════════ */
+  .section{
+    width:min(1100px,100%);margin:0 auto;
+    padding:clamp(56px,9vw,120px) clamp(20px,4vw,56px);
+    display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(20px,3vw,44px);
+  }
+  @media(max-width:860px){.section{grid-template-columns:1fr}}
+  .card{
+    background:rgba(255,255,255,.7);
+    border:1px solid rgba(34,21,51,.08);
+    border-radius:22px;
+    padding:30px 26px;
+    box-shadow:0 14px 34px -20px rgba(90,50,140,.35);
+    transition:transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s;
+  }
+  .card:hover{transform:translateY(-6px);box-shadow:0 24px 44px -20px rgba(90,50,140,.5)}
+  .card .icon{
+    width:52px;height:52px;border-radius:16px;margin-bottom:16px;
+    background:conic-gradient(from 210deg, var(--c1), var(--c2), var(--c3), var(--c1));
+    box-shadow:inset 0 0 0 3px #fff;
+  }
+  .card h3{font-size:19px;margin-bottom:8px}
+  .card p{font-size:14.5px;line-height:1.65;opacity:.75}
+  .section-head{
+    grid-column:1/-1;text-align:center;margin-bottom:8px;
+  }
+  .section-head h2{font-size:clamp(28px,4.4vw,48px);letter-spacing:-.02em}
+  .section-head p{margin-top:10px;opacity:.65;font-size:15px}
+
+  footer{
+    padding:44px 24px 60px;text-align:center;
+    font-size:13px;opacity:.65;
+  }
+  footer b{
+    background:linear-gradient(90deg,var(--c1),var(--c2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .molten i,.wordblock h1,.b-liquid::before,.b-shadow,.scrollcue::after{animation:none !important}
+    .bottle{transition:none}
+    html{scroll-behavior:auto}
+  }
+</style>
+</head>
+<body>
+
+<!-- hidden SVG defs: animated turbulence used by the strip -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="liquidWarp" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence id="warpTurb" type="fractalNoise" baseFrequency="0.012 0.05" numOctaves="2" seed="7" result="noise">
+        <animate attributeName="baseFrequency" dur="26s" values="0.012 0.05;0.02 0.028;0.009 0.061;0.012 0.05" repeatCount="indefinite"/>
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="46" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+
+<header class="hero" id="top">
+  <nav class="topbar">
+    <div class="logo">NOON</div>
+    <ul>
+      <li><a href="#why">Why noon</a></li>
+      <li><a href="#strip">Sunstruck</a></li>
+      <li><a href="#top">Top</a></li>
+    </ul>
+    <a class="cta" href="#why">Get sunlight</a>
+  </nav>
+
+  <div class="molten" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="molten-mask" aria-hidden="true"></div>
+  <div class="sheen" id="sheen" aria-hidden="true"></div>
+
+  <div class="hero-inner">
+    <div class="wordblock">
+      <h1>NOON</h1>
+      <p class="tag">The sunlight drink. Cold-pressed <b>noon in a bottle</b> — mango, lilac dusk and one long aqua afternoon.</p>
+      <p class="sub">Vitamin D turned up. Zero sugar, zero irony. Formulated at exactly 12:00 on a very good Tuesday.</p>
+      <div class="hero-actions">
+        <a class="btn solid" href="#why">Taste the noon →</a>
+        <a class="btn ghost" href="#strip">See the flavors</a>
+      </div>
+      <div class="chips" id="chips" role="group" aria-label="flavor theme">
+        <span class="label">Flavor —</span>
+        <button class="chip" data-c1="#FFB23E" data-c2="#B892FF" data-c3="#5EEAD4" aria-pressed="true">
+          <i class="dot" style="--sw1:#FFB23E"></i>Mango Dusk
+        </button>
+        <button class="chip" data-c1="#FF7B54" data-c2="#FFD166" data-c3="#FF5D8F" aria-pressed="false">
+          <i class="dot" style="--sw1:#FF7B54"></i>Solar Flare
+        </button>
+        <button class="chip" data-c1="#4CC9F0" data-c2="#B892FF" data-c3="#80FFDB" aria-pressed="false">
+          <i class="dot" style="--sw1:#4CC9F0"></i>Glacier Noon
+        </button>
+        <button class="chip" data-c1="#A0E7E5" data-c2="#F9C74F" data-c3="#90BE6D" aria-pressed="false">
+          <i class="dot" style="--sw1:#A0E7E5"></i>Botanical AM
+        </button>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="bottle" id="bottle" title="Our bottle — pure gradients">
+        <div class="b-cap"></div>
+        <div class="b-neck"></div>
+        <div class="b-body">
+          <div class="b-liquid"></div>
+          <div class="b-spark"></div>
+          <div class="b-spark two"></div>
+          <div class="b-label">
+            <span class="n">NOON</span>
+            <span class="s">12:00 sharp</span>
+          </div>
+          <div class="bubbles"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <div class="b-shadow"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scrollcue">pour</div>
+</header>
+
+<section class="strip" id="strip">
+  <!-- displaced decorative strip: repeats of type run through feTurbulence + feDisplacementMap -->
+  <svg class="distort" viewBox="0 0 1200 420" preserveAspectRatio="none" aria-hidden="true">
+    <g filter="url(#liquidWarp)">
+      <text x="60" y="120" font-size="86" font-weight="900" fill="rgba(255,255,255,.55)" font-family="system-ui">sunlight</text>
+      <text x="640" y="220" font-size="64" font-weight="900" fill="rgba(255,255,255,.35)" font-family="system-ui">· liquid ·</text>
+      <text x="120" y="320" font-size="104" font-weight="900" fill="rgba(255,255,255,.45)" font-family="system-ui">noon noon</text>
+      <text x="700" y="392" font-size="52" font-weight="900" fill="rgba(255,255,255,.3)" font-family="system-ui">catch the warm hours</text>
+      <rect x="0" y="0" width="1200" height="420" fill="rgba(255,255,255,.04)"/>
+    </g>
+  </svg>
+  <div class="strip-content">
+    Drink the warm hours.
+    <small>bornt at high sun · served very cold</small>
+  </div>
+</section>
+
+<section class="section" id="why">
+  <div class="section-head">
+    <h2>Why noon hits different</h2>
+    <p>Three reasons the day leans our way.</p>
+  </div>
+  <div class="card">
+    <div class="icon"></div>
+    <h3>Brewed at peak light</h3>
+    <p>We harvest flavour when the sun is straight overhead and the sugar in fruit is at its most confident. Then we chill it hard, because contrast is everything.</p>
+  </div>
+  <div class="card">
+    <div class="icon" style="border-radius:50%"></div>
+    <h3>Chrome for your throat</h3>
+    <p>A silky mouthfeel engineered from nothing but cold and care. It pours like molten metal and lands like a cool floor on a hot day.</p>
+  </div>
+  <div class="card">
+    <div class="icon" style="border-radius:4px"></div>
+    <h3>Re-tint your day</h3>
+    <p>Four moods, four palettes. Pick a flavour chip and the whole world — bottle, sky, type — agrees with you instantly.</p>
+  </div>
+</section>
+
+<footer>
+  <b>NOON</b> — a fictional sunlight drink. Made of gradients, turbulence and good light.<br>
+  Hover the bottle for bubbles. Move your cursor; the daylight follows.
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var root = document.documentElement;
+  var sheen = document.getElementById('sheen');
+  var bottle = document.getElementById('bottle');
+  var stage = document.getElementById('stage');
+
+  /* — flavour chips re-tint the whole theme — */
+  var chips = Array.prototype.slice.call(document.querySelectorAll('.chip'));
+  chips.forEach(function(chip){
+    chip.addEventListener('click', function(){
+      root.style.setProperty('--c1', chip.dataset.c1);
+      root.style.setProperty('--c2', chip.dataset.c2);
+      root.style.setProperty('--c3', chip.dataset.c3);
+      chips.forEach(function(c){ c.setAttribute('aria-pressed', c === chip ? 'true' : 'false'); });
+    });
+  });
+
+  /* — pointer with easing lag: sheen blob follows, bottle tilts in 3D — */
+  var tx = innerWidth * .5, ty = innerHeight * .44;   // target
+  var bx = tx, by = ty;                               // eased
+  addEventListener('pointermove', function(e){
+    tx = e.clientX; ty = e.clientY;
+  }, {passive:true});
+
+  function tick(){
+    bx += (tx - bx) * 0.055;
+    by += (ty - by) * 0.055;
+    if (sheen) {
+      root.style.setProperty('--blob-x', bx.toFixed(1) + 'px');
+      root.style.setProperty('--blob-y', by.toFixed(1) + 'px');
+    }
+    if (bottle && stage && !reduce) {
+      var r = stage.getBoundingClientRect();
+      var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      var dx = Math.max(-1, Math.min(1, (bx - cx) / (innerWidth * .5)));
+      var dy = Math.max(-1, Math.min(1, (by - cy) / (innerHeight * .6)));
+      var inView = r.bottom > 0 && r.top < innerHeight;
+      if (inView) {
+        bottle.style.transform =
+          'rotateY(' + (dx * 22).toFixed(2) + 'deg) rotateX(' + (-dy * 12).toFixed(2) + 'deg) rotateZ(' + (dx * 3).toFixed(2) + 'deg)';
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  /* — pause molten drift + rAF work when tab hidden — */
+  document.addEventListener('visibilitychange', function(){
+    document.querySelectorAll('.molten i').forEach(function(b){
+      b.style.animationPlayState = document.hidden ? 'paused' : 'running';
+    });
+  });
+})();
+</script>
+</body>
+</html>

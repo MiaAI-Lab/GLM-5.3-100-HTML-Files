@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHILATELY — the stamp album</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow-x:auto; overflow-y:auto; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:#efe8d8; color:#4a3c2c;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(160,130,80,.07) 0 2%, transparent 3%),
+      radial-gradient(circle at 70% 60%, rgba(160,130,80,.06) 0 2%, transparent 3%);
+  }
+  .album {
+    max-width:900px; margin:30px auto; padding:36px 40px 60px;
+    background:linear-gradient(160deg, #f6efe0, #ece2cc);
+    border-radius:6px 18px 18px 6px;
+    box-shadow:0 30px 70px rgba(90,70,40,.3), inset 0 0 0 1px rgba(140,110,70,.2);
+    position:relative;
+  }
+  .album::before { /* spine */
+    content:""; position:absolute; left:0; top:0; bottom:0; width:26px;
+    background:repeating-linear-gradient(180deg, #4a3c2c 0 3px, #3c2f22 3px 7px);
+    border-radius:6px 0 0 6px; opacity:.85;
+  }
+  header { margin:0 0 34px 26px; }
+  header h1 { font-size:clamp(22px, 4vw, 34px); font-weight:400; letter-spacing:.3em; color:#5a4a34; }
+  header p { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.34em; color:#8a7a5e; text-transform:uppercase; margin-top:6px; }
+
+  /* stamp grid */
+  .page { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:26px 22px; margin-left:26px; }
+  .stamp { position:relative; cursor:zoom-in; }
+  .stamp .frame {
+    background:#fff; padding:7px; box-shadow:0 4px 14px rgba(90,70,40,.22);
+    transform:rotate(var(--rot, 0deg)); transition:transform .25s cubic-bezier(.2,.9,.3,1);
+    position:relative;
+  }
+  .stamp:hover .frame { transform:rotate(0deg) scale(1.06); z-index:4; }
+  .stamp canvas { display:block; width:100%; }
+  /* perforation edge via dotted mask illusion */
+  .stamp .perf {
+    position:absolute; inset:0;
+    background-image:radial-gradient(circle at 0 50%, transparent 4px, #fff 4px);
+  }
+  .hinge {
+    position:absolute; left:50%; top:-9px; transform:translateX(-50%) rotate(-3deg);
+    width:26px; height:16px; background:rgba(220,200,160,.8);
+    border:1px dashed rgba(140,110,70,.4); z-index:2;
+  }
+  .caption { margin-top:9px; font-size:10.5px; font-style:italic; color:#8a7a5e; text-align:center; }
+  .catv { font-family:"Courier New", monospace; font-size:10px; color:#a08c6a; text-align:center; margin-top:2px; }
+
+  /* loupe */
+  .loupe {
+    position:fixed; width:170px; height:170px; border-radius:50%; z-index:60;
+    border:8px solid #5a4a34; box-shadow:0 20px 50px rgba(0,0,0,.4), inset 0 0 24px rgba(120,90,50,.3);
+    overflow:hidden; pointer-events:none; opacity:0; transition:opacity .25s;
+    background:#f6efe0;
+  }
+  .loupe.show { opacity:1; }
+  .loupe .mag {
+    position:absolute; width:200%; height:200%;
+    transform-origin:0 0; image-rendering:auto;
+  }
+  .loupe .mag canvas { width:100%; height:100%; display:block; }
+
+  /* swap drawer */
+  .drawer {
+    margin:40px 0 0 26px; padding:18px 22px; border:1px dashed rgba(140,110,70,.5);
+    border-radius:10px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  }
+  .drawer h3 { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.3em; color:#8a7a5e; text-transform:uppercase; }
+  .drawer .offers { display:flex; gap:12px; }
+  .offer {
+    background:#fff; padding:5px; cursor:pointer; box-shadow:0 3px 10px rgba(90,70,40,.2);
+    transition:transform .15s;
+  }
+  .offer:hover { transform:translateY(-4px) rotate(-2deg); }
+  .offer canvas { display:block; width:74px; }
+  .drawer .ticker { font-family:"Courier New", monospace; font-size:10.5px; color:#8a7a5e; margin-top:6px; width:100%; }
+  .drawer .ticker b { color:#5a4a34; }
+
+  @media (max-width:560px) { .album { padding:22px 18px 40px; } .page { margin-left:12px; } }
+</style>
+</head>
+<body>
+  <main class="album">
+    <header>
+      <h1>The Album</h1>
+      <p>philately · folio of mountain, sea &amp; sky · unhinged specimens included</p>
+    </header>
+
+    <section class="page" id="page"></section>
+
+    <div class="drawer">
+      <h3>swap meet · three offers, pick one</h3>
+      <div class="offers" id="offers"></div>
+      <div class="ticker">collection value <b id="valV">$0</b> · condition varies · forgeries probable</div>
+    </div>
+  </main>
+
+  <div class="loupe" id="loupe"><div class="mag" id="mag"></div></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById($id(id));
+  function $id(id) { return id; }
+  /* ---------- stamp renderer ---------- */
+  const THEMES = [
+    { name: "mont aiguille", cat: "FR 1864 · no. 23", tones: ["#3a5a4a", "#8aa89a", "#e8dcb8"], kind: "mount", val: 240 },
+    { name: "the merrow light", cat: "IE 1891 · no. 7", tones: ["#2a4a6a", "#7a9ab8", "#e8e0c8"], kind: "lighthouse", val: 180 },
+    { name: "loggerhead turtle", cat: "CV 1976 · no. 312", tones: ["#2e5a3a", "#6a9a68", "#f0e4c0"], kind: "turtle", val: 90 },
+    { name: "satellite echo i", cat: "SU 1962 · no. 45", tones: ["#2a2a4a", "#6a6a9a", "#d8d8e8"], kind: "satellite", val: 320 },
+    { name: "the berry pickers", cat: "NO 1933 · no. 88", tones: ["#4a3a2a", "#9a7a5a", "#e8d8b8"], kind: "figures", val: 60 },
+    { name: "coral atoll mail", cat: "PG 1954 · no. 12", tones: ["#3a4a6a", "#8a9ac0", "#f0e8d0"], kind: "atoll", val: 140 },
+  ];
+
+  function drawStamp(cnv, th) {
+    const c = cnv.getContext("2d");
+    const w = cnv.width = 360, h = cnv.height = 440;
+    /* stamp paper */
+    c.fillStyle = th.tones[2];
+    c.fillRect(0, 0, w, h);
+    /* paper grain */
+    for (let i = 0; i < 200; i++) {
+      c.fillStyle = "rgba(120,90,50," + Math.random() * 0.06 + ")";
+      c.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+    }
+    /* engraved frame */
+    c.strokeStyle = th.tones[0];
+    c.lineWidth = 8;
+    c.strokeRect(16, 16, w - 32, h - 96);
+    c.lineWidth = 2;
+    c.strokeRect(26, 26, w - 52, h - 116);
+    /* corner letters */
+    c.fillStyle = th.tones[0];
+    c.font = "700 22px Georgia";
+    c.fillText("P", 34, 54);
+    c.fillText("O", w - 48, 54);
+
+    /* vignette scene */
+    c.save();
+    c.translate(0, 0);
+    if (th.kind === "mount") {
+      /* mountain */
+      c.fillStyle = th.tones[0];
+      c.beginPath();
+      c.moveTo(40, 300); c.lineTo(160, 120); c.lineTo(300, 300);
+      c.closePath(); c.fill();
+      c.fillStyle = "#fff";
+      c.beginPath();
+      c.moveTo(140, 156); c.lineTo(160, 120); c.lineTo(184, 152);
+      c.lineTo(170, 146); c.closePath(); c.fill();
+      /* hachure lines */
+      c.strokeStyle = "rgba(255,255,255,.25)";
+      for (let i = 0; i < 5; i++) {
+        c.beginPath();
+        c.moveTo(120 + i * 18, 300);
+        c.lineTo(150 + i * 10, 180 + i * 16);
+        c.stroke();
+      }
+    } else if (th.kind === "lighthouse") {
+      c.fillStyle = th.tones[0];
+      c.fillRect(150, 130, 44, 170);
+      c.fillStyle = th.tones[1];
+      c.fillRect(150, 170, 44, 16);
+      c.fillRect(150, 220, 44, 16);
+      c.fillStyle = "#ffd980";
+      c.fillRect(154, 104, 36, 24);
+      c.fillStyle = th.tones[0];
+      c.fillRect(148, 98, 48, 8);
+      /* sea */
+      c.strokeStyle = th.tones[1];
+      for (let i = 0; i < 5; i++) {
+        c.beginPath();
+        c.moveTo(30, 312 + i * 10);
+        c.bezierCurveTo(120, 306 + i * 10, 240, 318 + i * 10, 330, 312 + i * 10);
+        c.stroke();
+      }
+    } else if (th.kind === "turtle") {
+      c.fillStyle = th.tones[0];
+      c.beginPath();
+      c.ellipse(180, 240, 96, 66, 0, 0, 6.283);
+      c.fill();
+      /* shell pattern */
+      c.strokeStyle = th.tones[1];
+      c.lineWidth = 3;
+      for (let i = 0; i < 4; i++) {
+        c.beginPath();
+        c.arc(180, 240, 30 + i * 20, 0.6, 2.5);
+        c.stroke();
+      }
+      /* head + flippers */
+      c.fillStyle = th.tones[1];
+      c.beginPath(); c.ellipse(280, 230, 26, 18, 0.4, 0, 6.283); c.fill();
+      c.beginPath(); c.ellipse(120, 210, 24, 12, -0.7, 0, 6.283); c.fill();
+      c.beginPath(); c.ellipse(130, 284, 22, 11, 0.6, 0, 6.283); c.fill();
+    } else if (th.kind === "satellite") {
+      c.fillStyle = th.tones[1];
+      c.beginPath(); c.arc(180, 220, 34, 0, 6.283); c.fill();
+      /* panels */
+      c.fillStyle = th.tones[0];
+      c.fillRect(60, 208, 84, 26);
+      c.fillRect(216, 208, 84, 26);
+      c.strokeStyle = th.tones[2];
+      for (let i = 0; i < 5; i++) {
+        c.beginPath(); c.moveTo(76 + i * 17, 208); c.lineTo(76 + i * 17, 234); c.stroke();
+        c.beginPath(); c.moveTo(232 + i * 17, 208); c.lineTo(232 + i * 17, 234); c.stroke();
+      }
+      /* stars */
+      c.fillStyle = "#fff";
+      for (let i = 0; i < 14; i++) c.fillRect(40 + (i * 53) % 280, 110 + (i * 31) % 160, 2.4, 2.4);
+    } else if (th.kind === "figures") {
+      /* two berry pickers silhouettes */
+      c.fillStyle = th.tones[0];
+      [[130, 1], [210, -1]].forEach(([fx, dir]) => {
+        c.beginPath(); c.arc(fx, 180, 15, 0, 6.283); c.fill();
+        c.fillRect(fx - 12, 196, 24, 52);
+        c.beginPath(); c.arc(fx + dir * 22, 160, 14, 0, 6.283); c.stroke();
+      });
+      /* bushes */
+      c.fillStyle = th.tones[1];
+      for (let i = 0; i < 4; i++) {
+        c.beginPath();
+        c.ellipse(70 + i * 72, 280, 34, 22, 0, 0, 6.283);
+        c.fill();
+      }
+    } else {
+      /* atoll: ring of islets */
+      c.strokeStyle = th.tones[1];
+      c.lineWidth = 26;
+      c.beginPath();
+      c.ellipse(180, 220, 100, 62, 0, 0.5, 5.6);
+      c.stroke();
+      c.fillStyle = th.tones[0];
+      for (let i = 0; i < 6; i++) {
+        const a = 0.7 + i * 0.8;
+        c.beginPath();
+        c.ellipse(180 + Math.cos(a) * 100, 220 + Math.sin(a) * 62, 16, 10, a, 0, 6.283);
+        c.fill();
+      }
+      c.fillStyle = th.tones[1];
+      c.beginPath();
+      c.ellipse(180, 220, 62, 36, 0, 0, 6.283);
+      c.fill();
+    }
+    c.restore();
+
+    /* denomination + country */
+    c.fillStyle = th.tones[0];
+    c.font = "900 44px Georgia";
+    c.fillText(Math.ceil(th.val / 60) * 5 + "", 34, h - 52);
+    c.font = "700 15px Georgia";
+    c.fillText("POSTES", 34, h - 32);
+    c.textAlign = "right";
+    c.fillText(th.name.toUpperCase().slice(0, 14), w - 34, h - 32);
+    c.textAlign = "left";
+
+    /* cancellation: wavy lines */
+    c.strokeStyle = "rgba(40,30,20,.5)";
+    c.lineWidth = 4;
+    c.beginPath();
+    for (let x = 30; x <= w - 30; x += 3) {
+      const y = 90 + Math.sin(x * 0.09) * 14;
+      x === 30 ? c.moveTo(x, y) : c.lineTo(x, y);
+    }
+    c.stroke();
+    /* postmark ring fragment */
+    c.beginPath();
+    c.arc(w * 0.5, h * 0.5, 74, 0.4, 2.4);
+    c.stroke();
+
+    /* perforations: punch holes around edge */
+    c.globalCompositeOperation = "destination-out";
+    const step = 22;
+    for (let x = step / 2; x < w; x += step) {
+      c.beginPath(); c.arc(x, 0, 7, 0, 6.283); c.fill();
+      c.beginPath(); c.arc(x, h, 7, 0, 6.283); c.fill();
+    }
+    for (let y = step / 2; y < h; y += step) {
+      c.beginPath(); c.arc(0, y, 7, 0, 6.283); c.fill();
+      c.beginPath(); c.arc(w, y, 7, 0, 6.283); c.fill();
+    }
+    c.globalCompositeOperation = "source-over";
+  }
+
+  /* ---------- build album page ---------- */
+  const page = $("page");
+  const stamps = [];
+  THEMES.forEach((th, i) => {
+    const el = document.createElement("figure");
+    el.className = "stamp";
+    el.style.setProperty("--rot", ((i % 2 ? 1 : -1) * (1 + Math.random() * 2)).toFixed(1) + "deg");
+    const frame = document.createElement("div");
+    frame.className = "frame";
+    const cnv = document.createElement("canvas");
+    drawStamp(cnv, th);
+    frame.appendChild(cnv);
+    const hinge = document.createElement("div");
+    hinge.className = "hinge";
+    el.appendChild(hinge);
+    el.appendChild(frame);
+    const cap = document.createElement("figcaption");
+    cap.className = "caption";
+    cap.textContent = th.name;
+    el.appendChild(cap);
+    const cat = document.createElement("div");
+    cat.className = "catv";
+    cat.textContent = th.cat + " · $" + th.val;
+    el.appendChild(cat);
+    page.appendChild(el);
+    stamps.push({ el, cnv, th, used: i > 3 });
+  });
+
+  /* ---------- loupe ---------- */
+  const loupe = $("loupe"), mag = $("mag");
+  document.addEventListener("pointermove", (e) => {
+    const over = e.target.closest ? e.target.closest(".stamp") : null;
+    if (!over) { loupe.classList.remove("show"); return; }
+    const st = stamps.find(s => s.el === over);
+    if (!st) return;
+    mag.innerHTML = "";
+    const clone = document.createElement("canvas");
+    clone.width = st.cnv.width; clone.height = st.cnv.height;
+    clone.getContext("2d").drawImage(st.cnv, 0, 0);
+    mag.appendChild(clone);
+    const r = over.getBoundingClientRect();
+    const kx = (e.clientX - r.left) / r.width;
+    const ky = (e.clientY - r.top) / r.height;
+    mag.style.transform = "translate(" + (-kx * 340 + 85) + "px," + (-ky * 420 + 85) + "px)";
+    loupe.style.left = (e.clientX - 85) + "px";
+    loupe.style.top = (e.clientY - 85) + "px";
+    loupe.classList.add("show");
+  });
+
+  /* plate flaw hunt: click stamp to inspect → chance of discovering a flaw (value bump) */
+  stamps.forEach(s => {
+    s.el.addEventListener("click", () => {
+      if (s.flawFound) return;
+      if (Math.random() < 0.3) {
+        s.flawFound = true;
+        s.th.val *= 4;
+        /* mark it */
+        const cap = s.el.querySelector(".caption");
+        cap.textContent = s.th.name + " ✦ plate flaw found!";
+        cap.style.color = "#a04a20";
+      }
+      updateValue();
+    });
+  });
+  function updateValue() {
+    $("valV").textContent = "$" + stamps.reduce((t, s) => t + s.th.val, 0);
+  }
+  updateValue();
+
+  /* ---------- swap meet ---------- */
+  const offers = $("offers");
+  function refreshOffers() {
+    offers.innerHTML = "";
+    for (let i = 0; i < 3; i++) {
+      const th = THEMES[Math.floor(Math.random() * THEMES.length)];
+      const d = document.createElement("div");
+      d.className = "offer";
+      const cnv = document.createElement("canvas");
+      drawStamp(cnv, th);
+      d.appendChild(cnv);
+      d.title = th.name + " · $" + th.val;
+      d.addEventListener("click", () => {
+        /* replaces a random duplicate */
+        const target = stamps[Math.floor(Math.random() * stamps.length)];
+        target.th = th;
+        drawStamp(target.cnv, th);
+        target.el.querySelector(".caption").textContent = th.name;
+        target.el.querySelector(".caption").style.color = "";
+        target.flawFound = false;
+        target.el.querySelector(".catv").textContent = th.cat + " · $" + th.val;
+        updateValue();
+        refreshOffers();
+      });
+      offers.appendChild(d);
+    }
+  }
+  refreshOffers();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KITE FESTIVAL — paper winds</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    touch-action:none; user-select:none; -webkit-user-select:none;
+    background:linear-gradient(180deg, #ffb27a 0%, #e88a9a 40%, #b06a9a 75%, #6a4a8a 100%);
+    color:#4a2438;
+  }
+  #sky { position:fixed; inset:0; }
+  canvas#c { position:absolute; inset:0; width:100%; height:100%; cursor:grab; }
+
+  .hud { position:fixed; left:22px; top:18px; z-index:10; text-shadow:0 1px 6px rgba(255,220,190,.5); }
+  .hud h1 { font-size:17px; font-weight:400; letter-spacing:.5em; text-transform:uppercase; color:#5a2440; }
+  .hud p { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.28em; text-transform:uppercase; color:#8a4a68; margin-top:5px; }
+
+  .scorebox { position:fixed; right:22px; top:18px; z-index:10; text-align:right;
+    font-family:system-ui, sans-serif; text-shadow:0 1px 6px rgba(255,220,190,.5); }
+  .scorebox .sc { font-size:30px; font-weight:300; color:#5a2440; }
+  .scorebox .lab { font-size:9px; letter-spacing:.3em; text-transform:uppercase; color:#8a4a68; }
+
+  .controls {
+    position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:10;
+    display:flex; gap:10px; align-items:center; padding:10px 16px; border-radius:99px;
+    background:rgba(255,240,225,.55); border:1px solid rgba(90,36,64,.25);
+    backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); flex-wrap:wrap; justify-content:center;
+  }
+  .controls button {
+    background:rgba(90,36,64,.1); color:#5a2440; border:1px solid rgba(90,36,64,.35);
+    font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.18em; text-transform:uppercase;
+    padding:9px 16px; border-radius:99px; cursor:pointer; transition:all .15s;
+  }
+  .controls button:hover { background:rgba(90,36,64,.24); }
+  .controls button.on { background:#5a2440; color:#ffe8d8; border-color:#5a2440; }
+  .hintline { position:fixed; left:22px; bottom:16px; z-index:10; font-family:system-ui, sans-serif;
+    font-size:9px; letter-spacing:.22em; color:rgba(90,36,64,.7); text-transform:uppercase; }
+  @media (max-width:640px) { .hintline { display:none; } }
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <div class="hud">
+    <h1>Paper Winds</h1>
+    <p>kite festival · drag to steer · thread the rings</p>
+  </div>
+  <div class="scorebox">
+    <div class="sc" id="scoreV">0</div>
+    <div class="lab">rings threaded</div>
+  </div>
+
+  <div class="controls">
+    <button id="reelBtn">reel in</button>
+    <button id="launchBtn">launch kite</button>
+    <button id="lanternBtn">lantern hour</button>
+  </div>
+  <span class="hintline">drift follows the wind · rings appear downwind</span>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById($id(id));
+  function $id(id) { return id; }
+  const cv = $("c"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let wind = 0.6, windT = 0;
+  let lanternHour = false;
+  let rings = [], burst = [];
+
+  const KITES = [
+    { name: "vermilion diamond", c1: "#e84a3a", c2: "#ffb27a", kind: "diamond" },
+    { name: "gold chevron", c1: "#e8a02e", c2: "#ffe8a0", kind: "chevron" },
+    { name: "peacock tails", c1: "#2e8a8a", c2: "#7ad8c8", kind: "diamond" },
+    { name: "plum bird", c1: "#8a4a8a", c2: "#e8a0d8", kind: "bird" },
+  ];
+  let kites = [];
+
+  function makeKite(def) {
+    return {
+      def,
+      x: W * 0.3, y: H * 0.55,
+      vx: 0.8, vy: -0.2,
+      line: 260,          /* string length */
+      tail: [],
+      phase: Math.random() * 6.28,
+      flyer: { x: W * 0.14, y: H * 0.86 },
+    };
+  }
+
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (!kites.length) kites.push(makeKite(KITES[0]));
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  /* clouds */
+  const clouds = [];
+  for (let i = 0; i < 5; i++) clouds.push({ x: Math.random(), y: 0.08 + Math.random() * 0.24, s: 0.5 + Math.random() * 0.9 });
+  /* birds far away */
+  const birds = [];
+  for (let i = 0; i < 4; i++) birds.push({ x: Math.random() * W, y: H * (0.1 + Math.random() * 0.2), ph: Math.random() * 6.28, sp: 0.3 + Math.random() * 0.5 });
+
+  /* rings spawn downwind */
+  function spawnRing() {
+    rings.push({
+      x: W * (0.55 + Math.random() * 0.35),
+      y: H * (0.18 + Math.random() * 0.4),
+      r: 26 + Math.random() * 16,
+      hit: false,
+      life: 1,
+    });
+  }
+  spawnRing();
+
+  /* ---------- physics ---------- */
+  let score = 0;
+  function step(t) {
+    /* wind gust model */
+    windT++;
+    wind = 0.5 + Math.sin(windT / 240) * 0.3 + Math.sin(windT / 61) * 0.12 + (Math.random() - 0.5) * 0.04;
+
+    kites.forEach(k => {
+      /* kite: lift + drag toward downwind, plus steering */
+      k.phase += 0.02;
+      k.vx += (wind * 1.4 - k.vx) * 0.02 + Math.sin(k.phase) * 0.01;
+      k.vy += (-0.15 - k.vy) * 0.015 + Math.sin(k.phase * 1.3) * 0.02;
+      /* string constraint to flyer */
+      const dx = k.x - k.flyer.x, dy = k.y - k.flyer.y;
+      const d = Math.hypot(dx, dy);
+      if (d > k.line) {
+        const pull = (d - k.line) / d;
+        k.x -= dx * pull * 0.5;
+        k.y -= dy * pull * 0.5;
+      }
+      k.x += k.vx;
+      k.y += k.vy;
+      /* bounds */
+      k.y = Math.max(40, Math.min(H * 0.85, k.y));
+      if (k.x > W + 60) k.x = -60;
+      /* tail: verlet chain */
+      k.tail.unshift({ x: k.x, y: k.y + 16 });
+      if (k.tail.length > 22) k.tail.pop();
+      /* ring threading */
+      rings.forEach(r => {
+        if (!r.hit && Math.hypot(k.x - r.x, k.y - r.y) < r.r * 0.8) {
+          r.hit = true;
+          score++;
+          $("scoreV").textContent = score;
+          paperBurst(r.x, r.y);
+          chime();
+        }
+      });
+    });
+    rings = rings.filter(r => !r.hit);
+    if (rings.length < 2 && Math.random() < 0.01) spawnRing();
+
+    /* bursts */
+    burst = burst.filter(p => p.life > 0);
+    burst.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.04; p.life -= 0.025;
+    });
+
+    /* ambient drift */
+    clouds.forEach(cl => {
+      cl.x += 0.0003 * (0.4 + wind);
+      if (cl.x > 1.2) cl.x = -0.3;
+    });
+    birds.forEach(b => {
+      b.x += b.sp * wind * 0.8;
+      if (b.x > W + 20) b.x = -20;
+    });
+  }
+
+  function paperBurst(x, y) {
+    for (let i = 0; i < 16; i++) {
+      burst.push({ x, y, vx: (Math.random() - 0.5) * 4, vy: -Math.random() * 3.4, life: 1, c: ["#e84a3a", "#e8a02e", "#2e8a8a", "#8a4a8a"][i % 4] });
+    }
+  }
+
+  /* ---------- render ---------- */
+  function render(t) {
+    /* dusk sky */
+    const sky = g.createLinearGradient(0, 0, 0, H);
+    if (lanternHour) {
+      sky.addColorStop(0, "#2a1a3e");
+      sky.addColorStop(0.5, "#5a2a4e");
+      sky.addColorStop(1, "#8a3a4e");
+    } else {
+      sky.addColorStop(0, "#ffb27a");
+      sky.addColorStop(0.45, "#e88a9a");
+      sky.addColorStop(1, "#b06a9a");
+    }
+    g.fillStyle = sky;
+    g.fillRect(0, 0, W, H);
+    /* sun */
+    const sx = W * 0.8, sy = H * (lanternHour ? 0.34 : 0.24);
+    const halo = g.createRadialGradient(sx, sy, 6, sx, sy, W * 0.3);
+    halo.addColorStop(0, lanternHour ? "rgba(240,220,255,.5)" : "rgba(255,236,190,.8)");
+    halo.addColorStop(1, "transparent");
+    g.fillStyle = halo;
+    g.fillRect(0, 0, W, H);
+
+    /* clouds */
+    clouds.forEach(cl => {
+      const cx = cl.x * W, cy = cl.y * H;
+      g.fillStyle = lanternHour ? "rgba(120,100,140,.4)" : "rgba(255,235,220,.6)";
+      [[0, 0, 42], [36, 6, 30], [-34, 8, 26], [14, -10, 26]].forEach(([dx, dy, r]) => {
+        g.beginPath();
+        g.ellipse(cx + dx * cl.s, cy + dy * cl.s, r * cl.s, r * 0.42 * cl.s, 0, 0, 6.283);
+        g.fill();
+      });
+    });
+
+    /* birds */
+    g.strokeStyle = lanternHour ? "rgba(60,40,70,.8)" : "rgba(90,50,70,.7)";
+    g.lineWidth = 1.6;
+    birds.forEach(b => {
+      const flap = Math.sin(t / 180 + b.ph) * 4;
+      g.beginPath();
+      g.moveTo(b.x - 7, b.y + flap * 0.4);
+      g.quadraticCurveTo(b.x, b.y - 3 - flap, b.x + 7, b.y + flap * 0.4);
+      g.stroke();
+    });
+
+    /* rings */
+    rings.forEach(r => {
+      g.strokeStyle = "rgba(255,255,255,.75)";
+      g.lineWidth = 3.4;
+      g.setLineDash([8, 6]);
+      g.beginPath(); g.arc(r.x, r.y, r.r, 0, 6.283); g.stroke();
+      g.setLineDash([]);
+      g.strokeStyle = "rgba(255,255,255,.3)";
+      g.beginPath(); g.arc(r.x, r.y, r.r + 7, 0, 6.283); g.stroke();
+    });
+
+    /* kites + strings + tails */
+    kites.forEach(k => drawKite(k, t));
+
+    /* paper burst */
+    burst.forEach(p => {
+      g.globalAlpha = p.life;
+      g.fillStyle = p.c;
+      g.save();
+      g.translate(p.x, p.y);
+      g.rotate(p.life * 6);
+      g.fillRect(-3, -2, 6, 4);
+      g.restore();
+      g.globalAlpha = 1;
+    });
+
+    /* ground strip + festival tents */
+    g.fillStyle = lanternHour ? "#1e1428" : "#8a4a68";
+    g.fillRect(0, H - 40, W, 40);
+    for (let i = 0; i < 5; i++) {
+      const tx = W * (0.06 + i * 0.21);
+      g.fillStyle = lanternHour ? "#2e1e3a" : "#a85a7a";
+      g.beginPath();
+      g.moveTo(tx - 22, H - 40);
+      g.lineTo(tx, H - 72);
+      g.lineTo(tx + 22, H - 40);
+      g.closePath();
+      g.fill();
+    }
+
+    /* flyer figures */
+    kites.forEach(k => {
+      g.fillStyle = lanternHour ? "#241628" : "#5a2440";
+      g.beginPath(); g.arc(k.flyer.x, k.flyer.y - 12, 4, 0, 6.283); g.fill();
+      g.fillRect(k.flyer.x - 3, k.flyer.y - 8, 6, 12);
+    });
+  }
+
+  function drawKite(k, t) {
+    /* string: quadratic sag */
+    g.strokeStyle = lanternHour ? "rgba(220,200,240,.5)" : "rgba(90,36,64,.5)";
+    g.lineWidth = 1.2;
+    g.beginPath();
+    g.moveTo(k.flyer.x, k.flyer.y - 10);
+    const midx = (k.flyer.x + k.x) / 2 + Math.sin(t / 900) * 8;
+    const midy = (k.flyer.y + k.y) / 2 + 26;
+    g.quadraticCurveTo(midx, midy, k.x, k.y);
+    g.stroke();
+
+    /* tail bows */
+    g.lineWidth = 1.6;
+    k.tail.forEach((p, i) => {
+      if (i % 3 === 0 && i > 1) {
+        g.fillStyle = k.def.c2;
+        g.save();
+        g.translate(p.x + Math.sin(t / 300 + i) * 3, p.y);
+        g.rotate(Math.sin(t / 400 + i) * 0.6);
+        g.fillRect(-4, -1.6, 8, 3.2);
+        g.restore();
+      }
+      if (i > 0) {
+        const prev = k.tail[i - 1];
+        g.strokeStyle = lanternHour ? "rgba(220,200,240,.4)" : "rgba(90,36,64,.4)";
+        g.beginPath(); g.moveTo(prev.x, prev.y); g.lineTo(p.x, p.y); g.stroke();
+      }
+    });
+
+    /* kite body */
+    const bob = Math.sin(k.phase * 2) * 3;
+    g.save();
+    g.translate(k.x, k.y + bob);
+    g.rotate(Math.sin(k.phase) * 0.12 + 0.1);
+    if (k.def.kind === "diamond") {
+      g.fillStyle = k.def.c1;
+      g.beginPath();
+      g.moveTo(0, -22); g.lineTo(16, 0); g.lineTo(0, 26); g.lineTo(-16, 0);
+      g.closePath(); g.fill();
+      g.strokeStyle = k.def.c2; g.lineWidth = 2.4;
+      g.beginPath(); g.moveTo(0, -22); g.lineTo(0, 26); g.moveTo(-16, 0); g.lineTo(16, 0); g.stroke();
+    } else if (k.def.kind === "chevron") {
+      g.fillStyle = k.def.c1;
+      g.beginPath();
+      g.moveTo(-20, -14); g.lineTo(0, 2); g.lineTo(20, -14); g.lineTo(20, 8); g.lineTo(0, 24); g.lineTo(-20, 8);
+      g.closePath(); g.fill();
+      g.fillStyle = k.def.c2;
+      g.beginPath();
+      g.moveTo(-20, -14); g.lineTo(0, 2); g.lineTo(20, -14); g.lineTo(0, -4);
+      g.closePath(); g.fill();
+    } else {
+      /* bird form */
+      g.fillStyle = k.def.c1;
+      g.beginPath();
+      g.moveTo(0, -18);
+      g.quadraticCurveTo(22, -6, 14, 18);
+      g.quadraticCurveTo(0, 28, -14, 18);
+      g.quadraticCurveTo(-22, -6, 0, -18);
+      g.fill();
+      g.fillStyle = k.def.c2;
+      g.beginPath();
+      g.moveTo(-20, 0); g.quadraticCurveTo(-34, 10, -22, 16); g.quadraticCurveTo(-16, 8, -20, 0);
+      g.fill();
+      g.beginPath();
+      g.moveTo(20, 0); g.quadraticCurveTo(34, 10, 22, 16); g.quadraticCurveTo(16, 8, 20, 0);
+      g.fill();
+    }
+    /* lantern glow at night */
+    if (lanternHour) {
+      const lg = g.createRadialGradient(0, 0, 2, 0, 0, 34);
+      lg.addColorStop(0, "rgba(255,200,120,.5)");
+      lg.addColorStop(1, "transparent");
+      g.fillStyle = lg;
+      g.beginPath(); g.arc(0, 0, 34, 0, 6.283); g.fill();
+    }
+    g.restore();
+  }
+
+  /* ---------- main loop ---------- */
+  function loop(t) {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+    step(t);
+    render(t);
+  }
+  requestAnimationFrame(loop);
+
+  /* ---------- steering ---------- */
+  let steering = false;
+  cv.addEventListener("pointerdown", (e) => { steering = true; steer(e); cv.style.cursor = "grabbing"; });
+  cv.addEventListener("pointermove", (e) => { if (steering) steer(e); });
+  addEventListener("pointerup", () => { steering = false; cv.style.cursor = "grab"; });
+  function steer(e) {
+    const k = kites[0];
+    if (!k) return;
+    k.vx += (e.clientX - k.x) * 0.0009;
+    k.vy += (e.clientY - k.y) * 0.0012;
+  }
+
+  /* ---------- controls ---------- */
+  $("reelBtn").addEventListener("click", () => {
+    const k = kites[0];
+    if (k) k.line = Math.max(140, k.line - 60);
+  });
+  $("launchBtn").addEventListener("click", () => {
+    const def = KITES[kites.length % KITES.length];
+    const k = makeKite(def);
+    k.x = W * 0.2 + Math.random() * 60;
+    k.flyer.x = W * (0.1 + Math.random() * 0.1);
+    kites.push(k);
+    if (kites.length > 3) kites.shift();
+  });
+  $("lanternBtn").addEventListener("click", function () {
+    lanternHour = !lanternHour;
+    this.classList.toggle("on", lanternHour);
+    this.textContent = lanternHour ? "daylight" : "lantern hour";
+  });
+
+  /* ---------- audio ---------- */
+  let AC = null;
+  function chime() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      const t0 = AC.currentTime;
+      [880, 1174].forEach((f, i) => {
+        const o = AC.createOscillator(), g2 = AC.createGain();
+        o.type = "sine"; o.frequency.value = f;
+        g2.gain.setValueAtTime(0.0001, t0);
+        g2.gain.exponentialRampToValueAtTime(0.04 / (i + 1), t0 + 0.02);
+        g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.9);
+        o.connect(g2); g2.connect(AC.destination);
+        o.start(t0); o.stop(t0 + 1);
+      });
+    } catch (e) {}
+  }
+})();
+</script>
+</body>
+</html>

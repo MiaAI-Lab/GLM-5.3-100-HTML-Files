@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOUNDS OF EARTH — the golden record</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:radial-gradient(ellipse at 50% 30%, #16120c, #0a0806 70%);
+    color:#e0d4bc; display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:26px; padding:20px; user-select:none; -webkit-user-select:none;
+  }
+  header { text-align:center; }
+  header h1 { font-size:clamp(17px, 3vw, 26px); font-weight:400; letter-spacing:.4em; text-transform:uppercase; color:#d4b46a; }
+  header p { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.34em; color:#8a7a5e; text-transform:uppercase; margin-top:8px; }
+
+  /* the record */
+  .deck { display:flex; align-items:center; gap:44px; flex-wrap:wrap; justify-content:center; }
+  .recordwrap { position:relative; width:min(420px, 84vw); aspect-ratio:1; }
+  .record {
+    position:absolute; inset:0; border-radius:50%;
+    background:
+      radial-gradient(circle, #1a1408 0 13.5%, #060402 13.5% 15%, transparent 15%),
+      repeating-radial-gradient(circle at 50% 50%, #c9a84a 0 1.2px, #a8863e 1.2px 2.6px),
+      #b8934a;
+    box-shadow:
+      0 30px 80px rgba(0,0,0,.75),
+      inset 0 0 60px rgba(60,40,10,.5),
+      inset -20px -14px 60px rgba(255,240,190,.18);
+    animation:spin 12s linear infinite;
+  }
+  .record.paused { animation-play-state:paused; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  /* label */
+  .record .label {
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:31%; height:31%; border-radius:50%;
+    background:radial-gradient(circle at 40% 35%, #2e5a8a, #1c3a5e 70%);
+    color:#d8e4f0; text-align:center; font-family:system-ui, sans-serif;
+    box-shadow:inset 0 0 8px rgba(0,0,0,.5);
+  }
+  .record .label .t { font-size:clamp(8px, 1.4vw, 11px); letter-spacing:.14em; margin-top:26%; line-height:1.5; }
+  .record .label .s { font-size:clamp(6px, 1vw, 8px); color:#8aa4c4; letter-spacing:.2em; }
+  /* hole */
+  .record .label::after {
+    content:""; position:absolute; left:50%; top:50%; width:9%; height:9%;
+    transform:translate(-50%,-50%); border-radius:50%; background:#0a0806;
+  }
+  /* specular sweep */
+  .record .gleam {
+    position:absolute; inset:0; border-radius:50%; pointer-events:none;
+    background:linear-gradient(115deg, transparent 32%, rgba(255,250,230,.24) 47%, transparent 58%);
+    animation:spin 12s linear infinite reverse;
+  }
+  /* etched marks: pulsar map hint */
+  .etch { position:absolute; inset:0; border-radius:50%; pointer-events:none; opacity:.55; }
+
+  /* stylus */
+  .stylus {
+    position:absolute; width:150px; height:150px; right:-8%; top:-8%;
+    pointer-events:none; transform-origin:100% 100%;
+    transform:rotate(-28deg); transition:transform .8s cubic-bezier(.2,.9,.3,1);
+    z-index:5;
+  }
+  .stylus.down { transform:rotate(6deg); }
+  .arm {
+    position:absolute; right:8px; top:34px; width:8px; height:120px; border-radius:4px;
+    background:linear-gradient(180deg, #d8d8e0, #8a8a96);
+    box-shadow:2px 2px 6px rgba(0,0,0,.5);
+  }
+  .cart {
+    position:absolute; left:-6px; bottom:-10px; width:22px; height:30px; border-radius:4px;
+    background:linear-gradient(180deg, #3a3a44, #1c1c24);
+  }
+  .head {
+    position:absolute; left:2px; bottom:-24px; width:8px; height:18px;
+    background:linear-gradient(180deg, #d4b46a, #8a6e34); border-radius:2px;
+  }
+  .base {
+    position:absolute; right:-6px; top:-10px; width:44px; height:44px; border-radius:50%;
+    background:radial-gradient(circle at 38% 32%, #d8d8e0, #6a6a76);
+    box-shadow:0 6px 14px rgba(0,0,0,.5);
+  }
+
+  /* tracklist */
+  .tracklist {
+    width:min(320px, 88vw); border:1px solid rgba(212,180,106,.24); border-radius:14px;
+    padding:18px 20px; background:rgba(16,12,8,.72);
+  }
+  .tracklist h3 { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.3em; color:#8a7a5e; text-transform:uppercase; margin-bottom:14px; }
+  .trk {
+    display:flex; align-items:baseline; gap:12px; padding:8px 4px; cursor:pointer;
+    border-bottom:1px solid rgba(212,180,106,.1); transition:background .14s; font-size:13.5px;
+  }
+  .trk:hover { background:rgba(212,180,106,.08); }
+  .trk.playing { color:#ffd98a; }
+  .trk .no { font-family:"Courier New", monospace; font-size:10px; color:#6a5a3e; width:24px; }
+  .trk .dur { margin-left:auto; font-family:"Courier New", monospace; font-size:10px; color:#6a5a3e; }
+
+  /* annotations */
+  .annot {
+    position:absolute; font-family:system-ui, sans-serif; font-size:9px; color:#8a7a5e;
+    letter-spacing:.14em; text-transform:uppercase; pointer-events:none; opacity:0; transition:opacity .5s;
+  }
+  .annot.show { opacity:1; }
+  .annot::before { content:""; position:absolute; left:-14px; top:50%; width:12px; height:1px; background:#6a5a3e; }
+
+  .odometer {
+    position:fixed; left:22px; bottom:18px; z-index:30; font-family:"Courier New", monospace;
+    font-size:11px; color:#8a7a5e; letter-spacing:.12em;
+  }
+  .odometer b { color:#d4b46a; font-weight:400; }
+  .hint { position:fixed; right:22px; bottom:18px; z-index:30; font-family:system-ui, sans-serif;
+    font-size:9px; letter-spacing:.22em; color:#5a4a34; text-transform:uppercase; }
+  @media (max-width:760px) { .hint { display:none; } .odometer { font-size:9.5px; } }
+  @media (prefers-reduced-motion: reduce) { .record, .record .gleam { animation:none; } }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Sounds of Earth</h1>
+    <p>voyager golden record · launched 1977 · still outbound</p>
+  </header>
+
+  <div class="deck">
+    <div class="recordwrap">
+      <svg class="etch" viewBox="0 0 400 400" aria-hidden="true">
+        <!-- pulsar map hint -->
+        <g stroke="#7a5a2e" stroke-width="1" fill="none" opacity=".7">
+          <line x1="200" y1="200" x2="152" y2="130"/><line x1="200" y1="200" x2="262" y2="150"/>
+          <line x1="200" y1="200" x2="286" y2="228"/><line x1="200" y1="200" x2="120" y2="252"/>
+          <line x1="200" y1="200" x2="222" y2="296"/><line x1="200" y1="200" x2="164" y2="290"/>
+          <line x1="200" y1="200" x2="96" y2="172"/>
+        </g>
+        <g fill="#7a5a2e">
+          <circle cx="152" cy="130" r="2"/><circle cx="262" cy="150" r="2"/><circle cx="286" cy="228" r="2"/>
+          <circle cx="120" cy="252" r="2"/><circle cx="222" cy="296" r="2"/><circle cx="164" cy="290" r="2"/>
+          <circle cx="96" cy="172" r="2"/>
+        </g>
+        <!-- hydrogen symbol -->
+        <circle cx="330" cy="96" r="6" stroke="#7a5a2e" fill="none"/>
+        <line x1="330" y1="86" x2="330" y2="106" stroke="#7a5a2e"/>
+      </svg>
+      <div class="record" id="record">
+        <div class="gleam"></div>
+        <div class="label">
+          <div class="t">SOUNDS<br>OF EARTH</div>
+          <div class="s">nasa · 1977</div>
+        </div>
+      </div>
+      <div class="stylus" id="stylus">
+        <div class="base"></div>
+        <div class="arm"><div class="cart"><div class="head"></div></div></div>
+      </div>
+      <div class="annot" id="annot" style="left:6%; top:18%;">pulsar map</div>
+    </div>
+
+    <div class="tracklist">
+      <h3>engraved track list · click to play</h3>
+      <div class="trk" data-t="whale"><span class="no">01</span>whale song<span class="dur">gliss</span></div>
+      <div class="trk" data-t="bach"><span class="no">02</span>bach, brandenburg 2<span class="dur">arpeggio</span></div>
+      <div class="trk" data-t="heartbeat"><span class="no">03</span>heartbeat<span class="dur">1.0s</span></div>
+      <div class="trk" data-t="greet"><span class="no">04</span>greetings, 55 languages<span class="dur">static</span></div>
+      <div class="trk" data-t="silence"><span class="no">05</span>the sounds of earth<span class="dur">∞</span></div>
+    </div>
+  </div>
+
+  <div class="odometer">distance from sun <b id="distV">24.7</b> billion km · moving at 17 km/s</div>
+  <div class="hint">drag the stylus onto the record</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  let AC = null, playing = null, nodes = [];
+  const record = $("record"), stylus = $("stylus");
+
+  /* ---------- audio ---------- */
+  function ac() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+    return AC;
+  }
+  function stopAll() {
+    nodes.forEach(n => { try { n.stop ? n.stop() : n.disconnect(); } catch (e) {} });
+    nodes = [];
+    playing = null;
+    record.classList.remove("paused");
+    document.querySelectorAll(".trk").forEach(t => t.classList.remove("playing"));
+  }
+  function noiseBurst(dur, freq, vol) {
+    const c = ac();
+    const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 1.4);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 0.8;
+    const g = c.createGain(); g.gain.value = vol;
+    src.connect(f); f.connect(g); g.connect(c.destination);
+    src.start();
+    nodes.push(src);
+    return { src, g };
+  }
+  function tone(freq, dur, type, vol, glideTo) {
+    const c = ac();
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, c.currentTime);
+    if (glideTo) o.frequency.linearRampToValueAtTime(glideTo, c.currentTime + dur);
+    g.gain.setValueAtTime(0.0001, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(vol, c.currentTime + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(); o.stop(c.currentTime + dur + 0.05);
+    nodes.push(o);
+    return o;
+  }
+
+  const TRACKS = {
+    whale() {
+      /* glissandi: slow sine sweeps */
+      let i = 0;
+      const iv = setInterval(() => {
+        if (playing !== "whale") { clearInterval(iv); return; }
+        const f = 180 + Math.random() * 400;
+        tone(f, 2.4, "sine", 0.06, f * (0.5 + Math.random() * 1.4));
+        if (i++ % 3 === 0) tone(f * 1.5, 1.4, "sine", 0.02, f * 0.8);
+      }, 2600);
+      tone(220, 2.4, "sine", 0.06, 420);
+    },
+    bach() {
+      /* music-box brandenburg-ish arpeggio */
+      const seq = [523.25, 659.25, 783.99, 1046.5, 783.99, 659.25, 587.33, 493.88];
+      let i = 0;
+      const iv = setInterval(() => {
+        if (playing !== "bach") { clearInterval(iv); return; }
+        tone(seq[i % seq.length], 0.9, "triangle", 0.05);
+        if (i % 4 === 0) tone(seq[(i + 2) % seq.length] / 2, 1.4, "sine", 0.03);
+        i++;
+      }, 300);
+    },
+    heartbeat() {
+      const thump = () => {
+        if (playing !== "heartbeat") return;
+        tone(52, 0.24, "sine", 0.12, 38);
+        setTimeout(() => tone(48, 0.2, "sine", 0.09, 36), 260);
+        setTimeout(thump, 1050);
+      };
+      thump();
+    },
+    greet() {
+      /* static bed + spoken-ish blips */
+      noiseBurst(2.6, 1600, 0.025);
+      let i = 0;
+      const iv = setInterval(() => {
+        if (playing !== "greet") { clearInterval(iv); return; }
+        /* formant-ish pair per "language" */
+        const f1 = 300 + Math.random() * 500, f2 = f1 * (1.6 + Math.random());
+        tone(f1, 0.3, "sawtooth", 0.014, f1 * (0.8 + Math.random() * 0.5));
+        tone(f2, 0.24, "sine", 0.012, f2 * 0.9);
+        if (i++ % 2 === 0) noiseBurst(0.1, 2200, 0.012);
+      }, 420);
+    },
+    silence() {
+      /* surface noise only: the sound of the record itself */
+      const iv = setInterval(() => {
+        if (playing !== "silence") { clearInterval(iv); return; }
+        noiseBurst(0.5, 3000, 0.008);
+      }, 700);
+      noiseBurst(0.6, 3000, 0.008);
+    },
+  };
+
+  /* ---------- play via tracklist ---------- */
+  document.querySelectorAll(".trk").forEach(t => t.addEventListener("click", () => {
+    stopAll();
+    ac();
+    playing = t.dataset.t;
+    t.classList.add("playing");
+    record.classList.remove("paused");
+    stylus.classList.add("down");
+    TRACKS[playing]();
+  }));
+
+  /* ---------- stylus drag onto record ---------- */
+  let sdrag = false;
+  stylus.addEventListener("pointerdown", () => { sdrag = true; });
+  addEventListener("pointerup", (e) => {
+    if (!sdrag) return;
+    sdrag = false;
+    const r = record.getBoundingClientRect();
+    const d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+    if (d < r.width / 2) {
+      stylus.classList.add("down");
+      playing = "silence";
+      record.classList.remove("paused");
+      TRACKS.silence();
+      /* tonearm hiss */
+      noiseBurst(0.3, 4000, 0.02);
+    } else {
+      stylus.classList.remove("down");
+      stopAll();
+    }
+  });
+
+  /* click record to stop */
+  record.addEventListener("click", () => {
+    if (playing) { stopAll(); stylus.classList.remove("down"); }
+  });
+
+  /* ---------- annotations toggle ---------- */
+  $("annot").classList.add("show");
+  setTimeout(() => $("annot").classList.remove("show"), 5000);
+
+  /* ---------- distance odometer ---------- */
+  /* voyager 1: ~24.7 billion km aug 2026, +17 km/s */
+  let dist = 24.72e9;
+  setInterval(() => {
+    if (document.hidden) return;
+    dist += 17;
+    $("distV").textContent = (dist / 1e9).toFixed(2);
+  }, 1000);
+})();
+</script>
+</body>
+</html>

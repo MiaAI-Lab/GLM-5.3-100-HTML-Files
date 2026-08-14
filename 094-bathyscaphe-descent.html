@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAUTILUS — the drop</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    color:#d8e4f0; overflow-x:hidden;
+    background:#0a2028;
+  }
+  #depthbar {
+    position:fixed; left:0; top:0; bottom:0; width:14px; z-index:40;
+    background:linear-gradient(180deg, #4aa0b8, #0a3a4a 40%, #051820 75%, #02060c);
+  }
+  #depthbar .cursor {
+    position:absolute; left:0; right:0; height:3px; background:#ffd9a0;
+    box-shadow:0 0 10px #ffd9a0; top:0;
+  }
+  #depthbar .tick { position:absolute; right:0; width:6px; height:1px; background:rgba(255,255,255,.35); }
+  #depthbar .tick.maj { width:10px; background:rgba(255,255,255,.6); }
+  main { margin-left:14px; position:relative; }
+
+  .zone { min-height:100vh; display:flex; flex-direction:column; justify-content:center; padding:14vh 8vw 10vh; position:relative; }
+  .z-k { font-family:system-ui, sans-serif; font-size:10px; letter-spacing:.42em; text-transform:uppercase; margin-bottom:16px; }
+  .z-k b { color:#7dd8c8; }
+  .zone h2 { font-size:clamp(30px, 5vw, 54px); font-weight:400; line-height:1.14; max-width:18ch; margin-bottom:20px; }
+  .zone p { font-family:system-ui, sans-serif; font-weight:300; font-size:15.5px; line-height:1.9; color:#a9c0d4; max-width:52ch; }
+  .readout {
+    margin-top:26px; display:inline-flex; gap:26px; padding:16px 22px;
+    border:1px solid rgba(150,220,210,.16); border-radius:12px; width:fit-content;
+    background:rgba(4,18,26,.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+    font-family:"Courier New", monospace;
+  }
+  .readout div { text-align:center; }
+  .readout b { display:block; font-size:19px; font-weight:400; color:#ffd9a0; }
+  .readout span { font-family:system-ui, sans-serif; font-size:8px; letter-spacing:.24em; text-transform:uppercase; color:#6a92a8; }
+
+  .creature-tip {
+    display:inline-block; margin-top:18px; padding:10px 16px; border-left:3px solid #7dd8c8;
+    background:rgba(125,216,200,.06); font-style:italic; font-size:13.5px; color:#a8d8cc;
+    max-width:46ch; opacity:0; transform:translateY(8px); transition:all .5s; cursor:pointer;
+  }
+  .creature-tip.show { opacity:1; transform:none; }
+
+  /* water background canvas */
+  #water { position:fixed; inset:0; z-index:-1; }
+  .snow { position:fixed; z-index:1; pointer-events:none; }
+  main { z-index:5; }
+
+  .spotlight {
+    position:fixed; inset:0; z-index:2; pointer-events:none;
+    background:radial-gradient(circle 180px at var(--sx, 50%) var(--sy, 50%), rgba(240,250,255,.06), transparent 70%);
+    opacity:0; transition:opacity .6s;
+  }
+  .spotlight.on { opacity:1; }
+  .sonarbtn {
+    position:fixed; right:22px; bottom:22px; z-index:30;
+    background:rgba(10,40,52,.8); color:#7dd8c8; border:1px solid rgba(125,216,200,.4);
+    font-family:system-ui, sans-serif; font-size:10px; letter-spacing:.22em; text-transform:uppercase;
+    padding:12px 22px; border-radius:99px; cursor:pointer; transition:all .2s; backdrop-filter:blur(6px);
+  }
+  .sonarbtn:hover { background:#12505e; }
+  .depthhud {
+    position:fixed; right:22px; top:20px; z-index:30; text-align:right;
+    font-family:"Courier New", monospace; color:#7dd8c8; font-size:13px; letter-spacing:.1em;
+  }
+  .depthhud small { display:block; font-family:system-ui, sans-serif; font-size:8.5px; letter-spacing:.3em; color:#4a7a8c; text-transform:uppercase; margin-top:4px; }
+  @media (max-width:640px) {
+    #depthbar { width:10px; }
+    main { margin-left:10px; }
+  }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto; } }
+</style>
+</head>
+<body>
+  <canvas id="water"></canvas>
+  <div id="depthbar"><div class="cursor" id="dbCur"></div></div>
+  <div class="spotlight" id="spot"></div>
+
+  <div class="depthhud"><span id="dhV">0 m</span><small>depth · descent rate 0.5 m/s</small></div>
+
+  <main>
+    <section class="zone" data-d="0" data-p="“All hands. Blowing tanks. We are going down.”">
+      <div class="z-k">surface · <b>0 m</b></div>
+      <h2>The ocean has more night than it has day.</h2>
+      <p>Below two hundred metres the sun gives up entirely. What follows is the largest
+      habitat on earth — dark, cold, patient — and you are dropping through it
+      in a steel sphere the size of a small car. Scroll to sink. The light will not follow you.</p>
+      <div class="readout"><div><b>0 m</b><span>depth</span></div><div><b>22°C</b><span>water</span></div><div><b>sunlit</b><span>zone</span></div></div>
+    </section>
+
+    <section class="zone" data-d="600" data-creature="Lanternfish drift past the porthole in single file, each one carrying its own tiny lighthouse.">
+      <div class="z-k">twilight · <b>600 m</b></div>
+      <h2>Here the light is a rumor told by fish.</h2>
+      <p>The last blue fades to a permanent dusk. Lanternfish stage the world's largest
+      migration every single night, rising toward the surface and sinking again before dawn —
+      a commute of billions, invisible from above.</p>
+      <div class="readout"><div><b>600 m</b><span>depth</span></div><div><b>8°C</b><span>water</span></div><div><b>61 atm</b><span>pressure</span></div></div>
+      <div class="creature-tip" id="ct1">▸ tap to identify</div>
+    </section>
+
+    <section class="zone" data-d="2400" data-creature="A siphonophore goes by — forty meters of connected lives, fishing in the dark as one long drifting city.">
+      <div class="z-k">midnight · <b>2,400 m</b></div>
+      <h2>Abyssal plain ahead. Weather is irrelevant now.</h2>
+      <p>Pressure: 240 atmospheres — the weight of a small car pressing on your thumbnail.
+      And still: life. Siphonophore chains like drifting strings of lights, dumbo octopuses
+      flapping through the black with ears like a cartoon.</p>
+      <div class="readout"><div><b>2,400 m</b><span>depth</span></div><div><b>3°C</b><span>water</span></div><div><b>241 atm</b><span>pressure</span></div></div>
+      <div class="creature-tip" id="ct2">▸ tap to identify</div>
+    </section>
+
+    <section class="zone" data-d="3800" data-creature="A sperm whale family passes above, clicking loudly enough to be felt in the hull — the loudest animals on earth, talking to each other in the dark.">
+      <div class="z-k">hadal approach · <b>3,800 m</b></div>
+      <h2>Something enormous says hello in clicks.</h2>
+      <p>Sperm whales hunt here a kilometre down, navigating and shouting in pulses that
+      rattle the hull. Your sonar answers politely. It is the only conversation for
+      a thousand kilometres in any direction.</p>
+      <div class="readout"><div><b>3,800 m</b><span>depth</span></div><div><b>2°C</b><span>water</span></div><div><b>381 atm</b><span>pressure</span></div></div>
+      <div class="creature-tip" id="ct3">▸ tap to identify</div>
+    </section>
+
+    <section class="zone" data-d="10900" data-creature="Hydrothermal vents: black smokers at 400°C, gardeners of chemosynthetic life that has never seen and will never see the sun.">
+      <div class="z-k">the bottom · <b>10,900 m</b></div>
+      <h2>Touchdown. The oldest dark on earth.</h2>
+      <p>The vent field glows on the monitors — black smokers pumping mineral smoke at
+      temperatures that would flash-boil the sub, surrounded by tube worms and blind crabs
+      farming bacteria that eat chemistry instead of light. Life never needed the sun.
+      It just preferred it.</p>
+      <div class="readout"><div><b>10,900 m</b><span>depth</span></div><div><b>1.6°C</b><span>water</span></div><div><b>1,092 atm</b><span>pressure</span></div></div>
+      <div class="creature-tip" id="ct4">▸ tap to identify</div>
+    </section>
+  </main>
+
+  <button class="sonarbtn" id="sonarBtn">◉ ping</button>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const water = $("water"), wg = water.getContext("2d");
+  let W = 0, H = 0;
+  let depth = 0, sinkRate = 0;
+  let snow = [], flashes = [];
+  let spotOn = false, ripples = [];
+
+  function resize() {
+    W = water.width = innerWidth;
+    H = water.height = innerHeight;
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  /* ---------- scroll → depth ---------- */
+  addEventListener("scroll", () => {
+    const p = Math.max(0, Math.min(1, scrollY / (document.body.scrollHeight - innerHeight)));
+    depth = p * 10900;
+    sinkRate = 1;
+    $("dhV").textContent = Math.round(depth).toLocaleString("en-US") + " m";
+    $("dbCur").style.top = (p * 100) + "%";
+  }, { passive: true });
+
+  /* depth bar ticks */
+  const bar = $("depthbar");
+  for (let i = 0; i <= 40; i++) {
+    const t = document.createElement("span");
+    t.className = "tick" + (i % 5 === 0 ? " maj" : "");
+    t.style.top = (i / 40 * 100) + "%";
+    bar.appendChild(t);
+  }
+
+  /* ---------- water render ---------- */
+  function depthHue() {
+    /* turquoise → deep navy → black */
+    const p = depth / 10900;
+    if (p < 0.15) return [10 + (32 - 10) * (p / 0.15), 32 + (64 - 32) * (p / 0.15), 40 + (80 - 40) * (p / 0.15)];
+    if (p < 0.5) {
+      const k = (p - 0.15) / 0.35;
+      return [32 - 26 * k, 64 - 52 * k, 80 - 60 * k];
+    }
+    const k = (p - 0.5) / 0.5;
+    return [6 - 5 * k, 12 - 10 * k, 20 - 18 * k];
+  }
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+    const [r, g2, b] = depthHue();
+    wg.fillStyle = "rgb(" + (r | 0) + "," + (g2 | 0) + "," + (b | 0) + ")";
+    wg.fillRect(0, 0, W, H);
+
+    /* marine snow drifting up while sinking */
+    if (Math.random() < 0.3 + sinkRate * 0.4) {
+      snow.push({ x: Math.random() * W, y: H + 6, vy: 0.4 + Math.random() * 0.9, vx: (Math.random() - 0.5) * 0.3, s: 0.8 + Math.random() * 1.8 });
+    }
+    snow = snow.filter(s => s.y > -8);
+    snow.forEach(s => {
+      s.y -= s.vy * (0.4 + sinkRate);
+      s.x += s.vx;
+      wg.fillStyle = "rgba(220,230,240,.4)";
+      wg.fillRect(s.x, s.y, s.s, s.s);
+    });
+    sinkRate *= 0.96;
+
+    /* sonar rings */
+    ripples = ripples.filter(rp => rp.a > 0.01);
+    ripples.forEach(rp => {
+      rp.r += 6; rp.a *= 0.97;
+      wg.strokeStyle = "rgba(125,216,200," + rp.a + ")";
+      wg.lineWidth = 2;
+      wg.beginPath(); wg.arc(rp.x, rp.y, rp.r, 0, 6.283); wg.stroke();
+    });
+
+    /* bioluminescent flashes in deep zones */
+    if (depth > 1500 && Math.random() < 0.02) {
+      flashes.push({ x: Math.random() * W, y: Math.random() * H, life: 1, hue: Math.random() < 0.5 ? "125,216,200" : "150,180,255" });
+    }
+    flashes = flashes.filter(f => f.life > 0);
+    flashes.forEach(f => {
+      f.life -= 0.02;
+      const rg = wg.createRadialGradient(f.x, f.y, 0.5, f.x, f.y, 18);
+      rg.addColorStop(0, "rgba(" + f.hue + "," + f.life * 0.7 + ")");
+      rg.addColorStop(1, "rgba(" + f.hue + ",0)");
+      wg.fillStyle = rg;
+      wg.beginPath(); wg.arc(f.x, f.y, 18, 0, 6.283); wg.fill();
+    });
+  }
+  requestAnimationFrame(loop);
+
+  /* ---------- spotlight in the dark ---------- */
+  addEventListener("pointermove", (e) => {
+    if (depth > 2200) {
+      spotOn = true;
+      $("spot").classList.add("on");
+      $("spot").style.setProperty("--sx", (e.clientX / innerWidth * 100) + "%");
+      $("spot").style.setProperty("--sy", (e.clientY / innerHeight * 100) + "%");
+      /* startle bioluminescence near cursor */
+      if (Math.random() < 0.12) {
+        flashes.push({ x: e.clientX + (Math.random() - 0.5) * 90, y: e.clientY + (Math.random() - 0.5) * 90, life: 1, hue: "125,216,200" });
+      }
+    }
+  });
+
+  /* ---------- sonar ---------- */
+  let AC = null;
+  $("sonarBtn").addEventListener("click", (e) => {
+    /* ring from button */
+    ripples.push({ x: innerWidth - 80, y: innerHeight - 60, r: 10, a: 0.8 });
+    ping();
+  });
+  function ping() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (err) { AC = null; } }
+    if (!AC) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      const t0 = AC.currentTime;
+      const o = AC.createOscillator(), gn = AC.createGain();
+      o.type = "sine"; o.frequency.setValueAtTime(1040, t0);
+      o.frequency.exponentialRampToValueAtTime(990, t0 + 0.3);
+      gn.gain.setValueAtTime(0.07, t0);
+      gn.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.55);
+      o.connect(gn); gn.connect(AC.destination);
+      o.start(t0); o.stop(t0 + 0.6);
+      /* echo */
+      setTimeout(() => {
+        const o2 = AC.createOscillator(), g2 = AC.createGain();
+        o2.type = "sine"; o2.frequency.value = 980;
+        g2.gain.setValueAtTime(0.02, AC.currentTime);
+        g2.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.4);
+        o2.connect(g2); g2.connect(AC.destination);
+        o2.start(); o2.stop(AC.currentTime + 0.45);
+      }, 900);
+    } catch (err) {}
+  }
+
+  /* ---------- creature tips ---------- */
+  ["ct1", "ct2", "ct3", "ct4"].forEach((id, i) => {
+    const el = $(id);
+    const zone = el.closest(".zone");
+    el.addEventListener("click", () => {
+      el.textContent = zone.dataset.creature;
+      el.classList.add("show");
+    });
+    /* auto reveal on scroll into view */
+    const io = new IntersectionObserver((ents) => {
+      ents.forEach(en => { if (en.isIntersecting) { el.textContent = zone.dataset.creature; el.classList.add("show"); } });
+    }, { threshold: 0.6 });
+    io.observe(zone);
+  });
+})();
+</script>
+</body>
+</html>

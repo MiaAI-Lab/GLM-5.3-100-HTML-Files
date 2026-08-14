@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DEPARTURES — the split-flap board</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    font-family: "Courier New", Courier, monospace;
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(90,70,40,.25), transparent 55%),
+      linear-gradient(180deg, #16130e, #0d0b08);
+    color:#e8dcc0; min-height:100vh; overflow-x:hidden;
+    display:flex; flex-direction:column; align-items:center; padding:26px 14px 90px;
+  }
+  header { text-align:center; margin-bottom:22px; }
+  header h1 {
+    font-size:clamp(20px, 4.4vw, 34px); letter-spacing:.5em; font-weight:700; color:#ffb52e;
+    text-shadow:0 0 18px rgba(255,181,46,.5); text-transform:uppercase;
+  }
+  header p { font-size:10px; letter-spacing:.4em; color:#8a7a58; margin-top:8px; text-transform:uppercase; }
+  .clock {
+    margin:14px auto 0; display:inline-block; background:#0a0806; border:1px solid #3a3220;
+    border-radius:8px; padding:8px 20px; font-size:18px; color:#ffd98a; letter-spacing:.3em;
+    box-shadow:inset 0 2px 8px #000;
+  }
+  .clock span { opacity:.75; font-size:10px; color:#8a7a58; letter-spacing:.24em; margin-left:10px; }
+
+  /* ---------- board ---------- */
+  .board {
+    width:min(980px, 100%); background:#0d0b08;
+    border:3px solid #26210f; border-radius:14px; padding:18px;
+    box-shadow:0 30px 80px rgba(0,0,0,.75), inset 0 0 60px rgba(0,0,0,.6);
+    position:relative; overflow-x:auto;
+  }
+  .bhead, .row {
+    display:grid;
+    grid-template-columns:1.2fr 3fr 1fr .8fr 1.4fr;
+    gap:10px; align-items:center;
+  }
+  .bhead {
+    font-size:10px; letter-spacing:.3em; color:#8a7a58; text-transform:uppercase;
+    padding:0 6px 12px; border-bottom:2px solid #3a3220; min-width:700px;
+  }
+  .rows { min-width:700px; }
+  .row {
+    padding:9px 6px; border-bottom:1px solid #241f10; transition:background .18s;
+    font-size:15px;
+  }
+  .row:hover { background:rgba(255,181,46,.07); }
+  .row.pinned { background:rgba(255,181,46,.12); }
+  .row .cells { display:flex; gap:4px; }
+  .row .tag { font-size:9px; color:#6a5c40; align-self:center; }
+
+  /* split-flap tile */
+  .flap {
+    display:inline-flex; flex-direction:column; width:26px; height:36px;
+    background:linear-gradient(180deg, #d9cfb4 0%, #cfc4a8 48%, #241f14 48%, #1a1610 100%);
+    border-radius:4px; position:relative; overflow:hidden;
+    box-shadow:0 2px 4px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.35);
+    color:#211a0d; font-weight:700; font-size:20px; line-height:1;
+    perspective:200px;
+  }
+  .flap .half { height:50%; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .flap .half.t { align-items:flex-end; padding-bottom:1px; border-radius:4px 4px 0 0; }
+  .flap .half.b { align-items:flex-start; padding-top:1px; }
+  .flap .half.b span { transform:translateY(-100%); }
+  .flap .half span { display:block; }
+  .flap.spin .half.t { animation:flapT .09s linear forwards; }
+  .flap.spin .half.b { animation:flapB .09s linear forwards; }
+  @keyframes flapT {
+    0% { transform:rotateX(0); }
+    50% { transform:rotateX(-88deg); }
+    100% { transform:rotateX(0); }
+  }
+  @keyframes flapB {
+    0% { transform:rotateX(0); }
+    50% { transform:rotateX(0); }
+    50.1% { transform:rotateX(88deg); }
+    100% { transform:rotateX(0); }
+  }
+  .flap.spacer { background:none; box-shadow:none; width:10px; }
+
+  .status {
+    font-size:10px; letter-spacing:.2em; text-transform:uppercase; font-weight:700;
+    padding:5px 10px; border-radius:4px; display:inline-block;
+  }
+  .status.sch { color:#9ab08a; border:1px solid #3d4a34; }
+  .status.brd { color:#0d0b08; background:#5fd35f; animation:brd 1.4s infinite; }
+  @keyframes brd { 50% { opacity:.75; } }
+  .status.dly { color:#ffb52e; border:1px solid #6e5320; }
+  .status.fin { color:#ff7d5c; border:1px solid #6e3020; animation:brd 1s infinite; }
+
+  /* ---------- controls ---------- */
+  .controls {
+    margin-top:20px; display:flex; gap:10px; flex-wrap:wrap; justify-content:center;
+  }
+  .controls button {
+    background:#1d1810; color:#e8dcc0; border:1px solid #4a3f26; border-radius:9px;
+    font:inherit; font-size:11px; letter-spacing:.22em; text-transform:uppercase;
+    padding:11px 20px; cursor:pointer; transition:all .15s;
+  }
+  .controls button:hover { background:#2c2517; border-color:#8a7440; }
+  .controls input {
+    background:#0d0b08; border:1px solid #4a3f26; color:#ffd98a; font:inherit;
+    font-size:13px; letter-spacing:.14em; padding:11px 16px; border-radius:9px; outline:none; width:170px;
+  }
+  .controls input:focus { border-color:#ffb52e; }
+  .tip {
+    position:fixed; z-index:30; background:#241f10; border:1px solid #6e5320; color:#ffe4a8;
+    padding:10px 14px; border-radius:8px; font-size:10.5px; letter-spacing:.06em; pointer-events:none;
+    opacity:0; transition:opacity .2s; max-width:240px;
+  }
+  .tip.show { opacity:1; }
+  .tip b { color:#ffb52e; }
+  @media (max-width:640px) {
+    .board { padding:10px; }
+    .flap { width:20px; height:30px; font-size:16px; }
+    .controls input { width:130px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .flap.spin .half.t, .flap.spin .half.b { animation:none; }
+    .status.brd, .status.fin { animation:none; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Departures</h1>
+    <p>concourse b · international terminal · est. 1968</p>
+    <div class="clock"><b id="clock">--:--:--</b><span>local</span></div>
+  </header>
+
+  <div class="board">
+    <div class="bhead">
+      <span>time</span><span>destination</span><span>flight</span><span>gate</span><span>status</span>
+    </div>
+    <div class="rows" id="rows"></div>
+  </div>
+
+  <div class="controls">
+    <button id="refresh">↻ refresh board</button>
+    <input type="text" id="search" placeholder="type a city…" autocomplete="off" spellcheck="false" aria-label="search destinations">
+  </div>
+  <p style="margin-top:14px;font-size:10px;letter-spacing:.24em;color:#6a5c40;text-transform:uppercase;">
+    click a row to pin · hover for flight card
+  </p>
+
+  <div class="tip" id="tip"></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const CITIES = ["LISBON","REYKJAVIK","KYOTO","MEXICO CITY","NAIROBI","OSLO","TAIPEI","LIMA","PORTO","SEOUL","MARRAKESH","HELSINKI","BUENOS AIRES","SINGAPORE","TALLINN","CAPE TOWN","VIENNA","QUITO","BRUGES","OSAKA"];
+  const AIRLINES = [["AZ", "#c23b22"], ["NO", "#2a6ea4"], ["KY", "#0f7a4d"], ["LM", "#8a5aa4"], ["TR", "#c98c2e"]];
+  const STATUSES = [["SCHEDULED","sch"],["SCHEDULED","sch"],["BOARDING","brd"],["DELAYED","dly"],["FINAL CALL","fin"],["SCHEDULED","sch"]];
+  let flights = [], pinned = new Set();
+
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function randInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function genFlights() {
+    flights = [];
+    const now = new Date();
+    for (let i = 0; i < 9; i++) {
+      const mins = now.getHours() * 60 + now.getMinutes() + 25 + i * randInt(18, 42);
+      flights.push({
+        time: pad(Math.floor(mins / 60) % 24) + ":" + pad(mins % 60),
+        city: CITIES.splice(0, 0) && CITIES[Math.floor(Math.random() * CITIES.length)],
+        flight: pick(AIRLINES)[0] + " " + randInt(100, 989),
+        gate: pick(["A", "B", "C", "D"]) + randInt(1, 18),
+        status: pick(STATUSES),
+        color: pick(AIRLINES)[1],
+      });
+    }
+    /* de-dupe cities */
+    const used = new Set();
+    flights = flights.map(f => {
+      let c = f.city;
+      let guard = 0;
+      while (used.has(c) && guard++ < 40) c = CITIES[Math.floor(Math.random() * CITIES.length)];
+      used.add(c);
+      f.city = c;
+      return f;
+    });
+    flights.sort((a, b) => a.time.localeCompare(b.time));
+  }
+
+  /* ---------- flap cell builder ---------- */
+  const GLYPHS = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:·";
+  function flapCell(ch) {
+    const d = document.createElement("span");
+    d.className = "flap";
+    d.innerHTML = '<span class="half t"><span>' + ch + '</span></span><span class="half b"><span>' + ch + '</span></span>';
+    d.dataset.cur = ch;
+    return d;
+  }
+  function flapWord(container, text, width) {
+    container.innerHTML = "";
+    const w = width || Math.max(text.length, 3);
+    for (let i = 0; i < w; i++) {
+      if (i >= text.length) { container.appendChild(flapCell(" ")); continue; }
+      container.appendChild(flapCell(text[i]));
+    }
+  }
+  function flapTo(container, text) {
+    const cells = container.querySelectorAll(".flap");
+    /* pad or trim */
+    let t = text;
+    while (t.length < cells.length) t += " ";
+    cells.forEach((cell, i) => {
+      const target = t[i] || " ";
+      if (cell.dataset.cur === target) return;
+      /* cycle through glyphs with stagger */
+      const curIdx = GLYPHS.indexOf(cell.dataset.cur);
+      const tgtIdx = GLYPHS.indexOf(target);
+      if (tgtIdx < 0) { setCell(cell, target); return; }
+      let steps = (tgtIdx - curIdx + GLYPHS.length) % GLYPHS.length;
+      steps = Math.min(steps, 10 + ((i * 3) % 8));
+      let step = 0;
+      const iv = setInterval(() => {
+        step++;
+        const idx = (curIdx + Math.round(step * ((tgtIdx - curIdx) / steps))) + GLYPHS.length * 2;
+        setCell(cell, GLYPHS[idx % GLYPHS.length], step >= steps);
+        if (step >= steps) {
+          clearInterval(iv);
+          setCell(cell, target, true);
+        }
+      }, 34 + i * 7);
+    });
+  }
+  function setCell(cell, ch, spin) {
+    cell.classList.remove("spin");
+    if (spin) void cell.offsetWidth;
+    cell.querySelector(".half.t span").textContent = ch;
+    cell.querySelector(".half.b span").textContent = ch;
+    cell.dataset.cur = ch;
+    if (spin) cell.classList.add("spin");
+  }
+
+  /* ---------- render rows ---------- */
+  function renderRows() {
+    const rows = $("rows");
+    rows.innerHTML = "";
+    const q = $("search").value.trim().toUpperCase();
+    flights.forEach((f, i) => {
+      if (q && !f.city.includes(q)) return;
+      const row = document.createElement("div");
+      row.className = "row" + (pinned.has(i) ? " pinned" : "");
+      row.innerHTML =
+        '<span class="cells c-time"></span>' +
+        '<span class="cells c-city"></span>' +
+        '<span class="cells c-flight"></span>' +
+        '<span class="cells c-gate"></span>' +
+        '<span><span class="status ' + f.status[1] + '">' + f.status[0] + '</span></span>';
+      flapWord(row.querySelector(".c-time"), f.time, 5);
+      flapWord(row.querySelector(".c-city"), f.city);
+      flapWord(row.querySelector(".c-flight"), f.flight, 7);
+      flapWord(row.querySelector(".c-gate"), f.gate, 3);
+      row.addEventListener("click", () => {
+        if (pinned.has(i)) pinned.delete(i); else pinned.add(i);
+        renderRows2();
+      });
+      row.addEventListener("mouseenter", (e) => showTip(e, f));
+      row.addEventListener("mousemove", (e) => moveTip(e));
+      row.addEventListener("mouseleave", hideTip);
+      rows.appendChild(row);
+    });
+  }
+  /* re-render preserving flap cycling */
+  function renderRows2() {
+    flights.forEach((f, i) => {
+      /* noop — pinning handled via class */
+    });
+    document.querySelectorAll(".row").forEach((row, idx) => { row.classList.toggle("pinned", pinned.has(idx)); });
+  }
+
+  const tip = $("tip");
+  function showTip(e, f) {
+    tip.innerHTML =
+      "<b>" + f.city + "</b><br>" +
+      "flight " + f.flight + " · gate " + f.gate + "<br>" +
+      "on time " + (Math.random() > 0.3 ? "yes" : "barely") + " · aircraft a32" + randInt(0, 8) + "<br>" +
+      "<span style='display:inline-block;width:10px;height:10px;border-radius:2px;background:" + f.color + ";margin-right:6px;'></span>livery stripe";
+    tip.classList.add("show");
+    moveTip(e);
+  }
+  function moveTip(e) {
+    tip.style.left = Math.min(innerWidth - 260, e.clientX + 16) + "px";
+    tip.style.top = (e.clientY + 16) + "px";
+  }
+  function hideTip() { tip.classList.remove("show"); }
+
+  /* ---------- shuffle: flap rows to new values ---------- */
+  function shuffleBoard() {
+    const old = flights.map(f => ({ ...f }));
+    genFlights();
+    const rows = document.querySelectorAll(".row");
+    let maxRow = Math.min(rows.length, flights.length);
+    /* rebuild if count differs */
+    if (rows.length !== flightsCount()) { renderRows(); return; }
+    flights.forEach((f, i) => {
+      const row = rows[i];
+      if (!row) return;
+      flapTo(row.querySelector(".c-time"), f.time);
+      flapTo(row.querySelector(".c-city"), f.city);
+      flapTo(row.querySelector(".c-flight"), f.flight);
+      flapTo(row.querySelector(".c-gate"), f.gate);
+      const st = row.querySelector(".status");
+      st.className = "status " + f.status[1];
+      st.textContent = f.status[0];
+    });
+  }
+  function flightsCount() { return document.querySelectorAll(".row").length; }
+
+  /* ---------- clock ---------- */
+  setInterval(() => {
+    const d = new Date();
+    $("clock").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+  }, 1000);
+
+  /* ---------- boot ---------- */
+  genFlights();
+  renderRows();
+  $("refresh").addEventListener("click", shuffleBoard);
+  $("search").addEventListener("input", renderRows);
+  /* occasional spontaneous single-row status change */
+  setInterval(() => {
+    if (document.hidden || Math.random() > 0.4) return;
+    const rows = document.querySelectorAll(".row");
+    const row = rows[randInt(0, rows.length - 1)];
+    if (!row) return;
+    const st = row.querySelector(".status");
+    const ns = pick(STATUSES);
+    st.className = "status " + ns[1];
+    st.textContent = ns[0];
+  }, 5000);
+})();
+</script>
+</body>
+</html>

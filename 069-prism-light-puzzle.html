@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRISM BREAK — an optics puzzle</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: "Courier New", Courier, monospace;
+    background:#0a0c12; color:#c8d2e0;
+    display:flex; flex-direction:column; height:100%;
+  }
+  #bench { flex:1; position:relative; overflow:hidden; cursor:crosshair; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; }
+
+  .topbar {
+    display:flex; align-items:center; gap:18px; padding:10px 18px;
+    background:rgba(10,12,18,.9); border-bottom:1px solid #1c2230; z-index:10;
+    flex-wrap:wrap;
+  }
+  .topbar h1 { font-size:13px; letter-spacing:.32em; color:#e8eef8; }
+  .topbar .lvl { font-size:11px; color:#7a8aa0; }
+  .topbar .lvl b { color:#ffd98a; }
+  .topbar .msg { font-size:11px; color:#7dd8a0; margin-left:auto; }
+
+  .tray {
+    position:absolute; left:14px; bottom:14px; z-index:20; display:flex; gap:10px;
+    padding:10px 14px; border-radius:12px; background:rgba(12,16,26,.9);
+    border:1px solid #1e2636;
+  }
+  .tray button {
+    font:inherit; font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+    background:#141a28; color:#c8d2e0; border:1px solid #2a3448; border-radius:8px;
+    padding:9px 13px; cursor:pointer; transition:all .13s;
+  }
+  .tray button:hover { border-color:#ffd98a; color:#ffd98a; }
+  .tray button.on { background:#ffd98a; color:#141008; border-color:#ffd98a; }
+
+  .controls {
+    position:absolute; right:14px; bottom:14px; z-index:20; display:flex; gap:8px;
+  }
+  .controls button {
+    font:inherit; font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+    background:#141a28; color:#8a97ac; border:1px solid #2a3448; border-radius:8px;
+    padding:9px 13px; cursor:pointer;
+  }
+  .controls button:hover { color:#c8d2e0; border-color:#3a4860; }
+
+  @media (max-width:640px) { .tray { flex-wrap:wrap; } }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>PRISM BREAK</h1>
+    <span class="lvl">level <b id="lvlV">1</b>/10 · targets <b id="tgtV">0/1</b></span>
+    <span class="msg" id="msgV">click pieces to rotate · guide the beam</span>
+  </div>
+
+  <div id="bench">
+    <canvas id="c"></canvas>
+    <div class="tray" id="tray">
+      <button data-t="mirror">mirror</button>
+      <button data-t="splitter">splitter</button>
+      <button data-t="prism">prism</button>
+    </div>
+    <div class="controls">
+      <button id="undoBtn">undo</button>
+      <button id="resetBtn">reset</button>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById($id(id));
+  function $id(id) { return id; }
+  const cv = $("c"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let pieces = [], beams = [], targets = [];
+  let emitter = { x: 0, y: 0, ang: 0 };
+  let level = 1, solved = 0;
+  let dragEmitter = false, dragPiece = null, dragOff = { x: 0, y: 0 };
+  let placing = null;
+
+  /* ---------- levels ---------- */
+  const LEVELS = [
+    { em: [0.1, 0.5, 0], pieces: [], targets: [[0.9, 0.5, "any"]] },
+    { em: [0.1, 0.2, 0], pieces: [], targets: [[0.9, 0.8, "any"]] },
+    { em: [0.5, 0.9, -1.57], pieces: [{ t: "mirror", x: 0.5, y: 0.5, ang: 0.785 }], targets: [[0.9, 0.5, "any"]] },
+    { em: [0.1, 0.5, 0], pieces: [{ t: "mirror", x: 0.9, y: 0.5, ang: 0.785 }], targets: [[0.5, 0.1, "any"]] },
+    { em: [0.1, 0.5, 0], pieces: [], targets: [[0.5, 0.2, "#ff5a5a"], [0.5, 0.8, "#5a9aff"]] },
+    { em: [0.5, 0.9, -1.57], pieces: [], targets: [[0.15, 0.2, "#5aff8a"], [0.85, 0.2, "#ff5a5a"]] },
+    { em: [0.1, 0.3, 0], pieces: [], targets: [[0.9, 0.3, "any"], [0.9, 0.7, "any"], [0.1, 0.7, "any"]] },
+    { em: [0.5, 0.05, 1.57], pieces: [], targets: [[0.2, 0.9, "#c9a0ff"], [0.8, 0.9, "#5a9aff"]] },
+    { em: [0.05, 0.5, 0], pieces: [], targets: [[0.5, 0.15, "any"], [0.5, 0.5, "any"], [0.5, 0.85, "any"]] },
+    { em: [0.5, 0.5, 0.4], pieces: [], targets: [[0.1, 0.9, "#5aff8a"], [0.9, 0.1, "#ff5a5a"], [0.9, 0.9, "#c9a0ff"]], sandbox: false },
+  ];
+
+  function loadLevel(n) {
+    const L = LEVELS[Math.min(n - 1, LEVELS.length - 1)];
+    pieces = L.pieces.map(p => ({ ...p, x: p.x * W, y: p.y * H, ang: p.ang || 0 }));
+    if (pieces.length === 0 && n > 2 && n !== 5 && n !== 6 && n !== 8 && n !== 9 && n !== 10) {
+      /* give starter piece on mirror levels */
+    }
+    emitter = { x: L.em[0] * W, y: L.em[1] * H, ang: L.em[2] };
+    targets = L.targets.map(t2 => ({ x: t2[0] * W, y: t2[1] * H, hue: t2[2], hit: false, pulse: 0 }));
+    level = n;
+    solved = 0;
+    $("lvlV").textContent = n;
+  }
+
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    const r = cv.getBoundingClientRect();
+    W = r.width; H = r.height;
+    cv.width = W * DPR; cv.height = H * DPR;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    loadLevel(level);
+  }
+  addEventListener("resize", resize);
+
+  /* ---------- ray tracing ---------- */
+  function traceRay(x, y, ang, hue, depth) {
+    depth = depth || 0;
+    if (depth > 12) return;
+    let best = null, bestT = 1e9, bestPiece = null;
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    /* walls */
+    const walls = [
+      { t: (0 - x) / dx, wall: true }, { t: (W - x) / dx, wall: true },
+      { t: (0 - y) / dy, wall: true }, { t: (H - y) / dy, wall: true },
+    ];
+    walls.forEach(w => { if (w.t > 1 && w.t < bestT) { bestT = w.t; best = w; bestPiece = null; } });
+    /* pieces */
+    pieces.forEach(p => {
+      /* piece as a segment through its center at angle p.ang */
+      const px = p.x, py = p.y;
+      const ex = Math.cos(p.ang), ey = Math.sin(p.ang);
+      const L = 34;
+      const seg = segIntersect(x, y, dx, dy, px - ex * L, py - ey * L, px + ex * L, py + ey * L);
+      if (seg && seg.t > 1 && seg.t < bestT) { bestT = seg.t; best = seg; bestPiece = p; }
+    });
+    /* targets */
+    targets.forEach(t2 => {
+      const d2 = Math.hypot(t2.x - x, t2.y - y);
+      const along = (t2.x - x) * dx + (t2.y - y) * dy;
+      const perp = Math.abs((t2.x - x) * dy - (t2.y - y) * dx);
+      if (along > 1 && perp < 16 && along < bestT) {
+        t2.hit = t2.hue === "any" || t2.hue === hue;
+        if (t2.hit) t2.pulse = 1;
+      }
+    });
+    const ex = x + dx * bestT, ey = y + dy * bestT;
+    beams.push({ x0: x, y0: y, x1: ex, y1: ey, hue });
+    /* interaction */
+    if (bestPiece) {
+      const p = bestPiece;
+      const pAng = p.ang;
+      if (p.t === "mirror") {
+        /* reflect: mirror normal perpendicular to its axis */
+        const nAng = pAng + Math.PI / 2;
+        const nx = Math.cos(nAng), ny = Math.sin(nAng);
+        const dot = dx * nx + dy * ny;
+        const rx = dx - 2 * dot * nx, ry = dy - 2 * dot * ny;
+        traceRay(ex, ey, Math.atan2(ry, rx), hue, depth + 1);
+      } else if (p.t === "splitter") {
+        /* half reflects, half passes */
+        const nAng = pAng + Math.PI / 2;
+        const nx = Math.cos(nAng), ny = Math.sin(nAng);
+        const dot = dx * nx + dy * ny;
+        const rx = dx - 2 * dot * nx, ry = dy - 2 * dot * ny;
+        traceRay(ex, ey, Math.atan2(ry, rx), hue, depth + 1);
+        traceRay(ex, ey, ang, hue, depth + 1);
+      } else if (p.t === "prism") {
+        /* disperse into spectrum */
+        const spread = 0.34;
+        const base = ang;
+        [["#ff5a5a", -spread], ["#ffd98a", -spread / 3], ["#5aff8a", 0], ["#5a9aff", spread / 3], ["#c9a0ff", spread]].forEach(([h, dA]) => {
+          traceRay(ex, ey, base + dA, h, depth + 2);
+        });
+      }
+    }
+  }
+  function segIntersect(x, y, dx, dy, ax, ay, bx, by) {
+    const rX = dx, rY = dy;
+    const sX = bx - ax, sY = by - ay;
+    const den = rX * sY - rY * sX;
+    if (Math.abs(den) < 1e-9) return null;
+    const t2 = ((ax - x) * sY - (ay - y) * sX) / den;
+    const u = ((ax - x) * rY - (ay - y) * rX) / den;
+    if (t2 > 0 && u >= 0 && u <= 1) return { t: t2 };
+    return null;
+  }
+
+  /* ---------- render ---------- */
+  let frame = 0;
+  function render(t) {
+    requestAnimationFrame(render);
+    if (document.hidden) return;
+    frame++;
+    g.clearRect(0, 0, W, H);
+    /* bench grid */
+    g.fillStyle = "rgba(200,220,255,.03)";
+    for (let x = 0; x < W; x += 36) for (let y = 0; y < H; y += 36) g.fillRect(x, y, 1.4, 1.4);
+
+    /* reset targets each trace */
+    targets.forEach(t2 => { t2.hit = false; });
+    beams = [];
+    traceRay(emitter.x, emitter.y, emitter.ang, "#ffffff", 0);
+
+    /* beams with glow */
+    beams.forEach(b => {
+      g.strokeStyle = b.hue;
+      g.globalAlpha = 0.9;
+      g.lineWidth = 2.4;
+      g.shadowColor = b.hue;
+      g.shadowBlur = 12;
+      g.beginPath();
+      g.moveTo(b.x0, b.y0);
+      g.lineTo(b.x1, b.y1);
+      g.stroke();
+    });
+    g.shadowBlur = 0;
+    g.globalAlpha = 1;
+
+    /* emitter */
+    g.save();
+    g.translate(emitter.x, emitter.y);
+    g.rotate(emitter.ang);
+    g.fillStyle = "#2a3448";
+    g.fillRect(-16, -10, 32, 20);
+    g.fillStyle = "#fff";
+    g.fillRect(10, -3, 6, 6);
+    g.restore();
+
+    /* pieces */
+    pieces.forEach(p => {
+      g.save();
+      g.translate(p.x, p.y);
+      g.rotate(p.ang);
+      if (p.t === "mirror") {
+        g.fillStyle = "#3a4a64";
+        g.fillRect(-36, -6, 72, 10);
+        g.fillStyle = "#cfe0f4";
+        g.fillRect(-36, -7, 72, 3);
+      } else if (p.t === "splitter") {
+        g.fillStyle = "rgba(140,190,230,.4)";
+        g.fillRect(-36, -3, 72, 6);
+        g.strokeStyle = "#7ab0d8";
+        g.strokeRect(-36, -3, 72, 6);
+      } else {
+        /* prism triangle */
+        g.beginPath();
+        g.moveTo(0, -24); g.lineTo(20, 16); g.lineTo(-20, 16);
+        g.closePath();
+        g.fillStyle = "rgba(160,150,220,.3)";
+        g.fill();
+        g.strokeStyle = "#9a8ad8";
+        g.lineWidth = 2;
+        g.stroke();
+      }
+      g.restore();
+    });
+
+    /* targets */
+    targets.forEach(t2 => {
+      const col = t2.hue === "any" ? "#ffd98a" : t2.hue;
+      g.save();
+      g.translate(t2.x, t2.y);
+      g.strokeStyle = col;
+      g.lineWidth = 2.4;
+      g.globalAlpha = t2.hit ? 1 : 0.5;
+      g.beginPath(); g.arc(0, 0, 16, 0, 6.283); g.stroke();
+      if (t2.hit) {
+        g.globalAlpha = 0.3 + 0.2 * Math.sin(t / 200);
+        g.fillStyle = col;
+        g.beginPath(); g.arc(0, 0, 10, 0, 6.283); g.fill();
+      }
+      g.restore();
+      t2.pulse *= 0.95;
+    });
+
+    /* win check */
+    if (targets.length && targets.every(t2 => t2.hit)) {
+      if (solved === 0) {
+        solved = 1;
+        $("msgV").textContent = "✓ solved! advancing…";
+        chimeWin();
+        setTimeout(() => {
+          if (level < 10) loadLevel(level + 1);
+          $("msgV").textContent = "click pieces to rotate · guide the beam";
+        }, 1600);
+      }
+    }
+    $("tgtV").textContent = targets.filter(t2 => t2.hit).length + "/" + targets.length;
+  }
+
+  /* ---------- input ---------- */
+  cv.addEventListener("pointerdown", (e) => {
+    const r = cv.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    /* placing from tray */
+    if (placing) {
+      pieces.push({ t: placing, x, y, ang: 0.6 });
+      placing = null;
+      document.querySelectorAll("#tray button").forEach(b => b.classList.remove("on"));
+      return;
+    }
+    /* piece hit: rotate or drag */
+    for (let i = pieces.length - 1; i >= 0; i--) {
+      const p = pieces[i];
+      if (Math.hypot(p.x - x, p.y - y) < 44) {
+        dragPiece = p;
+        dragOff = { x: x - p.x, y: y - p.y };
+        p._moved = false;
+        return;
+      }
+    }
+    /* emitter aim */
+    if (Math.hypot(emitter.x - x, emitter.y - y) < 40) {
+      dragEmitter = true;
+    }
+  });
+  cv.addEventListener("pointermove", (e) => {
+    const r = cv.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    if (dragEmitter) {
+      emitter.ang = Math.atan2(y - emitter.y, x - emitter.x);
+    } else if (dragPiece) {
+      dragPiece.x = x - dragOff.x;
+      dragPiece.y = y - dragOff.y;
+      dragPiece._moved = true;
+    }
+  });
+  addEventListener("pointerup", () => {
+    dragEmitter = false;
+    dragPiece = null;
+  });
+  cv.addEventListener("click", (e) => {
+    const r = cv.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    for (const p of pieces) {
+      if (Math.hypot(p.x - x, p.y - y) < 44 && !p._moved) {
+        p.ang += Math.PI / 4;
+        blip();
+        return;
+      }
+    }
+  });
+
+  /* tray */
+  document.querySelectorAll("#tray button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll("#tray button").forEach(x => x.classList.remove("on"));
+    if (placing === b.dataset.t) { placing = null; return; }
+    b.classList.add("on");
+    placing = b.dataset.t;
+    $("msgV").textContent = "click the bench to place the " + placing;
+  }));
+  $("undoBtn").addEventListener("click", () => pieces.pop());
+  $("resetBtn").addEventListener("click", () => loadLevel(level));
+
+  /* ---------- audio ---------- */
+  let AC = null;
+  function ac() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+    return AC;
+  }
+  function blip() {
+    const c = ac(); if (!c) return;
+    try {
+      const t0 = c.currentTime;
+      const o = c.createOscillator(), g2 = c.createGain();
+      o.type = "square"; o.frequency.setValueAtTime(680, t0);
+      o.frequency.exponentialRampToValueAtTime(880, t0 + 0.07);
+      g2.gain.setValueAtTime(0.02, t0);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09);
+      o.connect(g2); g2.connect(c.destination);
+      o.start(t0); o.stop(t0 + 0.1);
+    } catch (e) {}
+  }
+  function chimeWin() {
+    const c = ac(); if (!c) return;
+    [523, 659, 784, 1046].forEach((f, i) => {
+      setTimeout(() => {
+        try {
+          const t0 = c.currentTime;
+          const o = c.createOscillator(), g2 = c.createGain();
+          o.type = "sine"; o.frequency.value = f;
+          g2.gain.setValueAtTime(0.04, t0);
+          g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+          o.connect(g2); g2.connect(c.destination);
+          o.start(t0); o.stop(t0 + 0.55);
+        } catch (e) {}
+      }, i * 110);
+    });
+  }
+
+  /* boot after layout */
+  requestAnimationFrame(() => {
+    resize();
+    requestAnimationFrame(render);
+  });
+})();
+</script>
+</body>
+</html>

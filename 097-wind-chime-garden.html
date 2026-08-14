@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEOLIA — a garden that plays itself</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background:linear-gradient(180deg, #dfe8dd 0%, #c9d8c6 60%, #b8ccb4 100%);
+    color:#3d4a3c; touch-action:none; user-select:none; -webkit-user-select:none;
+    display:flex; flex-direction:column;
+  }
+  body.night {
+    background:linear-gradient(180deg, #1a2230 0%, #141c28 60%, #101822 100%);
+    color:#c8d4cc;
+  }
+  body { transition:background 1.6s ease; }
+  header {
+    padding:12px 22px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; z-index:10;
+    background:rgba(255,255,255,.25); border-bottom:1px solid rgba(61,74,60,.15);
+  }
+  body.night header { background:rgba(10,16,24,.4); border-color:rgba(200,212,204,.12); }
+  h1 { font-size:15px; font-weight:300; letter-spacing:.4em; text-transform:uppercase; }
+  h1 b { font-weight:600; color:#3d6e52; }
+  body.night h1 b { color:#8fd8b8; }
+  .windrow { display:flex; align-items:center; gap:10px; margin-left:auto; }
+  .windrow .lab { font-size:9px; letter-spacing:.22em; text-transform:uppercase; color:#7d8a7c; }
+  input[type=range] {
+    -webkit-appearance:none; appearance:none; width:110px; height:3px; border-radius:99px;
+    background:linear-gradient(90deg, #b8ccb4, #3d6e52); outline:none; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#f4f8f2; border:2px solid #3d6e52; cursor:grab; }
+  .btns { display:flex; gap:8px; }
+  .btns button {
+    background:rgba(61,110,82,.12); color:#3d6e52; border:1px solid rgba(61,110,82,.4);
+    border-radius:999px; font:inherit; font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
+    padding:8px 14px; cursor:pointer; transition:all .18s;
+  }
+  .btns button:hover { background:rgba(61,110,82,.25); }
+  .btns button.on { background:#3d6e52; color:#f4f8f2; }
+
+  #garden { flex:1; position:relative; overflow:hidden; cursor:grab; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; }
+
+  .plaque {
+    position:absolute; left:22px; bottom:18px; z-index:6; font-size:9.5px; letter-spacing:.2em;
+    text-transform:uppercase; color:#7d8a7c; line-height:1.9; pointer-events:none;
+  }
+  .plaque b { color:#3d6e52; font-weight:600; }
+  body.night .plaque { color:#7d9488; }
+  body.night .plaque b { color:#8fd8b8; }
+
+  /* score strip */
+  .score {
+    position:absolute; right:22px; bottom:18px; z-index:6; max-width:260px; text-align:right;
+    font-size:9px; letter-spacing:.14em; color:#7d8a7c; line-height:1.8; pointer-events:none;
+  }
+  .score .stave { font-family:"Courier New", monospace; font-size:10px; color:#3d6e52; letter-spacing:.05em; }
+  body.night .score .stave { color:#8fd8b8; }
+
+  .hint { position:absolute; left:50%; top:14px; transform:translateX(-50%); z-index:6;
+    font-size:9.5px; letter-spacing:.22em; text-transform:uppercase; color:#8a978a; opacity:.8; pointer-events:none; }
+
+  @media (max-width:640px) {
+    .score { display:none; }
+    .hint { font-size:8.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .stave { animation:none !important; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Aeo<b>lia</b></h1>
+    <div class="windrow">
+      <span class="lab">wind</span>
+      <input type="range" id="windR" min="0" max="100" value="34" aria-label="wind">
+      <div class="btns">
+        <button id="nightBtn">night</button>
+        <button id="muteBtn" class="on">sound on</button>
+      </div>
+    </div>
+  </header>
+
+  <div id="garden">
+    <canvas id="c"></canvas>
+    <div class="hint">the garden composes itself · drag chimes to play</div>
+    <div class="plaque">
+      aeolia · generative wind garden<br>
+      <b id="windLabel">breeze</b> · <span id="chimeCount">7 chimes</span>
+    </div>
+    <div class="score">
+      <div class="stave" id="stave">· · · · · · · ·</div>
+      last minute's melody
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const cv = $("c"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let wind = 0.34, night = false, soundOn = true;
+  let chimes = [], streaks = [], grass = [];
+  let melody = [];
+  let gust = 0, gustT = 0;
+
+  /* pentatonic scale (A minor pentatonic across two octaves) */
+  const SCALE = [220, 261.6, 293.7, 329.6, 392, 440, 523.2, 587.3, 659.2];
+
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    buildGarden();
+  }
+  function buildGarden() {
+    chimes = [];
+    const n = 7;
+    const frameY = H * 0.3;
+    for (let i = 0; i < n; i++) {
+      chimes.push({
+        x: W * (0.12 + 0.76 * (i / (n - 1))),
+        topY: frameY,
+        len: 90 + Math.random() * 130,
+        ang: 0, vel: 0,
+        tone: SCALE[Math.floor(Math.random() * SCALE.length)],
+        material: Math.random() < 0.4 ? "bamboo" : "metal",
+        hue: Math.random() < 0.5 ? "#b87333" : "#c9cdd4",
+      });
+    }
+    grass = [];
+    for (let i = 0; i < 60; i++) {
+      grass.push({ x: Math.random() * W, y: H - 14 - Math.random() * 26, len: 16 + Math.random() * 26, ph: Math.random() * 6.28 });
+    }
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  /* ---------- audio ---------- */
+  let AC = null, master;
+  function ensureAudio() {
+    if (AC) return AC;
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      master = AC.createGain(); master.gain.value = 0.5; master.connect(AC.destination);
+    } catch (e) { AC = null; }
+    return AC;
+  }
+  function ring(freq, material) {
+    if (!soundOn) return;
+    const c = ensureAudio();
+    if (!c) return;
+    try {
+      if (c.state === "suspended") c.resume().catch(() => {});
+      const t0 = c.currentTime;
+      const partials = material === "metal" ? [1, 2.76, 5.4, 8.9] : [1, 2.0, 3.0];
+      partials.forEach((p, i) => {
+        const o = c.createOscillator(), gn = c.createGain();
+        o.type = "sine";
+        o.frequency.value = freq * p * (material === "metal" ? 1 : 0.72);
+        gn.gain.setValueAtTime(0.0001, t0);
+        gn.gain.exponentialRampToValueAtTime(0.07 / (i + 1), t0 + 0.015);
+        gn.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.8 / (i * 0.7 + 1));
+        o.connect(gn); gn.connect(master);
+        o.start(t0); o.stop(t0 + 2.2);
+      });
+    } catch (e) {}
+  }
+  function rainHiss(on) {
+    /* subtle noise bed at storm level */
+    if (!AC || !on) return;
+    try {
+      const c = AC;
+      const buf = c.createBuffer(1, c.sampleRate, c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * 0.05;
+      const src = c.createBufferSource(); src.buffer = buf;
+      const f = c.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 4000;
+      const gn = c.createGain(); gn.gain.value = wind > 0.8 ? 0.03 : 0.012;
+      src.connect(f); f.connect(gn); gn.connect(master);
+      src.start(); src.stop(c.currentTime + 2.5);
+    } catch (e) {}
+  }
+
+  /* ---------- wind field ---------- */
+  function windAt(t, y) {
+    /* layered sines = cheap perlin */
+    const base = wind;
+    const g1 = Math.sin(t / 2600 + y * 0.01) * 0.5 + 0.5;
+    const g2 = Math.sin(t / 900 + y * 0.03 + 2) * 0.5 + 0.5;
+    return base * (0.35 + 0.65 * (g1 * 0.6 + g2 * 0.4)) + gust;
+  }
+
+  /* ---------- physics + melody loop ---------- */
+  let lastRing = 0;
+  function step(t) {
+    requestAnimationFrame(step);
+    if (document.hidden) return;
+    /* gusts */
+    gustT--;
+    if (gustT <= 0) {
+      gustT = 300 + Math.random() * 700;
+      gust = Math.random() < 0.3 ? 0.18 + Math.random() * 0.2 : 0;
+      if (gust > 0.3 && soundOn && AC) rainHiss(true);
+    }
+    gust *= 0.995;
+
+    const w = windAt(t, 100);
+    chimes.forEach((ch, i) => {
+      const local = windAt(t, ch.topY + ch.len) ;
+      ch.vel += (local - 0.4) * 0.004 * ch.len * 0.02;
+      ch.vel += Math.sin(t / 700 + i * 1.7) * 0.0006;
+      /* pendulum restore */
+      ch.vel += -ch.ang * 0.012;
+      ch.vel *= 0.992;
+      ch.ang += ch.vel;
+      /* collisions ring */
+      if (Math.abs(ch.ang) > 0.34 && t - lastRing > 240) {
+        lastRing = t;
+        ring(ch.tone, ch.material);
+        melody.push({ t: Date.now(), note: ch.tone });
+        if (melody.length > 24) melody.shift();
+        renderStave();
+        ch.flash = 1;
+      }
+      if (ch.flash) ch.flash = Math.max(0, ch.flash - 0.02);
+    });
+
+    /* wind streaks */
+    if (Math.random() < wind * 0.5) {
+      streaks.push({
+        x: Math.random() * W, y: H * 0.15 + Math.random() * H * 0.5,
+        vx: 1.4 + wind * 3, life: 1, len: 30 + wind * 90,
+      });
+    }
+    streaks = streaks.filter(s => s.life > 0 && s.x < W + 100);
+    streaks.forEach(s => { s.x += s.vx; s.life -= 0.012; });
+
+    draw(t);
+  }
+
+  /* ---------- render ---------- */
+  function draw(t) {
+    const nightMode = night;
+    g.clearRect(0, 0, W, H);
+    /* sun / moon path */
+    const sx = W * 0.82, sy = H * 0.16;
+    g.beginPath();
+    g.arc(sx, sy, nightMode ? 22 : 30, 0, 6.283);
+    g.fillStyle = nightMode ? "rgba(220,230,240,.85)" : "rgba(255,236,170,.95)";
+    g.shadowColor = nightMode ? "rgba(200,220,240,.7)" : "rgba(255,220,120,.9)";
+    g.shadowBlur = nightMode ? 26 : 44;
+    g.fill();
+    g.shadowBlur = 0;
+
+    /* frame */
+    g.strokeStyle = nightMode ? "rgba(120,110,90,.7)" : "rgba(90,76,54,.8)";
+    g.lineWidth = 5;
+    g.beginPath();
+    g.moveTo(W * 0.07, H * 0.3);
+    g.quadraticCurveTo(W * 0.5, H * 0.24, W * 0.93, H * 0.3);
+    g.stroke();
+
+    /* chimes hang from frame */
+    chimes.forEach((ch, i) => {
+      const bx = ch.x, by = ch.topY + 8;
+      const ex = bx + Math.sin(ch.ang) * ch.len, ey = by + Math.cos(ch.ang) * ch.len;
+      /* cord */
+      g.strokeStyle = nightMode ? "rgba(180,180,160,.5)" : "rgba(80,70,50,.6)";
+      g.lineWidth = 1.4;
+      g.beginPath(); g.moveTo(bx, by); g.lineTo(ex, ey); g.stroke();
+      /* tube */
+      const isBamboo = ch.material === "bamboo";
+      const tw = isBamboo ? 10 : 7;
+      g.save();
+      g.translate(ex, ey);
+      g.rotate(ch.ang);
+      g.fillStyle = ch.flash ? "#ffe9b0" : ch.hue;
+      if (ch.flash) { g.shadowColor = "#ffd980"; g.shadowBlur = 14 * ch.flash; }
+      g.beginPath();
+      g.roundRect ? g.roundRect(-tw / 2, -2, tw, 40 + ch.len * 0.12, 4) : g.rect(-tw / 2, -2, tw, 40 + ch.len * 0.12);
+      g.fill();
+      g.shadowBlur = 0;
+      /* top cap for bamboo node */
+      if (isBamboo) {
+        g.fillStyle = "rgba(0,0,0,.2)";
+        g.fillRect(-tw / 2, 12, tw, 2);
+      }
+      g.restore();
+      /* night lanterns glow */
+      if (nightMode) {
+        g.beginPath();
+        g.arc(ex, ey + 20, 16, 0, 6.283);
+        const lg = g.createRadialGradient(ex, ey + 20, 2, ex, ey + 20, 16);
+        lg.addColorStop(0, "rgba(255,200,120,.5)");
+        lg.addColorStop(1, "rgba(255,200,120,0)");
+        g.fillStyle = lg; g.fill();
+      }
+    });
+
+    /* wind streaks */
+    streaks.forEach(s => {
+      g.strokeStyle = "rgba(255,255,255," + s.life * 0.3 + ")";
+      g.lineWidth = 1.2;
+      g.beginPath();
+      g.moveTo(s.x, s.y);
+      g.quadraticCurveTo(s.x - s.len * 0.5, s.y - 4, s.x - s.len, s.y);
+      g.stroke();
+    });
+
+    /* grass */
+    grass.forEach(gr => {
+      const sway = Math.sin(t / 600 + gr.ph) * wind * 6;
+      g.strokeStyle = nightMode ? "rgba(60,90,70,.9)" : "rgba(70,110,80,.9)";
+      g.lineWidth = 1.6;
+      g.beginPath();
+      g.moveTo(gr.x, gr.y);
+      g.quadraticCurveTo(gr.x + sway * 0.4, gr.y - gr.len * 0.6, gr.x + sway, gr.y - gr.len);
+      g.stroke();
+    });
+
+    /* ground */
+    g.fillStyle = nightMode ? "#0e141c" : "#a8c2a2";
+    g.fillRect(0, H - 16, W, 16);
+  }
+  requestAnimationFrame(step);
+
+  /* ---------- stave strip ---------- */
+  function renderStave() {
+    const names = ["A", "C", "D", "E", "G", "a", "c", "d", "e"];
+    $("stave").textContent = melody.slice(-8).map(m => {
+      const i = SCALE.indexOf(m.note);
+      return i >= 0 ? names[i] : "·";
+    }).join(" ") + " ·";
+  }
+
+  /* ---------- interactions ---------- */
+  let dragging = null;
+  cv.addEventListener("pointerdown", (e) => {
+    const x = e.clientX, y = e.clientY;
+    for (const ch of chimes) {
+      if (Math.hypot(ch.x - x, (ch.topY + ch.len * 0.6) - y) < 44) {
+        dragging = ch;
+        ensureAudio();
+        /* manual strike */
+        ch.vel += (x > ch.x ? 1 : -1) * 0.05;
+        ring(ch.tone, ch.material);
+        melody.push({ t: Date.now(), note: ch.tone });
+        renderStave();
+        return;
+      }
+    }
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    dragging.ang = Math.max(-1, Math.min(1, (e.clientX - dragging.x) / 80));
+  });
+  addEventListener("pointerup", () => { dragging = null; });
+
+  $("windR").addEventListener("input", (e) => {
+    wind = parseInt(e.target.value, 10) / 100;
+    $("windLabel").textContent = wind < 0.15 ? "still air" : wind < 0.4 ? "breeze" : wind < 0.7 ? "fresh wind" : "storm";
+    if (wind > 0.85) sayStorm();
+  });
+  function sayStorm() {
+    /* detune in storm: lower chime tones slightly */
+    chimes.forEach(c => { c.tone *= 0.98; });
+  }
+  $("nightBtn").addEventListener("click", function () {
+    night = !night;
+    this.classList.toggle("on", night);
+    this.textContent = night ? "day" : "night";
+    document.body.classList.toggle("night", night);
+  });
+  $("muteBtn").addEventListener("click", function () {
+    soundOn = !soundOn;
+    this.textContent = soundOn ? "sound on" : "sound off";
+    this.classList.toggle("on", soundOn);
+    if (soundOn) ensureAudio();
+  });
+
+  /* first-gesture audio unlock */
+  addEventListener("pointerdown", function once() {
+    ensureAudio();
+    if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+    removeEventListener("pointerdown", once);
+  });
+})();
+</script>
+</body>
+</html>

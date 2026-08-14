@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GLYPH RAIN — composed cascade</title>
+<style>
+  :root{ --ph:#7dffb0; --dim:#0a0f0c; }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; overflow:hidden; background:#040705; color:var(--ph);
+    font:13px/1.4 "SF Mono","Cascadia Mono",Menlo,Consolas,"Courier New",monospace;
+  }
+  canvas{position:fixed; inset:0; width:100vw; height:100vh; display:block; cursor:crosshair}
+  .panel{
+    position:fixed; left:14px; bottom:14px; z-index:5;
+    display:flex; flex-direction:column; gap:10px;
+    padding:12px 14px; max-width:300px;
+    background:rgba(6,12,9,.82); border:1px solid rgba(125,255,176,.22);
+    backdrop-filter:blur(4px);
+  }
+  .brand{position:fixed; top:14px; left:16px; z-index:5; pointer-events:none}
+  .brand h1{
+    margin:0; font-size:clamp(15px,2.4vw,21px); font-weight:700; letter-spacing:.5em;
+    color:var(--ph); text-shadow:0 0 18px rgba(125,255,176,.6);
+  }
+  .brand p{margin:.4em 0 0; font-size:10px; letter-spacing:.28em; opacity:.6}
+  .row{display:flex; align-items:center; gap:10px}
+  .row label{font-size:9.5px; letter-spacing:.22em; text-transform:uppercase; opacity:.75; min-width:52px}
+  input[type=range]{flex:1; accent-color:var(--ph); cursor:pointer}
+  .chips{display:flex; gap:6px}
+  .chip{
+    width:26px; height:26px; border-radius:50%; cursor:pointer;
+    border:1.5px solid rgba(125,255,176,.25);
+    transition:transform .15s, box-shadow .15s, border-color .15s;
+  }
+  .chip:hover{transform:scale(1.12)}
+  .chip.sel{border-color:#fff; box-shadow:0 0 12px currentColor}
+  .tip{
+    font-size:10px; line-height:1.6; letter-spacing:.06em; opacity:.55;
+  }
+  .tip b{opacity:1; font-weight:700}
+  #typed{
+    position:fixed; top:14px; right:16px; z-index:5;
+    font-size:12px; letter-spacing:.2em; opacity:0; transition:opacity .4s;
+    color:var(--ph); text-shadow:0 0 12px currentColor; pointer-events:none;
+  }
+  #typed.on{opacity:.9}
+  @media (max-width:560px){
+    .panel{left:8px; right:8px; bottom:8px; max-width:none; padding:9px 11px}
+    .tip{display:none}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<header class="brand">
+  <h1>GLYPH RAIN</h1>
+  <p>composed cascade · phosphor</p>
+</header>
+<div id="typed"></div>
+<aside class="panel">
+  <div class="row">
+    <label for="dens">Density</label>
+    <input id="dens" type="range" min="8" max="100" value="46">
+  </div>
+  <div class="row">
+    <label>Palette</label>
+    <div class="chips" id="chips"></div>
+  </div>
+  <p class="tip"><b>type</b> to seed your glyphs · <b>move</b> to bend the rain · <b>click</b> for a radial burst</p>
+</aside>
+<script>
+'use strict';
+const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const rand=(a,b)=>a+Math.random()*(b-a);
+let DPR=1, cols=0, cell=16, cw=0;
+function resize(){
+  DPR=Math.min(2,devicePixelRatio||1);
+  cv.width=innerWidth*DPR; cv.height=innerHeight*DPR;
+  cell=(innerWidth<560?13:16)*DPR;
+  cols=Math.max(8,Math.floor(cv.width/cell));
+  rebuild();
+}
+addEventListener('resize',resize);
+/* ---------------- palettes ---------------- */
+const PALETTES=[
+  {id:'green', head:'#d8ffe8', mid:'#7dffb0', glow:'rgba(52,255,140,.55)', trail:'rgba(4,10,6,.16)', accent:'#ffc233'},
+  {id:'amber', head:'#fff3d0', mid:'#ffb347', glow:'rgba(255,164,60,.5)',  trail:'rgba(12,7,2,.16)',  accent:'#7dffb0'},
+  {id:'ice',   head:'#eaf9ff', mid:'#7fd4ff', glow:'rgba(110,200,255,.5)', trail:'rgba(3,7,11,.16)',  accent:'#ff7fd4'},
+  {id:'bloom', head:'#ffeaf6', mid:'#ff7fd4', glow:'rgba(255,120,210,.5)', trail:'rgba(10,3,8,.16)',  accent:'#8affd4'},
+];
+let PAL=PALETTES[0];
+/* ---------------- glyph sets ---------------- */
+const KATA='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン0123456789';
+const SYM='+-*=/\\|<>#@$%&{}[]';
+const GLYPHS=(KATA+SYM).split('');
+/* ---------------- streams ---------------- */
+let streams=[];
+function rebuild(){
+  streams=[];
+  for(let i=0;i<cols;i++) streams.push(makeStream(i));
+}
+function makeStream(i){
+  return {
+    col:i,
+    y:rand(-cv.height*.8, 0),
+    speed:rand(40,150)*DPR,
+    len:Math.floor(rand(6,26)),
+    glyphs: Array.from({length:40},()=>GLYPHS[Math.floor(Math.random()*GLYPHS.length)]),
+    rate:rand(2,6),      // glyph mutate per second
+    phase:rand(0,Math.PI*2),
+    bias:0,              // pointer attraction offset
+    bold:false,
+  };
+}
+/* density 8..100 -> fraction of active columns */
+let density=.46;
+function streamActive(s){
+  // density wave gives rhythm: columns toggle in synced bands
+  const wave=.5+.5*Math.sin(s.col*.55+performance.now()*.00022);
+  const thresh=density*(0.35+wave*0.9);
+  return (s.col*.6180339887)%1 < clamp(thresh,0,1);
+}
+/* ---------------- typing injection ---------------- */
+const typedEl=document.getElementById('typed');
+let typedQueue=[], typedFade=null;
+addEventListener('keydown',e=>{
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  let ch=null;
+  if(e.key.length===1) ch=e.key;
+  if(!ch) return;
+  typedQueue.push({ch, t:performance.now()});
+  // inject into a random stream near centre
+  const s=streams[Math.floor(streams.length*rand(.15,.85))];
+  if(s){
+    const idx=Math.floor(rand(0,s.glyphs.length));
+    s.glyphs[idx]=ch;
+    s.boldUntil=performance.now()+1400;
+  }
+  typedEl.textContent='→ '+typedQueue.slice(-14).map(o=>o.ch).join('');
+  typedEl.classList.add('on');
+  clearTimeout(typedFade);
+  typedFade=setTimeout(()=>typedEl.classList.remove('on'),2200);
+});
+/* ---------------- pointer attraction ---------------- */
+let px=-1e4, py=-1e4;
+addEventListener('pointermove',e=>{px=e.clientX*DPR; py=e.clientY*DPR});
+addEventListener('pointerleave',()=>{px=py=-1e4});
+/* ---------------- burst ---------------- */
+const shockwaves=[];
+cv.addEventListener('pointerdown',e=>{
+  shockwaves.push({x:e.clientX*DPR,y:e.clientY*DPR,r:0,max:Math.max(cv.width,cv.height)*.6,t:performance.now()});
+});
+/* ---------------- message phrases ---------------- */
+const PHRASES=['WAKE UP','THE RAIN REMEMBERS','SIGNAL · NOT NOISE','EVERY GLYPH A LETTER','FLOW STATE','KEEP TYPING'];
+let msg=null, msgNext=performance.now()+5200;
+function launchMsg(){
+  const text=PHRASES[Math.floor(Math.random()*PHRASES.length)];
+  const startX=Math.floor(rand(1,Math.max(2,cols-text.length-1)));
+  msg={text,startX,chars:text.split('').map(c=>({c,born:performance.now()+rand(0,900)}))};
+  msgNext=performance.now()+rand(11000,17000);
+}
+/* ---------------- UI wiring ---------------- */
+const densCtl=document.getElementById('dens');
+densCtl.addEventListener('input',()=>{density=densCtl.value/100});
+const chipsEl=document.getElementById('chips');
+PALETTES.forEach((p,i)=>{
+  const b=document.createElement('div');
+  b.className='chip'+(i===0?' sel':'');
+  b.style.background=`radial-gradient(circle at 35% 30%, ${p.head}, ${p.mid} 70%)`;
+  b.style.color=p.mid;
+  b.title=p.id;
+  b.addEventListener('click',()=>{
+    PAL=p;
+    chipsEl.querySelectorAll('.chip').forEach(c=>c.classList.remove('sel'));
+    b.classList.add('sel');
+  });
+  chipsEl.appendChild(b);
+});
+/* ---------------- render ---------------- */
+let prev=performance.now(), frameN=0;
+function draw(t){
+  const dt=Math.min(.05,(t-prev)/1000); prev=t;
+  // trail fade
+  ctx.fillStyle=PAL.trail;
+  ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.font=`${cell*.94}px "SF Mono","Cascadia Mono",Menlo,Consolas,monospace`;
+  ctx.textBaseline='top';
+  // shockwaves update
+  for(let i=shockwaves.length-1;i>=0;i--){
+    const w=shockwaves[i];
+    w.r+=dt*Math.max(cv.width,cv.height)*1.4;
+    if(w.r>w.max) shockwaves.splice(i,1);
+  }
+  // message scheduling
+  if(t>msgNext&&!msg) launchMsg();
+  let msgAlive=false;
+  if(msg){
+    for(const c of msg.chars) if(t-c.born<4000) msgAlive=true;
+    if(!msgAlive) msg=null;
+  }
+  const fs=cell;
+  for(const s of streams){
+    const active=streamActive(s);
+    const x=s.col*fs+fs*.08;
+    // speed modulation: slow near pointer (attracted hover effect)
+    let sp=s.speed*(.75+.25*Math.sin(t*.0006+s.phase));
+    let bias=s.bias;
+    const dx=x-px;
+    if(px>-9000&&Math.abs(dx)<cell*7){
+      // attract: streams drift toward pointer x and hang
+      sp*=.45;
+      bias=clamp((px-x)*.16,-cell*1.4,cell*1.4);
+    }
+    // shockwave push
+    for(const w of shockwaves){
+      const d=Math.hypot(x-w.x, s.y-w.y);
+      if(Math.abs(d-w.r)<cell*2.2){
+        sp*=2.6;
+        s.y+=dt*260*DPR*((s.y-w.y)>0?1:-1)*0; // scatter handled by glyph jump below
+        for(let g=0;g<s.glyphs.length;g++) if(Math.random()<.3) s.glyphs[g]=GLYPHS[Math.floor(Math.random()*GLYPHS.length)];
+      }
+    }
+    if(active||px>-9000){
+      s.y+=sp*dt;
+      if(s.y-fs*s.len>cv.height){ Object.assign(s,makeStream(s.col)); s.y=rand(-fs*4,0); }
+    }
+    // glyph mutation
+    if(Math.random()<s.rate*dt){
+      const idx=Math.floor(rand(0,s.glyphs.length));
+      s.glyphs[idx]=GLYPHS[Math.floor(Math.random()*GLYPHS.length)];
+    }
+    if(!active) continue;
+    const bold=s.boldUntil&&t<s.boldUntil;
+    const n=Math.min(s.len,s.glyphs.length);
+    for(let j=0;j<n;j++){
+      const gy=s.y-j*fs;
+      if(gy<-fs||gy>cv.height) continue;
+      const g=s.glyphs[(Math.floor(s.y/fs)+j)%s.glyphs.length]||'・';
+      let cx=x+bias*(j/n)*0 + bias*(1-j/n)*.4;
+      let alpha=1-j/n;
+      let size=fs*.94;
+      if(j===0){
+        ctx.fillStyle=PAL.head;
+        ctx.shadowColor=PAL.glow; ctx.shadowBlur=10*DPR;
+      } else {
+        const a=.85*alpha;
+        ctx.fillStyle=bold&&j<4?PAL.accent:hexA(PAL.mid,a);
+        ctx.shadowBlur=0;
+      }
+      ctx.globalAlpha=1;
+      ctx.fillText(g,cx,gy);
+      ctx.shadowBlur=0;
+    }
+    // amber accent: rare column flare
+    if(((s.col*7+t*.001)|0)%97===0&&n>4){
+      ctx.fillStyle=hexA(PAL.accent,.9);
+      ctx.shadowColor=PAL.accent; ctx.shadowBlur=12*DPR;
+      ctx.fillText(s.glyphs[(Math.floor(s.y/fs)+2)%s.glyphs.length],x,s.y-fs*2);
+      ctx.shadowBlur=0;
+    }
+  }
+  // draw message glyphs pinned into their columns
+  if(msg){
+    msg.chars.forEach((c,i)=>{
+      const age=t-c.born;
+      if(age<0||age>4000) return;
+      const col=msg.startX+i;
+      if(col>=streams.length) return;
+      const s=streams[col];
+      const y=clamp(py,-1e3,cv.height-fs*2)>0? Math.max(fs*2,Math.min(cv.height-fs, py)) : cv.height*.42;
+      const a=age<300?age/300:age>3400?1-(age-3400)/600:1;
+      const flick=.75+.25*Math.sin(t*.02+i*1.3);
+      ctx.globalAlpha=a*flick;
+      ctx.fillStyle=PAL.head;
+      ctx.shadowColor=PAL.glow; ctx.shadowBlur=14*DPR;
+      ctx.font=`bold ${fs*1.02}px "SF Mono",Menlo,Consolas,monospace`;
+      ctx.fillText(c.c,col*fs+fs*.08,y);
+      ctx.shadowBlur=0;
+      ctx.globalAlpha=1;
+      ctx.font=`${fs*.94}px "SF Mono","Cascadia Mono",Menlo,Consolas,monospace`;
+    });
+  }
+  // shockwave rings
+  for(const w of shockwaves){
+    ctx.strokeStyle=hexA(PAL.mid,.28*(1-w.r/w.max));
+    ctx.lineWidth=2*DPR;
+    ctx.beginPath(); ctx.arc(w.x,w.y,w.r,0,7); ctx.stroke();
+  }
+  // scanline sheen (subtle)
+  const scanY=(t*.06*DPR)%(cv.height+200)-100;
+  const g=ctx.createLinearGradient(0,scanY,0,scanY+120*DPR);
+  g.addColorStop(0,'rgba(255,255,255,0)');
+  g.addColorStop(.5,hexA(PAL.mid,.045));
+  g.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,scanY,cv.width,120*DPR);
+}
+function hexA(hex,a){
+  const n=parseInt(hex.slice(1),16);
+  return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;
+}
+/* ---------------- loop ---------------- */
+function loop(t){
+  draw(t);
+  requestAnimationFrame(loop);
+}
+resize();
+if(reduceMotion){
+  // render a few frames once to compose a still with trails, then stop
+  let k=0;
+  (function still(){
+    draw(performance.now());
+    if(++k<26) setTimeout(still,16);
+  })();
+} else requestAnimationFrame(loop);
+</script>
+</body>
+</html>

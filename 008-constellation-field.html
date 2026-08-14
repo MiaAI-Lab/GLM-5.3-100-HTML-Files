@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGNAL &amp; SILENCE — a quiet field</title>
+<style>
+  :root{
+    --navy:#070B1A;
+    --dot:#DCEBFF;
+    --cyan:#7FE3FF;
+    --warm:#FFD9A8;
+    --hair:rgba(220,235,255,.14);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    background:var(--navy);
+    color:var(--dot);
+    font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    overflow:hidden;
+  }
+  #field{
+    position:fixed;inset:0;display:block;
+    cursor:crosshair;
+    touch-action:none;
+  }
+  /* faint nebular wash so black isn't flat */
+  .wash{
+    position:fixed;inset:0;pointer-events:none;
+    background:
+      radial-gradient(70vmax 50vmax at 18% 12%, rgba(38,64,120,.34), transparent 62%),
+      radial-gradient(60vmax 46vmax at 84% 86%, rgba(70,40,90,.25), transparent 60%),
+      radial-gradient(40vmax 40vmax at 55% 45%, rgba(20,60,80,.18), transparent 65%);
+  }
+  .vignette{
+    position:fixed;inset:0;pointer-events:none;
+    background:radial-gradient(120% 120% at 50% 50%, transparent 55%, rgba(2,4,10,.75) 100%);
+  }
+
+  /* the quiet word */
+  .word{
+    position:fixed;left:50%;top:50%;
+    transform:translate(-50%,-50%);
+    text-align:center;
+    pointer-events:none;
+    user-select:none;
+    z-index:3;
+    padding:2.2em 3em;
+  }
+  .word h1{
+    font-weight:100;
+    font-size:clamp(28px,7vw,84px);
+    letter-spacing:.58em;
+    text-indent:.58em; /* recenter tracking */
+    color:rgba(230,242,255,.92);
+    text-shadow:0 0 26px rgba(127,227,255,.35), 0 0 90px rgba(127,227,255,.14);
+    animation:breathe 9s ease-in-out infinite;
+    white-space:nowrap;
+  }
+  .word p{
+    margin-top:1.4em;
+    font-size:clamp(9px,1.1vw,12px);
+    font-weight:400;
+    letter-spacing:.42em;text-indent:.42em;
+    text-transform:uppercase;
+    color:rgba(220,235,255,.4);
+    animation:breathe 9s ease-in-out infinite reverse;
+  }
+  @keyframes breathe{
+    0%,100%{opacity:.75}
+    50%{opacity:1}
+  }
+
+  /* HUD */
+  .hud{
+    position:fixed;z-index:5;
+    font-family:'Courier New',ui-monospace,monospace;
+    font-size:10px;letter-spacing:.22em;text-transform:uppercase;
+    color:rgba(220,235,255,.42);
+    user-select:none;
+  }
+  .hud.tl{top:18px;left:20px;line-height:2}
+  .hud.tr{top:18px;right:20px;text-align:right;line-height:2}
+  .hud.bl{bottom:18px;left:20px;line-height:2;max-width:min(46ch,70vw)}
+  .hud.br{bottom:18px;right:20px;text-align:right;line-height:2}
+  .hud b{color:var(--cyan);font-weight:700}
+  .hud .live{
+    display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:var(--cyan);margin-right:8px;vertical-align:1px;
+    animation:pulseDot 2.4s ease-in-out infinite;
+  }
+  @keyframes pulseDot{0%,100%{opacity:.35}50%{opacity:1}}
+  .hud .bar{
+    display:inline-block;width:110px;height:4px;
+    background:rgba(220,235,255,.12);border-radius:2px;
+    vertical-align:2px;margin-left:10px;overflow:hidden;position:relative;
+  }
+  .hud .bar i{
+    position:absolute;inset:0;transform-origin:left;
+    background:linear-gradient(90deg,rgba(127,227,255,.85),rgba(255,217,168,.9));
+    border-radius:2px;
+  }
+  .mode-tag{
+    color:var(--warm);
+    transition:opacity .5s;
+  }
+  .hint{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+    z-index:5;
+    font-family:'Courier New',ui-monospace,monospace;
+    font-size:10px;letter-spacing:.3em;text-transform:uppercase;
+    color:rgba(220,235,255,.5);
+    background:rgba(7,11,26,.55);
+    border:1px solid var(--hair);
+    padding:10px 18px;border-radius:999px;
+    backdrop-filter:blur(4px);
+    transition:opacity 1.2s;
+    pointer-events:none;
+    white-space:nowrap;
+  }
+  .hint.gone{opacity:0}
+  @media(max-width:560px){
+    .hud.tr,.hud.bl{display:none}
+    .word{padding:1.6em 1em}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .word h1,.word p,.hud .live{animation:none}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="field"></canvas>
+<div class="wash" aria-hidden="true"></div>
+<div class="word" id="word" aria-hidden="false">
+  <h1>STILL</h1>
+  <p>signal &amp; silence</p>
+</div>
+<div class="vignette" aria-hidden="true"></div>
+
+<div class="hud tl" aria-hidden="true">
+  <span class="live"></span>field active<br>
+  particles <b id="stat-n">—</b><br>
+  links <b id="stat-l">—</b>
+</div>
+<div class="hud tr" aria-hidden="true">
+  drift <b id="stat-fps">—</b> fps<br>
+  stars passed <b id="stat-s">0</b><br>
+  <span class="mode-tag" id="mode">calm</span>
+</div>
+<div class="hud bl" aria-hidden="true">
+  click — birth a cluster<br>
+  hold — gather a vortex<br>
+  double-click — restore calm
+</div>
+<div class="hud br" aria-hidden="true">
+  cursor — gentle attractor<br>
+  the field quiets when you do
+</div>
+
+<div class="hint" id="hint">click · hold · double-click</div>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var canvas = document.getElementById('field');
+  var ctx = canvas.getContext('2d');
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var W = 0, H = 0, cx = 0, cy = 0;
+
+  var NAVY = '#070B1A';
+  var COUNT = 160;
+  var LINK_DIST = 130;
+  var wordBox = {x:0, y:0, w:0, h:0};
+
+  var mouse = {x:-9999, y:-9999, active:false};
+  var mode = 'calm';            // calm | vortex
+  var holdTimer = null;
+  var lastClick = 0;
+  var starsPassed = 0;
+
+  var particles = [];
+  var pulses = [];              // expanding rings from clicks
+  var shooters = [];            // shooting stars
+
+  function resize(){
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    cx = W / 2; cy = H / 2;
+    var el = document.getElementById('word');
+    var r = el.getBoundingClientRect();
+    wordBox = {x: r.left, y: r.top, w: r.width, h: r.height};
+  }
+
+  function makeParticle(x, y, burst){
+    var a = Math.random() * Math.PI * 2;
+    var sp = burst ? (0.6 + Math.random() * 2.4) : (0.08 + Math.random() * 0.32);
+    return {
+      x: x !== undefined ? x : Math.random() * W,
+      y: y !== undefined ? y : Math.random() * H,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp,
+      r: 0.7 + Math.random() * 1.7,
+      warm: Math.random() < 0.075,          // a few warm sparks
+      tw: Math.random() * Math.PI * 2,       // twinkle phase
+      twS: 0.4 + Math.random() * 1.4
+    };
+  }
+
+  function seed(){
+    particles.length = 0;
+    for (var i = 0; i < COUNT; i++) particles.push(makeParticle());
+  }
+
+  /* keep particles out of the word's box: gentle flow-around */
+  function flowAroundWord(p){
+    var pad = 26;
+    var l = wordBox.x - pad, r = wordBox.x + wordBox.w + pad;
+    var t = wordBox.y - pad, b = wordBox.y + wordBox.h + pad;
+    if (p.x > l && p.x < r && p.y > t && p.y < b) {
+      // push toward the nearest edge
+      var dl = p.x - l, dr = r - p.x, dt = p.y - t, db = b - p.y;
+      var m = Math.min(dl, dr, dt, db);
+      var f = 0.5;
+      if (m === dl)      { p.vx -= f; p.vy += (Math.random() - .5) * .2; }
+      else if (m === dr) { p.vx += f; p.vy += (Math.random() - .5) * .2; }
+      else if (m === dt) { p.vy -= f; p.vx += (Math.random() - .5) * .2; }
+      else               { p.vy += f; p.vx += (Math.random() - .5) * .2; }
+    }
+  }
+
+  var frame = 0, fpsT = performance.now(), fpsN = 0, fpsVal = 60, running = true;
+
+  function step(){
+    if (!running) return;
+    frame++;
+    ctx.fillStyle = 'rgba(7,11,26,0.5)';   // ghost trails
+    ctx.fillRect(0, 0, W, H);
+
+    /* — links first (under dots) — */
+    var links = 0;
+    ctx.lineWidth = 1;
+    for (var i = 0; i < particles.length; i++) {
+      var a = particles[i];
+      for (var j = i + 1; j < particles.length; j++) {
+        var b = particles[j];
+        var dx = a.x - b.x, dy = a.y - b.y;
+        var d2 = dx * dx + dy * dy;
+        if (d2 < LINK_DIST * LINK_DIST) {
+          var d = Math.sqrt(d2);
+          var o = (1 - d / LINK_DIST) * 0.5;
+          ctx.strokeStyle = 'rgba(160,220,255,' + o.toFixed(3) + ')';
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+          links++;
+        }
+      }
+    }
+
+    /* — particles — */
+    var vortexX = mouse.active ? mouse.x : cx;
+    var vortexY = mouse.active ? mouse.y : cy;
+    for (var k = 0; k < particles.length; k++) {
+      var p = particles[k];
+      if (mode === 'vortex') {
+        var rvx = vortexX - p.x, rvy = vortexY - p.y;
+        var rd = Math.sqrt(rvx * rvx + rvy * rvy) || 1;
+        // tangential + mild inward pull
+        p.vx += (-rvy / rd) * 0.14 + (rvx / rd) * 0.045;
+        p.vy += ( rvx / rd) * 0.14 + (rvy / rd) * 0.045;
+        var sp2 = p.vx * p.vx + p.vy * p.vy;
+        if (sp2 > 9) { var s = 3 / Math.sqrt(sp2); p.vx *= s; p.vy *= s; }
+      } else {
+        // cursor as gentle attractor
+        if (mouse.active) {
+          var mx = mouse.x - p.x, my = mouse.y - p.y;
+          var md = Math.sqrt(mx * mx + my * my);
+          if (md < 240 && md > 0.001) {
+            var g = (1 - md / 240) * 0.012;
+            p.vx += (mx / md) * g * 4;
+            p.vy += (my / md) * g * 4;
+          }
+        }
+        flowAroundWord(p);
+      }
+
+      // tiny wander + speed clamp
+      p.vx += (Math.random() - 0.5) * 0.02;
+      p.vy += (Math.random() - 0.5) * 0.02;
+      var cs = mode === 'vortex' ? 3.2 : 0.9;
+      var s2 = p.vx * p.vx + p.vy * p.vy;
+      if (s2 > cs * cs) { var q = cs / Math.sqrt(s2); p.vx *= q; p.vy *= q; }
+
+      p.x += p.vx; p.y += p.vy;
+
+      // wrap edges
+      if (p.x < -20) p.x = W + 20; else if (p.x > W + 20) p.x = -20;
+      if (p.y < -20) p.y = H + 20; else if (p.y > H + 20) p.y = -20;
+
+      // twinkle
+      p.tw += 0.02 * p.twS;
+      var glow = 0.55 + Math.sin(p.tw) * 0.3;
+
+      if (p.warm) {
+        ctx.fillStyle = 'rgba(255,217,168,' + (glow + 0.15).toFixed(3) + ')';
+        ctx.shadowColor = 'rgba(255,190,120,.8)';
+        ctx.shadowBlur = 10;
+      } else {
+        ctx.fillStyle = 'rgba(220,235,255,' + glow.toFixed(3) + ')';
+        ctx.shadowColor = 'rgba(127,227,255,.6)';
+        ctx.shadowBlur = 6;
+      }
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    /* — ring pulses — */
+    for (var pi = pulses.length - 1; pi >= 0; pi--) {
+      var pu = pulses[pi];
+      pu.r += 3.2;
+      pu.o -= 0.012;
+      if (pu.o <= 0) { pulses.splice(pi, 1); continue; }
+      ctx.strokeStyle = 'rgba(127,227,255,' + pu.o.toFixed(3) + ')';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(pu.x, pu.y, pu.r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    /* — rare shooting stars — */
+    if (!reduce && Math.random() < 0.0035) {
+      var fromLeft = Math.random() < 0.5;
+      shooters.push({
+        x: fromLeft ? -60 : W + 60,
+        y: Math.random() * H * 0.6,
+        vx: (fromLeft ? 1 : -1) * (7 + Math.random() * 5),
+        vy: 1.4 + Math.random() * 1.8,
+        life: 1
+      });
+    }
+    for (var si = shooters.length - 1; si >= 0; si--) {
+      var st = shooters[si];
+      st.x += st.vx; st.y += st.vy; st.life -= 0.008;
+      if (st.life <= 0 || st.y > H + 40 || st.x < -120 || st.x > W + 120) {
+        shooters.splice(si, 1);
+        starsPassed++;
+        continue;
+      }
+      var grad = ctx.createLinearGradient(st.x, st.y, st.x - st.vx * 9, st.y - st.vy * 9);
+      grad.addColorStop(0, 'rgba(255,255,255,' + (0.9 * st.life).toFixed(3) + ')');
+      grad.addColorStop(1, 'rgba(127,227,255,0)');
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(st.x, st.y);
+      ctx.lineTo(st.x - st.vx * 9, st.y - st.vy * 9);
+      ctx.stroke();
+    }
+
+    /* — hud — */
+    fpsN++;
+    var now = performance.now();
+    if (now - fpsT > 700) {
+      fpsVal = Math.round(fpsN * 1000 / (now - fpsT));
+      fpsT = now; fpsN = 0;
+      document.getElementById('stat-fps').textContent = fpsVal;
+      document.getElementById('stat-n').textContent = particles.length;
+      document.getElementById('stat-l').textContent = links;
+      document.getElementById('stat-s').textContent = starsPassed;
+    }
+
+    requestAnimationFrame(step);
+  }
+
+  /* — input — */
+  var hintEl = document.getElementById('hint');
+  var modeEl = document.getElementById('mode');
+  function dismissHint(){ if (hintEl) hintEl.classList.add('gone'); }
+
+  function burst(x, y){
+    for (var i = 0; i < 26; i++) {
+      var a = (i / 26) * Math.PI * 2 + Math.random() * 0.3;
+      var sp = 1 + Math.random() * 2.6;
+      var np = makeParticle(x, y, false);
+      np.vx = Math.cos(a) * sp;
+      np.vy = Math.sin(a) * sp;
+      particles.push(np);
+    }
+    // softly cap total population
+    while (particles.length > 320) particles.shift();
+    pulses.push({x: x, y: y, r: 8, o: 0.7});
+  }
+
+  canvas.addEventListener('pointerdown', function(e){
+    dismissHint();
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(function(){
+      mode = 'vortex';
+      modeEl.textContent = 'vortex';
+    }, 420);
+    var now = Date.now();
+    if (now - lastClick < 320) {
+      // double-click: restore calm — return to seed state gently
+      mode = 'calm';
+      modeEl.textContent = 'calm';
+      while (particles.length > COUNT) particles.pop();
+      pulses.push({x: e.clientX, y: e.clientY, r: 4, o: 0.5});
+    }
+    lastClick = now;
+  });
+  canvas.addEventListener('pointerup', function(){
+    clearTimeout(holdTimer);
+    if (mode === 'vortex') { mode = 'calm'; modeEl.textContent = 'calm'; }
+  });
+  canvas.addEventListener('click', function(e){
+    if (mode !== 'vortex') burst(e.clientX, e.clientY);
+  });
+  canvas.addEventListener('pointermove', function(e){
+    mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
+  }, {passive:true});
+  canvas.addEventListener('pointerleave', function(){
+    mouse.active = false;
+  });
+
+  document.addEventListener('visibilitychange', function(){
+    running = !document.hidden;
+    if (running) { fpsT = performance.now(); requestAnimationFrame(step); }
+  });
+
+  window.addEventListener('resize', function(){
+    var oldW = W, oldH = H;
+    resize();
+    particles.forEach(function(p){
+      p.x *= W / (oldW || 1);
+      p.y *= H / (oldH || 1);
+    });
+  });
+
+  resize();
+  seed();
+  requestAnimationFrame(step);
+})();
+</script>
+</body>
+</html>

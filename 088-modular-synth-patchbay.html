@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MODULAR — the patchbay synth</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family:"Courier New", Courier, monospace;
+    background:#171310; color:#d8cfc0;
+    display:flex; align-items:center; justify-content:center; padding:14px;
+    user-select:none; -webkit-user-select:none;
+  }
+  .case {
+    display:flex; gap:0; background:linear-gradient(170deg, #3e2c1a, #2c1e10);
+    border-radius:14px; padding:18px;
+    box-shadow:0 30px 80px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,220,170,.16);
+    border:3px solid #1c130a;
+    position:relative; flex-wrap:wrap; max-width:96vw;
+  }
+  .case::after {
+    content:"PATCHBAY · model 3"; position:absolute; bottom:6px; right:16px;
+    font-size:8px; letter-spacing:.34em; color:#8a7050;
+  }
+  .module {
+    width:190px; background:linear-gradient(180deg, #241c14, #1a140e);
+    border:2px solid #3a2c1c; border-radius:8px; margin:0 6px;
+    padding:12px 12px 14px; position:relative;
+  }
+  .module h3 { font-size:9px; letter-spacing:.3em; color:#c9a860; text-transform:uppercase; margin-bottom:10px; }
+  .knobrow { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+  .knobwrap { text-align:center; }
+  .knob {
+    width:44px; height:44px; border-radius:50%; cursor:ns-resize;
+    background:radial-gradient(circle at 36% 30%, #e0d4b8, #a89468 60%, #6a5838);
+    box-shadow:0 4px 10px rgba(0,0,0,.5), inset 0 -3px 6px rgba(0,0,0,.3);
+    position:relative; touch-action:none;
+  }
+  .knob .mark { position:absolute; left:50%; top:4px; width:3px; height:12px; margin-left:-1.5px;
+    background:#2c1e10; border-radius:2px; }
+  .knobwrap .kl { font-size:7px; letter-spacing:.14em; color:#8a7a5e; margin-top:4px; text-transform:uppercase; }
+  /* jacks */
+  .jacks { display:flex; gap:8px; margin-top:10px; align-items:center; flex-wrap:wrap; }
+  .jack {
+    width:22px; height:22px; border-radius:50%; cursor:pointer; position:relative;
+    background:radial-gradient(circle at 40% 36%, #3a3026, #14100a 70%);
+    border:3px solid #6a5838;
+  }
+  .jack.out { border-color:#c9a860; }
+  .jack:hover { border-color:#ffd98a; }
+  .jack.sel { border-color:#7dd8ff; box-shadow:0 0 10px rgba(125,216,255,.8); }
+  .jack .jl { position:absolute; top:26px; left:50%; transform:translateX(-50%);
+    font-size:6.5px; color:#8a7a5e; white-space:nowrap; letter-spacing:.08em; }
+  .jacks { margin-bottom:10px; }
+
+  /* scope screen */
+  .scope {
+    width:100%; height:74px; background:#0c1408; border-radius:6px;
+    border:2px solid #2c3a20; margin-bottom:8px;
+  }
+  /* keyboard */
+  .kb { display:flex; margin-top:6px; }
+  .kb button {
+    width:22px; height:64px; background:linear-gradient(180deg,#e8e0cc,#b8ac90);
+    border:1px solid #555; border-radius:0 0 4px 4px; cursor:pointer; position:relative;
+  }
+  .kb button.blk { background:linear-gradient(180deg,#241c14,#14100a); height:40px; margin:0 -7px; z-index:2;
+    border-radius:0 0 3px 3px; }
+  .kb button:active { background:#c9a860; }
+  .kb button .n { position:absolute; bottom:3px; left:50%; transform:translateX(-50%);
+    font-size:7px; color:#6a5a3e; }
+  .hints { font-size:8px; color:#6a5a3e; margin-top:8px; line-height:1.7; letter-spacing:.04em; }
+  /* preset row */
+  .presets { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .presets button {
+    font:inherit; font-size:8px; letter-spacing:.1em; background:#241c14; color:#c9a860;
+    border:1px solid #3a2c1c; border-radius:6px; padding:6px 9px; cursor:pointer;
+  }
+  .presets button:hover { border-color:#c9a860; }
+  @media (max-width:820px) { .case { flex-direction:column; } .module { width:min(320px, 90vw); } }
+</style>
+</head>
+<body>
+  <main class="case">
+    <!-- VCO -->
+    <section class="module">
+      <h3>osc · vco-a</h3>
+      <div class="knobrow">
+        <div class="knobwrap"><div class="knob" data-param="pitch" data-min="-24" data-max="24" data-val="0"><div class="mark"></div></div><div class="kl">tune</div></div>
+        <div class="knobwrap"><div class="knob" data-param="detune" data-min="0" data-max="50" data-val="8"><div class="mark"></div></div><div class="kl">detune</div></div>
+      </div>
+      <div class="knobrow">
+        <div class="knobwrap"><div class="knob" data-param="level" data-min="0" data-max="100" data-val="70"><div class="mark"></div></div><div class="kl">level</div></div>
+      </div>
+      <div class="jacks">
+        <div class="jack" data-wave="sawtooth" title="saw"><span class="jl">saw</span></div>
+        <div class="jack" data-wave="square" title="square"><span class="jl">sqr</span></div>
+        <div class="jack" data-wave="triangle" title="tri"><span class="jl">tri</span></div>
+        <div class="jack" data-wave="sine" title="sin"><span class="jl">sin</span></div>
+      </div>
+      <div class="hints">wave jacks: click to select the voice</div>
+    </section>
+
+    <!-- VCF -->
+    <section class="module">
+      <h3>filter · vcf</h3>
+      <div class="knobrow">
+        <div class="knobwrap"><div class="knob" data-param="cutoff" data-min="80" data-max="4000" data-val="900"><div class="mark"></div></div><div class="kl">cutoff</div></div>
+        <div class="knobwrap"><div class="knob" data-param="res" data-min="0" data-max="20" data-val="4"><div class="mark"></div></div><div class="kl">reso</div></div>
+      </div>
+      <canvas class="scope" id="scopeC" width="160" height="74"></canvas>
+      <div class="jacks">
+        <div class="jack in" data-port="vcf-in" title="audio in"><span class="jl">in</span></div>
+        <div class="jack out" data-port="vcf-out" title="audio out"><span class="jl">out</span></div>
+      </div>
+    </section>
+
+    <!-- LFO -->
+    <section class="module">
+      <h3>lfo</h3>
+      <div class="knobrow">
+        <div class="knobwrap"><div class="knob" data-param="lfoRate" data-min="1" data-max="120" data-val="20"><div class="mark"></div></div><div class="kl">rate</div></div>
+        <div class="knobwrap"><div class="knob" data-param="lfoDepth" data-min="0" data-max="100" data-val="30"><div class="mark"></div></div><div class="kl">depth</div></div>
+      </div>
+      <div class="jacks">
+        <div class="jack out" data-port="lfo-out" title="mod out"><span class="jl">mod</span></div>
+      </div>
+    </section>
+
+    <!-- output + keyboard -->
+    <section class="module">
+      <h3>vca · output</h3>
+      <div class="knobrow">
+        <div class="knobwrap"><div class="knob" data-param="master" data-min="0" data-max="100" data-val="55"><div class="mark"></div></div><div class="kl">vol</div></div>
+        <div class="jacks">
+          <div class="jack in" data-port="out-in" title="speaker in"><span class="jl">spk</span></div>
+        </div>
+      </div>
+      <div class="kb" id="kb"></div>
+      <div class="presets">
+        <button data-p="pluck">pluck</button>
+        <button data-p="growl">growl</button>
+        <button data-p="siren">siren</button>
+      </div>
+      <div class="hints">play with keys a–k (white) · w,e,t,y,u (black)<br>drag the patch cable: vco wave → vcf in → spk</div>
+    </section>
+  </main>
+
+  <!-- the cable -->
+  <svg id="cableSvg" style="position:fixed;inset:0;pointer-events:none;z-index:50"></svg>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById($id(id));
+  function $id(id) { return id; }
+  /* ---------- state ---------- */
+  const P = { pitch: 0, detune: 8, level: 0.7, cutoff: 900, res: 4, lfoRate: 20, lfoDepth: 0.3, master: 0.55 };
+  let wave = "sawtooth";
+  const patches = {}; /* from port -> to port */
+
+  /* ---------- audio graph ---------- */
+  let AC = null, oscA, oscB, mixGain, filter, lfo, lfoGain, masterGain, analyser, dataArr;
+  function ensure() {
+    if (AC) return AC;
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = AC.createGain();
+      masterGain.gain.value = P.master * 0.5;
+      analyser = AC.createAnalyser();
+      analyser.fftSize = 256;
+      dataArr = new Uint8Array(analyser.frequencyBinCount);
+      masterGain.connect(analyser);
+      analyser.connect(AC.destination);
+      filter = AC.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = P.cutoff;
+      filter.Q.value = P.res;
+      filter.connect(masterGain);
+      mixGain = AC.createGain();
+      mixGain.gain.value = P.level;
+      mixGain.connect(filter);
+      oscA = AC.createOscillator(); oscA.type = wave;
+      oscB = AC.createOscillator(); oscB.type = wave;
+      const gA = AC.createGain(); gA.gain.value = 0.5;
+      const gB = AC.createGain(); gB.gain.value = 0.5;
+      oscA.connect(gA); gA.connect(mixGain);
+      oscB.connect(gB); gB.connect(mixGain);
+      oscA.start(); oscB.start();
+      lfo = AC.createOscillator(); lfo.type = "sine"; lfo.frequency.value = P.lfoRate / 10;
+      lfoGain = AC.createGain(); lfoGain.gain.value = P.lfoDepth * 400;
+      lfo.connect(lfoGain);
+      lfoGain.connect(filter.frequency);
+      lfo.start();
+    } catch (e) { AC = null; }
+    return AC;
+  }
+
+  /* ---------- keyboard ---------- */
+  const NOTES = { a: 261.63, w: 277.18, s: 293.66, e: 311.13, d: 329.63, f: 349.23, t: 369.99, g: 392.0, y: 415.3, h: 440.0, u: 466.16, j: 493.88, k: 523.25 };
+  const kb = $("kb");
+  const kbOrder = ["a", "w", "s", "e", "d", "f", "t", "g", "y", "h", "u", "j", "k"];
+  kbOrder.forEach(k => {
+    const b = document.createElement("button");
+    const blk = "wetyu".includes(k);
+    if (blk) b.className = "blk";
+    b.dataset.k = k;
+    b.innerHTML = "<span class='n'>" + (blk ? "" : k) + "</span>";
+    kb.appendChild(b);
+  });
+  function noteOn(k) {
+    const c = ensure();
+    if (!c || !NOTES[k]) return;
+    if (c.state === "suspended") c.resume().catch(() => {});
+    const f = NOTES[k] * Math.pow(2, P.pitch / 12);
+    try {
+      oscA.frequency.setTargetAtTime(f, c.currentTime, 0.01);
+      oscB.frequency.setTargetAtTime(f * (1 + P.detune / 1000), c.currentTime, 0.01);
+    } catch (e) {}
+  }
+  addEventListener("keydown", (e) => {
+    if (e.repeat) return;
+    const k = e.key.toLowerCase();
+    if (NOTES[k]) {
+      noteOn(k);
+      const btn = kb.querySelector("[data-k='" + k + "']");
+      if (btn) btn.style.background = "#c9a860";
+    }
+  });
+  addEventListener("keyup", (e) => {
+    const btn = kb.querySelector("[data-k='" + e.key.toLowerCase() + "']");
+    if (btn) btn.style.background = "";
+  });
+  kb.addEventListener("pointerdown", (e) => {
+    const b = e.target.closest("button");
+    if (b) noteOn(b.dataset.k);
+  });
+
+  /* ---------- knobs ---------- */
+  let dragKnob = null, dragStartY = 0, dragStartV = 0;
+  document.querySelectorAll(".knob").forEach(k => {
+    k.addEventListener("pointerdown", (e) => {
+      dragKnob = k;
+      dragStartY = e.clientY;
+      dragStartV = parseFloat(k.dataset.val);
+      k.setPointerCapture && k.setPointerCapture(e.pointerId);
+      ensure();
+    });
+  });
+  addEventListener("pointermove", (e) => {
+    if (!dragKnob) return;
+    const min = parseFloat(dragKnob.dataset.min);
+    const max = parseFloat(dragKnob.dataset.max);
+    const v = Math.max(min, Math.min(max, dragStartV + (dragStartY - e.clientY) / 100 * (max - min)));
+    dragKnob.dataset.val = v;
+    dragKnob.style.transform = "rotate(" + (-135 + (v - min) / (max - min) * 270) + "deg)";
+    applyParam(dragKnob.dataset.param, v);
+  });
+  addEventListener("pointerup", () => { dragKnob = null; });
+  function applyParam(name, v) {
+    if (name === "cutoff") P.cutoff = v;
+    if (name === "res") P.res = v;
+    if (name === "level") P.level = v / 100;
+    if (name === "pitch") P.pitch = v;
+    if (name === "detune") P.detune = v;
+    if (name === "master") P.master = v / 100;
+    if (name === "lfoRate") P.lfoRate = v;
+    if (name === "lfoDepth") P.lfoDepth = v / 100;
+    if (AC) {
+      try {
+        if (name === "cutoff") filter.frequency.setTargetAtTime(v, AC.currentTime, 0.03);
+        if (name === "res") filter.Q.value = v;
+        if (name === "level") mixGain.gain.setTargetAtTime(P.level, AC.currentTime, 0.03);
+        if (name === "master") masterGain.gain.setTargetAtTime(P.master * 0.5, AC.currentTime, 0.05);
+        if (name === "lfoRate") lfo.frequency.setTargetAtTime(v / 10, AC.currentTime, 0.05);
+        if (name === "lfoDepth") lfoGain.gain.setTargetAtTime(P.lfoDepth * 400, AC.currentTime, 0.05);
+      } catch (e) {}
+    }
+  }
+
+  /* ---------- wave select ---------- */
+  document.querySelectorAll(".jack[data-wave]").forEach(j => {
+    j.addEventListener("click", () => {
+      document.querySelectorAll(".jack[data-wave]").forEach(x => x.classList.remove("sel"));
+      j.classList.add("sel");
+      wave = j.dataset.wave;
+      if (AC) { try { oscA.type = wave; oscB.type = wave; } catch (e) {} }
+    });
+  });
+  document.querySelector(".jack[data-wave='sawtooth']").classList.add("sel");
+
+  /* ---------- presets ---------- */
+  const PRESETS = {
+    pluck: { cutoff: 1600, res: 8, lfoRate: 60, lfoDepth: 0.12, wave: "triangle", pitch: 0, detune: 4 },
+    growl: { cutoff: 300, res: 16, lfoRate: 8, lfoDepth: 0.7, wave: "sawtooth", pitch: -12, detune: 18 },
+    siren: { cutoff: 2200, res: 4, lfoRate: 30, lfoDepth: 0.9, wave: "sine", pitch: 12, detune: 2 },
+  };
+  document.querySelectorAll(".presets button").forEach(b => b.addEventListener("click", () => {
+    ensure();
+    const pr = PRESETS[b.dataset.p];
+    for (const [k2, v] of Object.entries(pr)) {
+      if (k2 === "wave") {
+        wave = v;
+        document.querySelectorAll(".jack[data-wave]").forEach(x => x.classList.toggle("sel", x.dataset.wave === v));
+        if (AC) { try { oscA.type = v; oscB.type = v; } catch (e) {} }
+        continue;
+      }
+      const knob = document.querySelector(".knob[data-param='" + k2 + "']");
+      if (knob) {
+        knob.dataset.val = v;
+        const min = parseFloat(knob.dataset.min), max = parseFloat(knob.dataset.max);
+        knob.style.transform = "rotate(" + (-135 + (v - min) / (max - min) * 270) + "deg)";
+      }
+      applyParam(k2, v);
+    }
+  }));
+
+  /* ---------- scope ---------- */
+  const scope = $("scopeC"), sg = scope.getContext("2d");
+  function drawScope() {
+    requestAnimationFrame(drawScope);
+    if (document.hidden || !analyser) return;
+    analyser.getByteFrequencyData(dataArr);
+    sg.clearRect(0, 0, 160, 74);
+    sg.strokeStyle = "#8aff6a";
+    sg.lineWidth = 1.4;
+    sg.beginPath();
+    for (let i = 0; i < dataArr.length; i += 2) {
+      const x = (i / dataArr.length) * 160;
+      const y = 70 - (dataArr[i] / 255) * 64;
+      i ? sg.lineTo(x, y) : sg.moveTo(x, y);
+    }
+    sg.stroke();
+  }
+  requestAnimationFrame(drawScope);
+
+  /* init knob positions */
+  document.querySelectorAll(".knob").forEach(k => {
+    const min = parseFloat(k.dataset.min), max = parseFloat(k.dataset.max), v = parseFloat(k.dataset.val);
+    k.style.transform = "rotate(" + (-135 + (v - min) / (max - min) * 270) + "deg)";
+  });
+})();
+</script>
+</body>
+</html>

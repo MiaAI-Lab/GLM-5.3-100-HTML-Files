@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BANNER & FIELD — a vexillology studio</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow-x:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:#e8e2d4; color:#2a2620; min-height:100vh;
+    display:flex; flex-direction:column; align-items:center; padding:26px 16px 40px;
+  }
+  header { text-align:center; margin-bottom:26px; }
+  header h1 { font-size:clamp(22px, 4vw, 36px); font-weight:400; letter-spacing:.3em; text-transform:uppercase; }
+  header p { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.36em; color:#8a8274; text-transform:uppercase; margin-top:6px; }
+
+  .studio { display:flex; gap:30px; width:min(1000px, 96vw); flex-wrap:wrap; justify-content:center; }
+  /* the waving flag */
+  .flagstage { position:relative; flex:1; min-width:320px; }
+  .pole {
+    position:absolute; left:-14px; top:-10px; bottom:0; width:8px; border-radius:4px;
+    background:linear-gradient(90deg, #b8b0a0, #8a8274);
+    box-shadow:2px 0 6px rgba(0,0,0,.18);
+  }
+  .pole::before { content:""; position:absolute; top:-22px; left:50%; transform:translateX(-50%);
+    width:14px; height:14px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #e8dca0, #a8862e); }
+  #flagWrap { position:relative; margin-left:6px; aspect-ratio:3/2; }
+  #flagWrap canvas { width:100%; height:100%; display:block; border-radius:2px;
+    box-shadow:0 18px 44px rgba(42,38,32,.28); }
+  .flagmeta { margin-top:14px; text-align:center; font-style:italic; font-size:13px; color:#6a6254; }
+
+  /* controls */
+  .bench {
+    width:300px; display:flex; flex-direction:column; gap:18px;
+  }
+  .grp label { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.24em; text-transform:uppercase; color:#8a8274; display:block; margin-bottom:8px; }
+  .seg { display:flex; flex-wrap:wrap; gap:6px; }
+  .seg button {
+    flex:1; min-width:60px; background:#f4efe4; color:#2a2620; border:1px solid #c9c0ae;
+    font:inherit; font-size:10.5px; padding:9px 6px; cursor:pointer; transition:all .13s; border-radius:8px;
+    font-family:system-ui, sans-serif;
+  }
+  .seg button:hover { border-color:#2a2620; }
+  .seg button.on { background:#2a2620; color:#f4efe4; border-color:#2a2620; }
+  .colors { display:flex; gap:8px; flex-wrap:wrap; }
+  .sw {
+    width:34px; height:34px; border-radius:8px; border:2px solid transparent; cursor:pointer;
+    transition:transform .12s; box-shadow:inset 0 0 6px rgba(0,0,0,.14);
+  }
+  .sw:hover { transform:scale(1.1); }
+  .sw.on { border-color:#2a2620; transform:scale(1.12); }
+  .charge-row { display:flex; gap:6px; flex-wrap: wrap; }
+  .charge-row button {
+    width:42px; height:42px; background:#f4efe4; border:1px solid #c9c0ae; border-radius:8px;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .13s;
+  }
+  .charge-row button:hover { border-color:#2a2620; }
+  .charge-row button.on { background:#2a2620; border-color:#2a2620; }
+  .charge-row svg { width:26px; height:26px; }
+
+  /* scorecard */
+  .scorecard {
+    border:1px solid #c9c0ae; border-radius:12px; padding:14px 16px; background:#f4efe4;
+  }
+  .scorecard h3 { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.26em; color:#8a8274; text-transform:uppercase; margin-bottom:10px; }
+  .rule { display:flex; align-items:center; gap:8px; font-size:11.5px; color:#4a4438; padding:5px 0; font-family:system-ui, sans-serif; }
+  .rule i { width:16px; height:16px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
+    font-style:normal; font-size:10px; background:#d8d0be; color:#6a6254; }
+  .rule.pass i { background:#5a8a4a; color:#fff; }
+  .rule.fail i { background:#b05a3a; color:#fff; }
+
+  .btnrow { display:flex; gap:10px; }
+  .btnrow button {
+    flex:1; background:#2a2620; color:#f4efe4; border:none; font-family:system-ui, sans-serif;
+    font-size:9.5px; letter-spacing:.2em; text-transform:uppercase; padding:12px 8px; border-radius:99px; cursor:pointer;
+    transition:all .15s;
+  }
+  .btnrow button:hover { background:#4a4438; }
+  .btnrow button.ghost { background:transparent; color:#2a2620; border:1px solid #2a2620; }
+
+  /* parade preview */
+  .parade {
+    position:fixed; left:0; right:0; bottom:0; height:110px; z-index:40; pointer-events:none;
+    overflow:hidden; opacity:0; transition:opacity .5s;
+  }
+  .parade.on { opacity:1; }
+  .parade .marchers { position:absolute; bottom:0; display:flex; gap:26px; align-items:flex-end; animation:march 14s linear infinite; }
+  @keyframes march { from { transform:translateX(0); } to { transform:translateX(-50%); } }
+  .miniflag { width:44px; height:30px; border-radius:2px; box-shadow:0 3px 8px rgba(0,0,0,.25);
+    animation:miniwave 1.4s ease-in-out infinite alternate; transform-origin:left center; }
+  @keyframes miniwave { to { transform:skewY(-4deg) scaleX(.97); } }
+  .parade .ground { position:absolute; bottom:0; left:0; right:0; height:14px; background:#d8d0be; }
+
+  @media (max-width:700px) { .bench { width:100%; } }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Banner &amp; Field</h1>
+    <p>a vexillology studio · design a flag that survives a parade</p>
+  </header>
+
+  <div class="studio">
+    <div class="flagstage">
+      <div class="pole"></div>
+      <div id="flagWrap"><canvas id="flagC" width="900" height="600"></canvas></div>
+      <div class="flagmeta" id="flagName">a tricolor of black, signal red, and gold — with a rising sun</div>
+    </div>
+
+    <div class="bench">
+      <div class="grp">
+        <label>field division</label>
+        <div class="seg" id="divisions">
+          <button data-d="tri-h" class="on">tricolor</button>
+          <button data-d="tri-v">vertical</button>
+          <button data-d="bend">bend</button>
+          <button data-d="nordic">nordic</button>
+          <button data-d="canton">canton</button>
+          <button data-d="saltire">saltire</button>
+        </div>
+      </div>
+      <div class="grp">
+        <label>heraldic palette</label>
+        <div class="colors" id="colors"></div>
+      </div>
+      <div class="grp">
+        <label>charge</label>
+        <div class="charge-row" id="charges">
+          <button data-ch="none" class="on" title="none">∅</button>
+          <button data-ch="sun" title="sun"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4M4 4l3 3M17 17l3 3M20 4l-3 3M7 17l-3 3" stroke="currentColor" stroke-width="2"/></svg></button>
+          <button data-ch="star" title="star"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.6 6.8 7.4.4-5.8 4.6 2 7.2-6.2-4.2-6.2 4.2 2-7.2L2 9.2l7.4-.4z"/></svg></button>
+          <button data-ch="crescent" title="crescent"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 3a9 9 0 1 0 0 18 7.5 7.5 0 1 1 0-18z"/></svg></button>
+          <button data-ch="wave" title="wave"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M2 9c3-3 6 3 9 0s6 3 11 0M2 16c3-3 6 3 9 0s6 3 11 0"/></svg></button>
+          <button data-ch="mountain" title="mountain"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 20L10 6l4 8 3-5 4 11z"/></svg></button>
+        </div>
+      </div>
+
+      <div class="scorecard">
+        <h3>flag 101 · north american vexillological rules</h3>
+        <div class="rule" id="r1"><i>?</i> simple enough for a child to draw</div>
+        <div class="rule" id="r2"><i>?</i> meaningful symbolism in elements</div>
+        <div class="rule" id="r3"><i>?</i> only 2–3 basic colors</div>
+        <div class="rule" id="r4"><i>?</i> no lettering or seals</div>
+        <div class="rule" id="r5"><i>?</i> distinctive at distance</div>
+      </div>
+
+      <div class="btnrow">
+        <button id="paradeBtn">day parade</button>
+        <button id="exportBtn" class="ghost">export png</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="parade" id="parade">
+    <div class="marchers" id="marchers"></div>
+    <div class="ground"></div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById($id(id));
+  function $id(id) { return id; }
+  const cv = $("flagC"), g = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+
+  const HERALDIC = [
+    { c: "#1a1a1e", n: "sable" }, { c: "#ffffff", n: "argent" },
+    { c: "#b02a20", n: "gules" }, { c: "#1f4f8a", n: "azure" },
+    { c: "#2e7d43", n: "vert" }, { c: "#d4a017", n: "or" },
+    { c: "#6a3a8a", n: "purpure" }, { c: "#0e3a3a", n: "tenebrity" },
+  ];
+  /* slots: c1 primary, c2 secondary, c3 charge color */
+  let state = { div: "tri-h", c1: 0, c2: 2, c3: 5, charge: "sun" };
+
+  /* build swatch UI ×3 rows worth in one strip */
+  const colorsEl = $("colors");
+  HERALDIC.forEach((h, i) => {
+    const b = document.createElement("button");
+    b.className = "sw";
+    b.style.background = h.c;
+    b.title = h.n;
+    b.addEventListener("click", () => {
+      /* cycle: click assigns to next slot — hold simple: c1 if unassigned, then c2, then c3 */
+      if (state.c1 === 5 || (state.c1 === 0 && state.c2 === 2 && state.c3 === 5 && i === 0)) state.c1 = i;
+      /* simpler: rotate through slots per click count */
+      const clicks = (colorsEl._n || 0);
+      if (clicks % 3 === 0) state.c1 = i;
+      else if (clicks % 3 === 1) state.c2 = i;
+      else state.c3 = i;
+      colorsEl._n = clicks + 1;
+      syncSwatches();
+      renderFlag();
+      score();
+    });
+    colorsEl.appendChild(b);
+  });
+  function syncSwatches() {
+    [...colorsEl.children].forEach((b, i) => {
+      b.classList.toggle("on", i === state.c1 || i === state.c2 || i === state.c3);
+      b.style.outline = i === state.c1 ? "3px solid #2a2620" : i === state.c2 ? "3px dashed #2a2620" : i === state.c3 ? "3px dotted #2a2620" : "";
+    });
+  }
+
+  /* ---------- flag renderer ---------- */
+  function renderFlag() {
+    const c1 = HERALDIC[state.c1].c, c2 = HERALDIC[state.c2].c, c3 = HERALDIC[state.c3].c;
+    g.clearRect(0, 0, W, H);
+    const d = state.div;
+    if (d === "tri-h") {
+      g.fillStyle = c1; g.fillRect(0, 0, W, H / 3);
+      g.fillStyle = c2; g.fillRect(0, H / 3, W, H / 3);
+      g.fillStyle = c3; g.fillRect(0, 2 * H / 3, W, H / 3);
+    } else if (d === "tri-v") {
+      g.fillStyle = c1; g.fillRect(0, 0, W / 3, H);
+      g.fillStyle = c2; g.fillRect(W / 3, 0, W / 3, H);
+      g.fillStyle = c3; g.fillRect(2 * W / 3, 0, W / 3, H);
+    } else if (d === "bend") {
+      g.fillStyle = c1; g.fillRect(0, 0, W, H);
+      g.save();
+      g.translate(W / 2, H / 2);
+      g.rotate(-Math.atan2(H, W));
+      g.fillStyle = c2;
+      const diag = Math.hypot(W, H);
+      g.fillRect(-diag / 2, -H * 0.14, diag, H * 0.28);
+      g.restore();
+    } else if (d === "nordic") {
+      g.fillStyle = c1; g.fillRect(0, 0, W, H);
+      g.fillStyle = c2;
+      g.fillRect(W * 0.3 - H * 0.09, 0, H * 0.18, H);
+      g.fillRect(0, H / 2 - H * 0.09, W, H * 0.18);
+    } else if (d === "canton") {
+      g.fillStyle = c1; g.fillRect(0, 0, W, H);
+      g.fillStyle = c2;
+      for (let i = 0; i < 3; i++) for (let k = 0; k < 3; k++) {
+        g.fillRect(0, 0, 0, 0); /* stripes version below */
+      }
+      g.fillStyle = c1; g.fillRect(0, 0, W, H);
+      g.fillStyle = c2;
+      g.fillRect(0, H * 0.22, W, H * 0.12);
+      g.fillRect(0, H * 0.66, W, H * 0.12);
+      g.fillStyle = c3;
+      g.fillRect(0, 0, W * 0.42, H * 0.5);
+    } else {
+      /* saltire */
+      g.fillStyle = c1; g.fillRect(0, 0, W, H);
+      g.strokeStyle = c2;
+      g.lineWidth = H * 0.2;
+      g.beginPath();
+      g.moveTo(0, 0); g.lineTo(W, H);
+      g.moveTo(W, 0); g.lineTo(0, H);
+      g.stroke();
+    }
+    /* charge drawn over center (canton puts it in canton) */
+    if (state.charge !== "none") {
+      const cx = d === "canton" ? W * 0.21 : W / 2;
+      const cy = d === "canton" ? H * 0.25 : H / 2;
+      const s = d === "canton" ? H * 0.16 : H * 0.2;
+      g.fillStyle = HERALDIC[state.c3].c;
+      g.strokeStyle = HERALDIC[state.c3].c;
+      if (state.charge === "sun") {
+        g.beginPath(); g.arc(cx, cy, s * 0.55, 0, 6.283); g.fill();
+        g.lineWidth = s * 0.14;
+        for (let i = 0; i < 12; i++) {
+          const a = (6.283 / 12) * i;
+          g.beginPath();
+          g.moveTo(cx + Math.cos(a) * s * 0.7, cy + Math.sin(a) * s * 0.7);
+          g.lineTo(cx + Math.cos(a) * s, cy + Math.sin(a) * s);
+          g.stroke();
+        }
+      } else if (state.charge === "star") {
+        g.beginPath();
+        for (let i = 0; i < 5; i++) {
+          const a = (6.283 / 5) * i - 1.57;
+          const a2 = a + 6.283 / 10;
+          g.lineTo(cx + Math.cos(a) * s, cy + Math.sin(a) * s);
+          g.lineTo(cx + Math.cos(a2) * s * 0.42, cy + Math.sin(a2) * s * 0.42);
+        }
+        g.closePath(); g.fill();
+      } else if (state.charge === "crescent") {
+        g.beginPath();
+        g.arc(cx, cy, s, 0.5, 6.283 - 0.5);
+        g.closePath();
+        g.fill();
+      } else if (state.charge === "wave") {
+        g.lineWidth = s * 0.16;
+        g.beginPath();
+        for (let i = 0; i < 3; i++) {
+          g.moveTo(cx - s, cy - s * 0.4 + i * s * 0.4);
+          g.quadraticCurveTo(cx, cy - s * 0.7 + i * s * 0.4, cx + s, cy - s * 0.4 + i * s * 0.4);
+        }
+        g.stroke();
+      } else {
+        g.beginPath();
+        g.moveTo(cx - s, cy + s * 0.5);
+        g.lineTo(cx - s * 0.1, cy - s * 0.6);
+        g.lineTo(cx + s * 0.15, cy);
+        g.lineTo(cx + s * 0.45, cy - s * 0.4);
+        g.lineTo(cx + s, cy + s * 0.5);
+        g.closePath(); g.fill();
+      }
+    }
+    /* waving overlay: shading ripples */
+    for (let x = 0; x < W; x += 6) {
+      const sh = Math.sin(x * 0.02 + Date.now() / 600) * 0.06;
+      g.fillStyle = sh > 0 ? "rgba(255,255,255," + sh + ")" : "rgba(0,0,0," + (-sh) + ")";
+      g.fillRect(x, 0, 6, H);
+    }
+    /* name line */
+    const parts = [HERALDIC[state.c1].n, HERALDIC[state.c2].n, HERALDIC[state.c3].n];
+    $("flagName").textContent = DIVNAMES[state.div] + " of " + parts.join(", ") + " — " + (state.charge === "none" ? "unadorned" : "charged with a " + state.charge);
+  }
+  const DIVNAMES = { "tri-h": "a horizontal tricolor", "tri-v": "a pale", "bend": "a bend", "nordic": "a nordic cross", "canton": "a striped field with canton", "saltire": "a saltire" };
+
+  /* continuous ripple */
+  (function ripple() {
+    requestAnimationFrame(ripple);
+    if (!document.hidden) renderFlag();
+  })();
+
+  /* ---------- controls ---------- */
+  $("divisions").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    $("divisions").querySelectorAll("button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    state.div = b.dataset.d;
+    score();
+  }));
+  $("charges").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    $("charges").querySelectorAll("button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    state.charge = b.dataset.ch;
+    score();
+  }));
+
+  /* ---------- scoring ---------- */
+  function score() {
+    const used = new Set([state.c1, state.c2, state.c3]);
+    const pass = (id, ok) => {
+      const el = $(id);
+      el.classList.toggle("pass", ok);
+      el.classList.toggle("fail", !ok);
+      el.querySelector("i").textContent = ok ? "✓" : "✗";
+    };
+    pass("r1", state.charge !== "none" ? true : used.size >= 2);
+    pass("r2", state.charge !== "none" || used.size >= 3);
+    pass("r3", used.size <= 3);
+    pass("r4", true); /* no lettering available, always passes */
+    pass("r5", used.size >= 2 && state.charge !== "none");
+  }
+
+  /* ---------- parade ---------- */
+  $("paradeBtn").addEventListener("click", () => {
+    const parade = $("parade");
+    if (parade.classList.contains("on")) { parade.classList.remove("on"); return; }
+    const m = $("marchers");
+    m.innerHTML = "";
+    /* mini canvas flags cloned from the design */
+    for (let i = 0; i < 14; i++) {
+      const mf = document.createElement("div");
+      mf.className = "miniflag";
+      const mc = document.createElement("canvas");
+      mc.width = 88; mc.height = 60;
+      const mg = mc.getContext("2d");
+      mg.drawImage(cv, 0, 0, 88, 60);
+      mf.appendChild(mc);
+      mf.style.animationDelay = (i * 0.2) + "s";
+      m.appendChild(mf);
+    }
+    parade.classList.add("on");
+    setTimeout(() => parade.classList.remove("on"), 15000);
+  });
+
+  /* ---------- export ---------- */
+  $("exportBtn").addEventListener("click", () => {
+    try {
+      const out = document.createElement("canvas");
+      out.width = W; out.height = H;
+      out.getContext("2d").drawImage(cv, 0, 0);
+      const a = document.createElement("a");
+      a.download = "my-flag-" + Date.now() + ".png";
+      a.href = out.toDataURL("image/png");
+      a.click();
+    } catch (e) {}
+  });
+
+  syncSwatches();
+  renderFlag();
+  score();
+})();
+</script>
+</body>
+</html>

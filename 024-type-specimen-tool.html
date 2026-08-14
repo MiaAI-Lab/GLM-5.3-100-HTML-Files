@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRAVITY — type specimen instrument</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { height:100%; }
+  body {
+    min-height:100%;
+    background:#EFEBE3;
+    color:#191713;
+    font-family: system-ui, -apple-system, sans-serif;
+    display:grid; grid-template-columns: 1fr 300px;
+    grid-template-rows: 56px 1fr auto;
+    grid-template-areas: "top top" "stage side" "glyphs glyphs";
+    overflow-x:hidden;
+  }
+  /* ---------- top bar ---------- */
+  header {
+    grid-area:top; display:flex; align-items:center; gap:18px; padding:0 22px;
+    border-bottom:2px solid #191713; background:#EFEBE3; z-index:20;
+  }
+  .brand { font-weight:800; letter-spacing:.32em; font-size:14px; text-transform:uppercase; }
+  .brand em { font-style:normal; background:#191713; color:#EFEBE3; padding:2px 8px; margin-left:6px; }
+  .spec { margin-left:auto; font-family:"Courier New", monospace; font-size:11px; color:#6b665c; letter-spacing:.06em; }
+  .spec b { color:#191713; }
+  /* ---------- stage ---------- */
+  .stage {
+    grid-area:stage; position:relative; display:flex; align-items:center; justify-content:center;
+    overflow:hidden; cursor:grab; min-height:46vh;
+    background:
+      linear-gradient(90deg, rgba(25,23,19,.05) 1px, transparent 1px) 0 0 / calc(100%/12) 100%,
+      linear-gradient(180deg, rgba(25,23,19,.05) 1px, transparent 1px) 0 0 / 100% 3rem,
+      #EFEBE3;
+  }
+  .stage.dragging { cursor:grabbing; }
+  #specimen {
+    user-select:none; -webkit-user-select:none; line-height:.94; letter-spacing:-.02em;
+    font-weight:800; text-align:center; padding:0 4vw; word-break:break-word;
+    color:#191713;
+    text-shadow: 1px 0 rgba(210,60,40,.28), -1px 0 rgba(40,90,200,.22);
+    transform:translateX(var(--off,0px));
+    transition:transform .35s cubic-bezier(.2,.9,.2,1);
+  }
+  .stage .corner { position:absolute; font-size:9.5px; letter-spacing:.3em; text-transform:uppercase; color:#a39d8f; }
+  .stage .tl { top:12px; left:16px; } .stage .tr { top:12px; right:16px; }
+  .stage .bl { bottom:12px; left:16px; } .stage .br { bottom:12px; right:16px; }
+  /* ---------- side rail ---------- */
+  aside {
+    grid-area:side; border-left:2px solid #191713; padding:20px 18px; overflow-y:auto;
+    display:flex; flex-direction:column; gap:16px; background:#EAE5DB; z-index:10;
+    scrollbar-width:thin; max-height:70vh;
+  }
+  .grp label {
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:9.5px; letter-spacing:.24em; text-transform:uppercase; color:#6b665c; margin-bottom:7px;
+  }
+  .grp label output { font-family:"Courier New", monospace; color:#191713; font-size:11px; letter-spacing:0; }
+  input[type=range] {
+    -webkit-appearance:none; appearance:none; width:100%; height:3px; background:#191713; border-radius:2px; outline:none; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none; width:15px; height:15px; border-radius:50%; background:#EFEBE3;
+    border:3px solid #191713; cursor:grab;
+  }
+  input[type=range]::-moz-range-thumb { width:9px; height:9px; border-radius:50%; background:#EFEBE3; border:3px solid #191713; }
+  .seg { display:flex; flex-wrap:wrap; gap:5px; }
+  .seg button {
+    flex:1; min-width:44px; border:1.5px solid #191713; background:transparent; color:#191713;
+    font:inherit; font-size:10px; letter-spacing:.14em; text-transform:uppercase; padding:7px 4px; cursor:pointer;
+    transition:all .13s;
+  }
+  .seg button:hover { background:rgba(25,23,19,.09); }
+  .seg button.on { background:#191713; color:#EFEBE3; }
+  .swatches { display:flex; gap:7px; }
+  .swatches button { flex:1; height:30px; border:1.5px solid #191713; cursor:pointer; transition:transform .13s; }
+  .swatches button:hover { transform:translateY(-2px); }
+  .swatches button.on { outline:3px solid #D23C28; outline-offset:2px; }
+  .railnote { font-size:9.5px; line-height:1.7; color:#8a8476; letter-spacing:.04em; }
+  .railnote b { color:#191713; }
+  /* ---------- glyph grid ---------- */
+  .glyphs {
+    grid-area:glyphs; border-top:2px solid #191713; background:#191713; color:#EFEBE3;
+    padding:18px 22px 22px;
+  }
+  .glyphs h3 { font-size:10px; letter-spacing:.32em; text-transform:uppercase; color:#9d968a; margin-bottom:12px; font-weight:600; }
+  .ggrid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(52px, 1fr)); gap:6px; max-height:180px; overflow-y:auto;
+    scrollbar-width:thin;
+  }
+  .gcell {
+    aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+    border:1px solid rgba(239,235,227,.16); font-size:24px; cursor:pointer;
+    transition:all .14s; background:rgba(239,235,227,.03); font-weight:600;
+  }
+  .gcell:hover { background:#EFEBE3; color:#191713; transform:scale(1.12); z-index:2; }
+  .gcell.pinned { background:#D23C28; color:#fff; border-color:#D23C28; }
+  /* composing bar */
+  .compose {
+    margin-top:12px; display:flex; align-items:center; gap:12px;
+    border:1px dashed rgba(239,235,227,.35); padding:10px 14px; min-height:48px;
+  }
+  .compose .lab { font-size:9px; letter-spacing:.28em; text-transform:uppercase; color:#9d968a; white-space:nowrap; }
+  #composeStr { font-size:22px; font-weight:700; letter-spacing:.02em; flex:1; }
+  .compose button {
+    border:1px solid rgba(239,235,227,.4); background:transparent; color:#EFEBE3; font:inherit;
+    font-size:9px; letter-spacing:.2em; text-transform:uppercase; padding:7px 12px; cursor:pointer; transition:all .14s;
+  }
+  .compose button:hover { background:#EFEBE3; color:#191713; }
+  @media (max-width:820px) {
+    body { grid-template-columns:1fr; grid-template-areas:"top" "stage" "side" "glyphs"; }
+    aside { border-left:none; border-top:2px solid #191713; max-height:none; }
+    .stage { min-height:38vh; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #specimen { transition:none; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">Gravity<em>specimen</em></div>
+    <div class="spec" id="specLine"><b>128</b>px · <b>800</b> · track <b>-2</b> · lh <b>0.94</b> · <b>charcoal on bone</b></div>
+  </header>
+
+  <div class="stage" id="stage">
+    <span class="corner tl">fig. 01 — display</span>
+    <span class="corner tr">12-col / 3rem baseline</span>
+    <span class="corner bl">drag specimen ↔</span>
+    <span class="corner br" id="wordCount">0 glyphs</span>
+    <div id="specimen" title="click to edit">Handgloves</div>
+  </div>
+
+  <aside>
+    <div class="grp">
+      <label>Size <output id="oSize">128px</output></label>
+      <input type="range" id="rSize" min="24" max="360" value="128">
+    </div>
+    <div class="grp">
+      <label>Weight <output id="oWeight">800</output></label>
+      <input type="range" id="rWeight" min="100" max="900" step="100" value="800">
+    </div>
+    <div class="grp">
+      <label>Tracking <output id="oTrack">-0.02em</output></label>
+      <input type="range" id="rTrack" min="-80" max="120" value="-2">
+    </div>
+    <div class="grp">
+      <label>Leading <output id="oLead">0.94</output></label>
+      <input type="range" id="rLead" min="60" max="220" value="94">
+    </div>
+    <div class="grp">
+      <label>Casing</label>
+      <div class="seg" id="segCase">
+        <button data-v="none" class="on">Aa</button>
+        <button data-v="upper">AA</button>
+        <button data-v="lower">aa</button>
+      </div>
+    </div>
+    <div class="grp">
+      <label>Alignment</label>
+      <div class="seg" id="segAlign">
+        <button data-v="left">left</button>
+        <button data-v="center" class="on">center</button>
+        <button data-v="right">right</button>
+      </div>
+    </div>
+    <div class="grp">
+      <label>Ink &amp; paper</label>
+      <div class="swatches" id="swatches">
+        <button data-ink="#191713" data-paper="#EFEBE3" style="background:#191713" class="on" title="charcoal on bone"></button>
+        <button data-ink="#D23C28" data-paper="#F4EFE6" style="background:#D23C28" title="vermilion on ivory"></button>
+        <button data-ink="#0F4C5C" data-paper="#E8F1F2" style="background:#0F4C5C" title="petrol on mist"></button>
+        <button data-ink="#EFEBE3" data-paper="#191713" style="background:#EFEBE3" title="bone on ink"></button>
+      </div>
+    </div>
+    <div class="grp">
+      <label>Ghost offset <output id="oGhost">1px</output></label>
+      <input type="range" id="rGhost" min="0" max="8" value="1">
+    </div>
+    <p class="railnote">
+      <b>Click the word</b> to type your own. Pin glyphs below into the composing bar,
+      then send them to the stage. <b>Drag the stage</b> for optical centering.
+    </p>
+  </aside>
+
+  <section class="glyphs">
+    <h3>Glyph case — click to pin · dbl-click stage to send</h3>
+    <div class="ggrid" id="ggrid"></div>
+    <div class="compose">
+      <span class="lab">Composing bar</span>
+      <div id="composeStr">R&nbsp;</div>
+      <button id="sendUp">set specimen ↑</button>
+      <button id="clearBar">clear</button>
+    </div>
+  </section>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const spec = $("specimen"), stage = $("stage");
+  const st = { size:128, weight:800, track:-2, lead:94, caseV:"none", align:"center", ghost:1 };
+
+  function apply() {
+    spec.style.fontSize = st.size + "px";
+    spec.style.fontWeight = st.weight;
+    spec.style.letterSpacing = (st.track / 100) + "em";
+    spec.style.lineHeight = st.lead / 100;
+    spec.style.textAlign = st.align;
+    let txt = spec.textContent;
+    if (st.caseV === "upper") txt = txt.toUpperCase();
+    if (st.caseV === "lower") txt = txt.toLowerCase();
+    if (txt !== spec.textContent) spec.textContent = txt;
+    spec.style.textShadow = st.ghost === 0 ? "none" :
+      st.ghost + "px 0 rgba(210,60,40,.28), -" + st.ghost + "px 0 rgba(40,90,200,.22)";
+    $("wordCount").textContent = spec.textContent.length + " glyphs";
+    $("specLine").innerHTML =
+      "<b>" + st.size + "</b>px · <b>" + st.weight + "</b> · track <b>" + (st.track/100) +
+      "</b> · lh <b>" + (st.lead/100) + "</b> · <b>" + st.size * (st.lead/100) + "</b>px block";
+  }
+
+  /* sliders */
+  const bind = (rid, oid, key, fmt) => {
+    const r = $(rid);
+    r.addEventListener("input", () => {
+      st[key] = parseInt(r.value, 10);
+      $(oid).textContent = fmt(st[key]);
+      apply();
+    });
+  };
+  bind("rSize","oSize","size", v=>v+"px");
+  bind("rWeight","oWeight","weight", v=>v);
+  bind("rTrack","oTrack","track", v=>(v/100)+"em");
+  bind("rLead","oLead","lead", v=>(v/100));
+  bind("rGhost","oGhost","ghost", v=>v+"px");
+
+  /* segmented controls */
+  function seg(id, key, cb) {
+    $(id).querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      $(id).querySelectorAll("button").forEach(x => x.classList.remove("on"));
+      b.classList.add("on");
+      st[key] = b.dataset.v;
+      apply(); if (cb) cb();
+    }));
+  }
+  seg("segCase","caseV");
+  seg("segAlign","align");
+
+  /* swatches */
+  $("swatches").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    $("swatches").querySelectorAll("button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    document.body.style.background = b.dataset.paper;
+    stage.style.background =
+      "linear-gradient(90deg, " + hexA(b.dataset.ink,.05) + " 1px, transparent 1px) 0 0 / calc(100%/12) 100%," +
+      "linear-gradient(180deg, " + hexA(b.dataset.ink,.05) + " 1px, transparent 1px) 0 0 / 100% 3rem," +
+      b.dataset.paper;
+    spec.style.color = b.dataset.ink;
+    header_.style.background = b.dataset.paper; header_.style.color = b.dataset.ink;
+    header_.style.borderColor = b.dataset.ink;
+  }));
+  const header_ = document.querySelector("header");
+  function hexA(hex, a) {
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    return "rgba(" + r + "," + g + "," + b + "," + a + ")";
+  }
+
+  /* editable specimen */
+  let editing = false;
+  spec.addEventListener("click", () => {
+    if (editing) return;
+    editing = true;
+    const inp = document.createElement("input");
+    inp.value = spec.textContent;
+    inp.style.cssText = "font:inherit; font-size:inherit; font-weight:inherit; text-align:center; background:transparent; border:none; border-bottom:3px solid #D23C28; color:inherit; outline:none; letter-spacing:inherit; width:90%;";
+    spec.textContent = ""; spec.appendChild(inp);
+    inp.focus(); inp.select();
+    const done = () => {
+      spec.textContent = inp.value.trim() || "Handgloves";
+      editing = false; apply();
+    };
+    inp.addEventListener("blur", done);
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") done(); });
+  });
+
+  /* drag stage */
+  let off = 0, dragging = false, sx = 0, so = 0;
+  stage.addEventListener("pointerdown", (e) => {
+    if (e.target === spec || spec.contains(e.target)) return;
+    dragging = true; sx = e.clientX; so = off;
+    stage.classList.add("dragging");
+  });
+  window.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    off = Math.max(-260, Math.min(260, so + (e.clientX - sx)));
+    spec.style.setProperty("--off", off + "px");
+  });
+  window.addEventListener("pointerup", () => { dragging = false; stage.classList.remove("dragging"); });
+  stage.addEventListener("dblclick", () => { off = 0; spec.style.setProperty("--off","0px"); });
+
+  /* glyph grid */
+  const glyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789&@?!§ÆØÅæøå".split("");
+  const ggrid = $("ggrid");
+  const composeStr = $("composeStr");
+  let bar = "R ";
+  function renderBar() {
+    composeStr.innerHTML = bar.split("").map(c =>
+      c === " " ? "&nbsp;" : "<span style='color:#D23C28'>" + c + "</span>"
+    ).join("");
+  }
+  renderBar();
+  glyphs.forEach(ch => {
+    const d = document.createElement("div");
+    d.className = "gcell";
+    d.textContent = ch;
+    d.addEventListener("click", () => {
+      d.classList.toggle("pinned");
+      if (d.classList.contains("pinned")) bar += ch;
+      else bar = bar.split(ch).join("");
+      renderBar();
+    });
+    ggrid.appendChild(d);
+  });
+  $("clearBar").addEventListener("click", () => {
+    bar = ""; renderBar();
+    ggrid.querySelectorAll(".pinned").forEach(c => c.classList.remove("pinned"));
+  });
+  $("sendUp").addEventListener("click", () => {
+    if (!bar.trim()) return;
+    spec.textContent = bar.trim();
+    apply();
+    spec.scrollIntoView({ behavior:"smooth", block:"center" });
+  });
+
+  apply();
+})();
+</script>
+</body>
+</html>

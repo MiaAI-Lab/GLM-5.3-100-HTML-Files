@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AURORA — After-Dark Sign-In</title>
+<style>
+  :root{
+    --night:#060918;
+    --ink:#E8ECF8;
+    --dim:#8B93B5;
+    --glass:rgba(18,24,52,.42);
+    --edge:rgba(160,190,255,.16);
+    --teal:#3EE6C4;
+    --violet:#8A6CFF;
+    --magenta:#FF5FD2;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:var(--night);
+    color:var(--ink);
+    overflow:hidden;
+    display:grid;
+    place-items:center;
+    min-height:100vh;
+    min-height:100dvh;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- starfield ---------- */
+  #stars{position:fixed;inset:0;z-index:0;opacity:.9}
+  .tw{position:absolute;border-radius:50%;background:#CFE0FF;
+      animation:twinkle var(--d,4s) ease-in-out infinite alternate}
+  @keyframes twinkle{from{opacity:.12;transform:scale(.7)}to{opacity:.9;transform:scale(1.15)}}
+
+  /* ---------- aurora ribbons ---------- */
+  .ribbon{
+    position:fixed;
+    width:150vmax;height:34vmax;
+    filter:blur(52px);
+    opacity:.5;
+    mix-blend-mode:screen;
+    z-index:1;
+    pointer-events:none;
+    will-change:transform;
+  }
+  .r1{background:linear-gradient(100deg,transparent 8%,var(--teal) 38%,#1FA9C9 55%,transparent 84%);
+      top:-8vmax;left:-18vmax;transform:rotate(-14deg);
+      animation:drift1 52s ease-in-out infinite alternate}
+  .r2{background:linear-gradient(84deg,transparent 6%,var(--violet) 40%,#5E7BFF 60%,transparent 88%);
+      top:24vmax;left:-24vmax;transform:rotate(9deg);
+      animation:drift2 61s ease-in-out infinite alternate}
+  .r3{background:linear-gradient(115deg,transparent 10%,var(--magenta) 45%,#B04FE0 62%,transparent 90%);
+      top:52vmax;left:-30vmax;transform:rotate(-6deg);
+      animation:drift3 47s ease-in-out infinite alternate}
+  .r4{background:linear-gradient(95deg,transparent 12%,#2FD0A8 40%,#7C5CFF 70%,transparent 92%);
+      top:10vmax;left:14vmax;transform:rotate(22deg);opacity:.32;
+      animation:drift4 58s ease-in-out infinite alternate}
+  @keyframes drift1{from{transform:rotate(-14deg) translate(0,0)}to{transform:rotate(-9deg) translate(7vw,-5vh)}}
+  @keyframes drift2{from{transform:rotate(9deg) translate(0,0)}to{transform:rotate(14deg) translate(-6vw,6vh)}}
+  @keyframes drift3{from{transform:rotate(-6deg) translate(0,0)}to{transform:rotate(-12deg) translate(9vw,-7vh)}}
+  @keyframes drift4{from{transform:rotate(22deg) translate(0,0)}to{transform:rotate(17deg) translate(-8vw,4vh)}}
+
+  /* ---------- parallax stage ---------- */
+  #stage{
+    position:relative;z-index:3;
+    perspective:1100px;
+    width:min(420px,92vw);
+    transition:transform .35s cubic-bezier(.2,.7,.3,1);
+  }
+
+  /* ---------- glass card ---------- */
+  #card{
+    position:relative;
+    padding:52px 44px 46px;
+    border-radius:24px;
+    background:var(--glass);
+    -webkit-backdrop-filter:blur(22px) saturate(1.35);
+    backdrop-filter:blur(22px) saturate(1.35);
+    border:1px solid var(--edge);
+    box-shadow:
+      0 1px 0 rgba(220,235,255,.14) inset,
+      0 -1px 0 rgba(0,0,0,.25) inset,
+      0 30px 70px -20px rgba(0,0,10,.7),
+      0 8px 24px rgba(0,0,10,.45);
+    transform-style:preserve-3d;
+    transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));
+    transition:transform .25s cubic-bezier(.2,.7,.3,1), box-shadow .4s;
+  }
+  /* layered top highlight */
+  #card::before{
+    content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,0) 34%);
+  }
+  #card::after{
+    content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:radial-gradient(120% 60% at 50% -10%,rgba(120,200,255,.12),transparent 60%);
+  }
+
+  /* ---------- wordmark ---------- */
+  .mark{
+    text-align:center;margin-bottom:8px;
+    font-weight:200;font-size:clamp(30px,7vw,40px);
+    letter-spacing:.52em;text-indent:.52em;
+    color:var(--ink);
+    text-shadow:0 0 24px rgba(140,190,255,.35);
+  }
+  .mark b{font-weight:200;background:linear-gradient(90deg,var(--teal),#9AD8FF 40%,var(--magenta));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{
+    text-align:center;color:var(--dim);font-size:11.5px;letter-spacing:.34em;text-indent:.34em;
+    text-transform:uppercase;margin-bottom:40px;font-weight:400;
+  }
+
+  /* ---------- fields ---------- */
+  .field{position:relative;margin-bottom:26px}
+  .field input{
+    width:100%;padding:24px 18px 10px;
+    background:rgba(8,12,30,.5);
+    border:1px solid rgba(150,175,230,.14);
+    border-radius:14px;
+    color:var(--ink);
+    font-size:15px;font-family:inherit;
+    outline:none;
+    transition:border-color .3s, box-shadow .3s, background .3s;
+    caret-color:var(--teal);
+  }
+  .field input:focus{
+    border-color:rgba(62,230,196,.55);
+    box-shadow:0 0 0 3px rgba(62,230,196,.10), 0 0 26px rgba(62,230,196,.16);
+    background:rgba(10,16,38,.62);
+  }
+  .field label{
+    position:absolute;left:19px;top:16px;
+    color:var(--dim);font-size:14.5px;pointer-events:none;
+    transition:all .22s cubic-bezier(.2,.7,.3,1);
+  }
+  .field input:focus + label,
+  .field input:not(:placeholder-shown) + label{
+    top:7px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#9FE8DA;
+  }
+  .field input:not(:focus):not(:placeholder-shown) + label{color:var(--dim)}
+  .field .tick{
+    position:absolute;right:14px;top:20px;color:var(--teal);font-size:13px;
+    opacity:0;transform:scale(.5);transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  }
+  .field.valid .tick{opacity:1;transform:scale(1)}
+
+  /* ---------- sign-in button ---------- */
+  .btn{
+    position:relative;overflow:hidden;
+    width:100%;margin-top:6px;
+    padding:15px 0;border:none;border-radius:14px;cursor:pointer;
+    font-family:inherit;font-size:13px;font-weight:600;
+    letter-spacing:.3em;text-indent:.3em;text-transform:uppercase;color:#061018;
+    background:linear-gradient(92deg,#4DEDC9,#7FB2FF 55%,#C77BFF);
+    background-size:200% 100%;
+    box-shadow:0 10px 30px -8px rgba(90,140,255,.45), 0 0 0 1px rgba(255,255,255,.18) inset;
+    transition:transform .18s, box-shadow .3s, background-position .6s;
+  }
+  .btn:hover{transform:translateY(-2px);box-shadow:0 16px 40px -8px rgba(120,160,255,.55);
+    background-position:100% 0}
+  .btn:active{transform:translateY(1px) scale(.985)}
+  .btn::after{ /* sheen sweep */
+    content:"";position:absolute;top:0;left:-70%;width:45%;height:100%;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);
+    transform:skewX(-22deg);
+    animation:sheen 4.6s ease-in-out infinite;
+  }
+  @keyframes sheen{0%,55%{left:-70%}85%,100%{left:135%}}
+  .btn.busy{pointer-events:none;color:transparent}
+  .btn.busy::before{
+    content:"";position:absolute;left:50%;top:50%;width:20px;height:20px;margin:-10px 0 0 -10px;
+    border-radius:50%;border:2px solid rgba(6,16,24,.25);border-top-color:#061018;
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .meta{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-top:22px;color:var(--dim);font-size:12px;letter-spacing:.06em;
+  }
+  .meta a{color:#A9C4FF;text-decoration:none;transition:color .25s,text-shadow .25s}
+  .meta a:hover{color:var(--teal);text-shadow:0 0 14px rgba(62,230,196,.6)}
+
+  /* ---------- success state ---------- */
+  #success{
+    position:absolute;inset:0;border-radius:24px;
+    display:grid;place-items:center;text-align:center;
+    background:rgba(10,16,38,.55);
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    opacity:0;visibility:hidden;transform:scale(1.04);
+    transition:opacity .5s, transform .5s cubic-bezier(.2,.7,.3,1), visibility .5s;
+    z-index:5;
+  }
+  #success.show{opacity:1;visibility:visible;transform:scale(1)}
+  .ring{
+    width:92px;height:92px;border-radius:50%;
+    border:2px solid rgba(62,230,196,.25);
+    display:grid;place-items:center;margin:0 auto 20px;
+    box-shadow:0 0 40px rgba(62,230,196,.28), 0 0 0 1px rgba(62,230,196,.12) inset;
+    animation:ringpulse 2.6s ease-in-out infinite;
+  }
+  @keyframes ringpulse{0%,100%{box-shadow:0 0 34px rgba(62,230,196,.22),0 0 0 0 rgba(62,230,196,.28) inset}
+    50%{box-shadow:0 0 58px rgba(62,230,196,.4),0 0 0 6px rgba(62,230,196,.05) inset}}
+  .ring svg path{
+    stroke:var(--teal);stroke-width:7;fill:none;stroke-linecap:round;stroke-linejoin:round;
+    stroke-dasharray:60;stroke-dashoffset:60;
+    filter:drop-shadow(0 0 8px rgba(62,230,196,.8));
+  }
+  #success.show .ring svg path{animation:draw .7s .25s cubic-bezier(.2,.7,.3,1) forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  #success h2{font-weight:200;font-size:22px;letter-spacing:.4em;text-indent:.4em;margin-bottom:8px}
+  #success p{color:var(--dim);font-size:12px;letter-spacing:.14em}
+  .shimmer{
+    background:linear-gradient(90deg,var(--teal),#B7E9FF 40%,var(--magenta));
+    background-size:200% 100%;
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    animation:shimm 3s linear infinite;
+  }
+  @keyframes shimm{to{background-position:200% 0}}
+  .again{
+    margin-top:26px;background:none;border:1px solid rgba(160,190,255,.25);color:#A9C4FF;
+    padding:9px 22px;border-radius:999px;font-family:inherit;font-size:11px;
+    letter-spacing:.22em;text-transform:uppercase;cursor:pointer;transition:all .3s;
+  }
+  .again:hover{border-color:var(--teal);color:var(--teal);box-shadow:0 0 18px rgba(62,230,196,.25)}
+
+  /* ---------- footer hint ---------- */
+  .hint{
+    position:fixed;bottom:22px;left:0;right:0;text-align:center;z-index:3;
+    color:rgba(139,147,181,.55);font-size:10.5px;letter-spacing:.28em;text-transform:uppercase;
+  }
+
+  @media (max-width:430px){
+    #card{padding:44px 26px 38px;border-radius:20px}
+    .mark{letter-spacing:.4em;text-indent:.4em}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .ribbon,.tw,.btn::after,.ring,.shimmer{animation:none !important}
+    #stage{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="stars"></canvas>
+<div class="ribbon r1"></div>
+<div class="ribbon r2"></div>
+<div class="ribbon r3"></div>
+<div class="ribbon r4"></div>
+
+<div id="stage">
+  <div id="card">
+    <div class="mark">AUR<b>O</b>RA</div>
+    <div class="sub">After&nbsp;Dark&nbsp;Access</div>
+
+    <form id="form" novalidate autocomplete="off">
+      <div class="field" id="fEmail">
+        <input id="email" type="email" placeholder=" " required>
+        <label for="email">Email address</label>
+        <span class="tick">✓</span>
+      </div>
+      <div class="field" id="fPass">
+        <input id="pass" type="password" placeholder=" " required minlength="4">
+        <label for="pass">Passphrase</label>
+        <span class="tick">✓</span>
+      </div>
+
+      <button class="btn" id="go" type="submit"><span>Enter the Night</span></button>
+
+      <div class="meta">
+        <a href="#" id="magic">Compose a pass-phrase</a>
+        <a href="#" id="resend">Recover</a>
+      </div>
+    </form>
+
+    <div id="success">
+      <div>
+        <div class="ring">
+          <svg width="46" height="46" viewBox="0 0 52 52" aria-hidden="true">
+            <path d="M14 27l8 8 16-17"/>
+          </svg>
+        </div>
+        <h2 class="shimmer">WELCOME</h2>
+        <p id="greetline">Neural handshake complete.</p>
+        <button class="again" id="again" type="button">Sign out</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="hint">Move your cursor — the night responds</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- static starfield on canvas ---------- */
+  var cv = document.getElementById('stars');
+  var ctx = cv.getContext('2d');
+  var stars = [], DPR = Math.min(devicePixelRatio || 1, 2);
+
+  function seed(){
+    cv.width = innerWidth * DPR; cv.height = innerHeight * DPR;
+    cv.style.width = innerWidth+'px'; cv.style.height = innerHeight+'px';
+    stars = [];
+    var count = Math.floor((innerWidth * innerHeight) / 5200);
+    for(var i=0;i<count;i++){
+      stars.push({
+        x: Math.random()*cv.width,
+        y: Math.random()*cv.height,
+        r: (Math.random()*1.1 + .3) * DPR,
+        p: Math.random()*Math.PI*2,
+        s: .4 + Math.random()*1.4
+      });
+    }
+  }
+  seed();
+  addEventListener('resize', seed);
+
+  var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var t = 0;
+  (function loop(){
+    t += .016;
+    ctx.clearRect(0,0,cv.width,cv.height);
+    for(var i=0;i<stars.length;i++){
+      var st = stars[i];
+      var a = .25 + .55 * (Math.sin(t*st.s + st.p)*.5+.5);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#CFE0FF';
+      ctx.beginPath();
+      ctx.arc(st.x, st.y, st.r, 0, 6.2832);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    if(!reduced) requestAnimationFrame(loop);
+  })();
+  if(reduced){ /* one static frame already drawn */ }
+
+  /* ---------- mouse parallax tilt ---------- */
+  var stage = document.getElementById('stage');
+  var card = document.getElementById('card');
+  var raf = null;
+
+  function onMove(e){
+    var cx = innerWidth/2, cy = innerHeight/2;
+    var dx = (e.clientX - cx) / cx;   /* -1 .. 1 */
+    var dy = (e.clientY - cy) / cy;
+    stage.style.setProperty('--pry', (dx*3).toFixed(2)+'deg');
+    card.style.setProperty('--ry', (dx*5).toFixed(2)+'deg');
+    card.style.setProperty('--rx', (-dy*4).toFixed(2)+'deg');
+    /* ribbons lean faintly against the cursor */
+    document.querySelectorAll('.ribbon').forEach(function(r,i){
+      var k = (i%2? -1.6 : 1.6);
+      r.style.translate = (dx*k)+'vw '+(dy*k*.6)+'vh';
+    });
+  }
+  var queued = false;
+  addEventListener('pointermove', function(e){
+    if(queued) return; queued = true;
+    raf = requestAnimationFrame(function(){ queued=false; onMove(e); });
+  }, {passive:true});
+
+  /* ---------- validation niceties ---------- */
+  var email = document.getElementById('email');
+  var pass = document.getElementById('pass');
+  email.addEventListener('input', function(){
+    document.getElementById('fEmail').classList.toggle('valid', /.+@.+\..+/.test(email.value));
+  });
+  pass.addEventListener('input', function(){
+    document.getElementById('fPass').classList.toggle('valid', pass.value.length >= 4);
+  });
+
+  /* ---------- fake success flow ---------- */
+  var form = document.getElementById('form');
+  var go = document.getElementById('go');
+  var success = document.getElementById('success');
+
+  form.addEventListener('submit', function(ev){
+    ev.preventDefault();
+    if(!/.+@.+\..+/.test(email.value)){
+      email.focus();
+      card.animate(
+        [{transform:'translateX(0)'},{transform:'translateX(-9px)'},{transform:'translateX(8px)'},{transform:'translateX(0)'}],
+        {duration:280, easing:'ease-in-out'}
+      );
+      return;
+    }
+    go.classList.add('busy');
+    setTimeout(function(){
+      var name = email.value.split('@')[0] || 'traveller';
+      document.getElementById('greetline').textContent =
+        'The sky remembers you, ' + name + '.';
+      go.classList.remove('busy');
+      success.classList.add('show');
+    }, 1300);
+  });
+
+  document.getElementById('again').addEventListener('click', function(){
+    success.classList.remove('show');
+    pass.value=''; 
+    document.getElementById('fPass').classList.remove('valid');
+  });
+
+  /* ---------- pass-phrase composer (pure delight) ---------- */
+  var WORDS_A = ['midnight','velvet','pale','hollow','amber','quiet','north','drifting','glass','slow'];
+  var WORDS_B = ['aurora','tide','signal','lantern','meridian','frost','echo','harbor','comet','dusk'];
+  document.getElementById('magic').addEventListener('click', function(ev){
+    ev.preventDefault();
+    var a = WORDS_A[Math.floor(Math.random()*WORDS_A.length)];
+    var b = WORDS_B[Math.floor(Math.random()*WORDS_B.length)];
+    var n = Math.floor(Math.random()*90+10);
+    pass.value = a + '-' + b + '-' + n;
+    pass.type = 'text';
+    document.getElementById('fPass').classList.add('valid');
+    setTimeout(function(){ pass.type='password'; }, 1600);
+  });
+
+  /* ---------- gentle key sound? no — silence is the luxury. ---------- */
+})();
+</script>
+</body>
+</html>

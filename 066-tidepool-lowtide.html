@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LOW TIDE — an interactive tide pool</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background:#20323a; touch-action:none; user-select:none; -webkit-user-select:none;
+  }
+  #pool { position:fixed; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; }
+
+  .hud {
+    position:fixed; left:20px; top:16px; z-index:10; color:#d8e8e4;
+    text-shadow:0 1px 6px rgba(0,0,0,.5);
+  }
+  .hud h1 { font-size:17px; font-weight:300; letter-spacing:.5em; text-transform:uppercase; }
+  .hud p { font-size:9px; letter-spacing:.26em; text-transform:uppercase; margin-top:5px; color:#9ab8b4; }
+
+  .guide {
+    position:fixed; right:16px; bottom:16px; z-index:20; width:230px;
+    background:rgba(14,26,30,.88); border:1px solid rgba(150,200,190,.22); border-radius:14px;
+    padding:14px 16px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    transform:translateY(20px); opacity:0; transition:all .3s; pointer-events:none;
+  }
+  .guide.show { transform:none; opacity:1; pointer-events:auto; }
+  .guide h3 { font-size:14px; color:#cfe8e0; font-style:italic; }
+  .guide .lat { font-size:8.5px; letter-spacing:.24em; color:#7a9a94; text-transform:uppercase; margin:3px 0 8px; }
+  .guide p { font-size:11px; line-height:1.7; color:#a8c4be; }
+
+  .controls {
+    position:fixed; left:20px; bottom:16px; z-index:20; display:flex; gap:12px; align-items:center;
+    padding:12px 18px; border-radius:99px;
+    background:rgba(14,26,30,.85); border:1px solid rgba(150,200,190,.22);
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  }
+  .controls .lab { font-size:8.5px; letter-spacing:.24em; color:#7a9a94; text-transform:uppercase; }
+  input[type=range] {
+    -webkit-appearance:none; appearance:none; width:130px; height:3px; border-radius:99px;
+    background:linear-gradient(90deg, #6a9aa8, #a8d8d0); outline:none; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:15px; height:15px; border-radius:50%; background:#dff0ec; border:2px solid #6a9aa8; }
+  .controls .tv { font-size:10px; color:#cfe8e0; width:64px; letter-spacing:.08em; }
+
+  .hintline { position:fixed; right:20px; top:16px; z-index:10; font-size:9px; letter-spacing:.22em;
+    text-transform:uppercase; color:rgba(216,232,228,.55); text-shadow:0 1px 4px rgba(0,0,0,.5); }
+  @media (max-width:640px) { .hintline { display:none; } }
+</style>
+</head>
+<body>
+  <div id="pool"><canvas id="c"></canvas></div>
+
+  <div class="hud">
+    <h1>Low Tide</h1>
+    <p>ankle depth · be gentle</p>
+  </div>
+  <div class="hintline">your shadow frightens the pool · hold to drop a pebble</div>
+
+  <div class="controls">
+    <span class="lab">tide</span>
+    <input type="range" id="tideR" min="0" max="100" value="70" aria-label="tide level">
+    <span class="tv" id="tideV">low · pools</span>
+  </div>
+
+  <div class="guide" id="guide">
+    <h3 id="gName">—</h3>
+    <div class="lat" id="gLat">—</div>
+    <p id="gBody">—</p>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const cv = $("c"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let tide = 0.7, mx = -999, my = -999, shadowNear = false;
+  let ripples = [], bubbles = [];
+
+  /* ---------- rocks & pools ---------- */
+  const rocks = [];
+  function buildRocks() {
+    rocks.length = 0;
+    /* big basin rocks */
+    for (let i = 0; i < 9; i++) {
+      rocks.push({
+        x: (0.08 + 0.84 * (i / 8)) * W + (Math.random() - 0.5) * 60,
+        y: H * (0.42 + Math.random() * 0.4),
+        rx: 70 + Math.random() * 130,
+        ry: 34 + Math.random() * 60,
+        tone: 0.5 + Math.random() * 0.5,
+        moss: Math.random() < 0.5,
+      });
+    }
+  }
+
+  /* ---------- creatures ---------- */
+  const CATALOG = [
+    { name: "giant green anemone", lat: "anthopleura xanthogrammica",
+      body: "Waist-deep in its own patience. It will outwait your shadow, your afternoon, and possibly your century." },
+    { name: "hermit crab", lat: "pagurus sp.",
+      body: "Renting a periwinkle shell by the month. When threatened, it shuts the door and becomes furniture." },
+    { name: "ochre sea star", lat: "pisaster ochraceus",
+      body: "The tide pool's landlord. It eats mussels slowly, which keeps the whole pool from becoming a mussel." },
+    { name: "acorn barnacles", lat: "balanus glandula",
+      body: "Set in stone, literally. They spend childhood swimming and adulthood standing very still, feeding on whatever drifts by." },
+    { name: "tide pool sculpin", lat: "ologocottus sp.",
+      body: "A fish that pretends to be a rock, near rocks, for a living. Startles badly; apologizes never." },
+    { name: "coralline algae", lat: "corallinaceae",
+      body: "The pink paint on the rocks. It is a plant that builds itself a limestone skeleton, which is showing off." },
+  ];
+  const creatures = [];
+  function placeCreatures() {
+    creatures.length = 0;
+    const kinds = ["anemone", "crab", "star", "barnacles", "sculpin", "algae"];
+    kinds.forEach((k, i) => {
+      const rock = rocks[Math.floor(Math.random() * rocks.length)];
+      creatures.push({
+        kind: k,
+        x: rock ? rock.x + (Math.random() - 0.5) * rock.rx * 1.2 : W * 0.5,
+        y: rock ? rock.y + (Math.random() - 0.5) * rock.ry : H * 0.6,
+        info: CATALOG[i % CATALOG.length],
+        retreat: 0,   /* 0 calm .. 1 hidden */
+        phase: Math.random() * 6.28,
+      });
+    });
+  }
+
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    buildRocks();
+    placeCreatures();
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  /* ---------- input ---------- */
+  cv.addEventListener("pointermove", (e) => { mx = e.clientX; my = e.clientY; }, { passive: true });
+  cv.addEventListener("pointerdown", (e) => {
+    /* pebble splash */
+    ripples.push({ x: e.clientX, y: e.clientY, r: 4, a: 1 });
+    for (let i = 0; i < 8; i++) {
+      bubbles.push({ x: e.clientX, y: e.clientY, vx: (Math.random() - 0.5) * 2.4, vy: -Math.random() * 2.4, life: 1 });
+    }
+    plunk();
+  });
+  addEventListener("pointerleave", () => { mx = -999; my = -999; });
+
+  /* ---------- audio ---------- */
+  let AC = null;
+  function plunk() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      const t0 = AC.currentTime;
+      const o = AC.createOscillator(), gn = AC.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(420, t0);
+      o.frequency.exponentialRampToValueAtTime(160, t0 + 0.22);
+      gn.gain.setValueAtTime(0.07, t0);
+      gn.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
+      o.connect(gn); gn.connect(AC.destination);
+      o.start(t0); o.stop(t0 + 0.32);
+    } catch (e) {}
+  }
+
+  /* ---------- tide ---------- */
+  $("tideR").addEventListener("input", (e) => {
+    tide = parseInt(e.target.value, 10) / 100;
+    $("tideV").textContent = tide < 0.3 ? "draining · stranded" : tide < 0.6 ? "low · pools" : tide < 0.85 ? "high · rising" : "flood · all wet";
+  });
+
+  /* ---------- render loop ---------- */
+  let t = 0;
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+    t = now;
+
+    /* sea/sky split by tide */
+    const horizon = H * (0.3 - tide * 0.1);
+    /* sky */
+    const sky = g.createLinearGradient(0, 0, 0, horizon);
+    sky.addColorStop(0, "#b8d8d4");
+    sky.addColorStop(1, "#e8e4c8");
+    g.fillStyle = sky;
+    g.fillRect(0, 0, W, horizon);
+    /* sun glints */
+    g.fillStyle = "rgba(255,250,220,.8)";
+    for (let i = 0; i < 5; i++) {
+      g.fillRect(W * 0.2 + i * 40 + Math.sin(now / 900 + i) * 6, horizon - 30 - i * 6, 14, 2);
+    }
+    /* water */
+    const waterY = horizon;
+    const water = g.createLinearGradient(0, waterY, 0, H);
+    water.addColorStop(0, "#4a8a90");
+    water.addColorStop(0.4, "#35707a");
+    water.addColorStop(1, "#224a55");
+    g.fillStyle = water;
+    g.fillRect(0, waterY, W, H - waterY);
+
+    /* rocks */
+    rocks.forEach(r => {
+      /* wet darker when tide high */
+      const wet = 0.5 + tide * 0.4;
+      const base = Math.round(90 + r.tone * 50 - wet * 20);
+      g.fillStyle = "rgb(" + base + "," + Math.round(base * 0.92) + "," + Math.round(base * 1.06) + ")";
+      g.beginPath();
+      g.ellipse(r.x, r.y, r.rx, r.ry, 0, Math.PI, 0);
+      g.fill();
+      /* top highlight */
+      g.fillStyle = "rgba(220,230,220,.18)";
+      g.beginPath();
+      g.ellipse(r.x - r.rx * 0.2, r.y - r.ry * 0.5, r.rx * 0.5, r.ry * 0.4, 0, Math.PI, 0);
+      g.fill();
+      /* moss cap */
+      if (r.moss) {
+        g.fillStyle = "rgba(90,140,80,.55)";
+        g.beginPath();
+        g.ellipse(r.x + r.rx * 0.1, r.y - r.ry * 0.92, r.rx * 0.42, r.ry * 0.2, 0.1, Math.PI, 0);
+        g.fill();
+      }
+    });
+
+    /* caustics: moving light ripples on water */
+    g.save();
+    g.globalCompositeOperation = "overlay";
+    g.strokeStyle = "rgba(200,240,230,.16)";
+    g.lineWidth = 2;
+    for (let i = 0; i < 7; i++) {
+      g.beginPath();
+      const yy = waterY + 20 + i * ((H - waterY) / 8);
+      for (let x = 0; x <= W; x += 24) {
+        const y = yy + Math.sin(x * 0.02 + now / 700 + i * 1.4) * 6;
+        x ? g.lineTo(x, y) : g.moveTo(x, y);
+      }
+      g.stroke();
+    }
+    g.restore();
+
+    /* creatures */
+    creatures.forEach(cr => {
+      /* shadow fear: pointer within 120px */
+      const d = Math.hypot(mx - cr.x, my - cr.y);
+      const fear = d < 130 ? 1 : 0;
+      cr.retreat += (fear - cr.retreat) * 0.06;
+      drawCreature(cr, now);
+      /* click → guide card */
+    });
+
+    /* ripples */
+    ripples = ripples.filter(r => r.a > 0.02);
+    ripples.forEach(r => {
+      r.r += 2.2; r.a *= 0.965;
+      g.strokeStyle = "rgba(230,248,244," + r.a * 0.7 + ")";
+      g.lineWidth = 2;
+      g.beginPath(); g.arc(r.x, r.y, r.r, 0, 6.283); g.stroke();
+      g.beginPath(); g.arc(r.x, r.y, r.r * 0.6, 0, 6.283); g.stroke();
+    });
+    /* bubbles */
+    bubbles = bubbles.filter(b => b.life > 0);
+    bubbles.forEach(b => {
+      b.x += b.vx; b.y += b.vy; b.vy += 0.06; b.life -= 0.02;
+      g.fillStyle = "rgba(230,248,244," + b.life * 0.8 + ")";
+      g.beginPath(); g.arc(b.x, b.y, 2.4, 0, 6.283); g.fill();
+    });
+
+    /* shadow of your hand */
+    if (mx > 0) {
+      g.fillStyle = "rgba(10,20,24,.18)";
+      g.beginPath();
+      g.ellipse(mx + 14, my + 20, 60, 34, 0, 0, 6.283);
+      g.fill();
+    }
+  }
+  requestAnimationFrame(loop);
+
+  function drawCreature(cr, now) {
+    const hide = cr.retreat;
+    g.save();
+    g.translate(cr.x, cr.y);
+    if (cr.kind === "anemone") {
+      /* column */
+      g.fillStyle = "rgba(90,160,120," + (1 - hide * 0.7) + ")";
+      g.beginPath();
+      g.ellipse(0, 4, 16, 10 + hide * 4, 0, 0, 6.283);
+      g.fill();
+      /* tentacles */
+      const n = 12;
+      for (let i = 0; i < n; i++) {
+        const a = (6.283 / n) * i + Math.sin(now / 900 + cr.phase + i) * 0.08;
+        const len = (14 + Math.sin(now / 700 + i * 2 + cr.phase) * 3) * (1 - hide);
+        g.strokeStyle = "rgba(120,200,150," + (0.85 - hide * 0.7) + ")";
+        g.lineWidth = 2.4;
+        g.lineCap = "round";
+        g.beginPath();
+        g.moveTo(Math.cos(a) * 8, -4 + Math.sin(a) * 5);
+        g.lineTo(Math.cos(a) * (8 + len), -4 + Math.sin(a) * (5 + len));
+        g.stroke();
+      }
+    } else if (cr.kind === "crab") {
+      const scoot = Math.sin(now / 400 + cr.phase) * 3;
+      g.translate(scoot * (1 - hide), 0);
+      g.scale(1 - hide * 0.5, 1 - hide * 0.5);
+      /* shell */
+      g.fillStyle = "#c9a882";
+      g.beginPath();
+      g.moveTo(-14, 4); g.quadraticCurveTo(0, -16 - hide * 8, 14, 4); g.closePath(); g.fill();
+      /* legs */
+      g.strokeStyle = "#a8865e"; g.lineWidth = 2;
+      for (const s of [-1, 1]) {
+        for (let i = 0; i < 2; i++) {
+          g.beginPath();
+          g.moveTo(s * 8, 2 + i * 3);
+          g.lineTo(s * (16 + i * 3), 6 + i * 3 + Math.sin(now / 300 + i) * 1.5);
+          g.stroke();
+        }
+      }
+      /* eyes */
+      g.fillStyle = "#3a2c1e";
+      g.fillRect(-4, -8 - hide * 6, 2, 3); g.fillRect(3, -8 - hide * 6, 2, 3);
+    } else if (cr.kind === "star") {
+      g.rotate(Math.sin(now / 4000 + cr.phase) * 0.2);
+      g.fillStyle = "rgba(224,142,74," + (1 - hide * 0.6) + ")";
+      g.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const a = (6.283 / 5) * i - 1.57;
+        const a2 = a + 6.283 / 10;
+        g.lineTo(Math.cos(a) * 17, Math.sin(a) * 17);
+        g.lineTo(Math.cos(a2) * 7, Math.sin(a2) * 7);
+      }
+      g.closePath(); g.fill();
+      /* dots */
+      g.fillStyle = "rgba(255,240,220,.5)";
+      for (let i = 0; i < 5; i++) {
+        const a = (6.283 / 5) * i - 1.57;
+        g.beginPath(); g.arc(Math.cos(a) * 9, Math.sin(a) * 9, 1.2, 0, 6.283); g.fill();
+      }
+    } else if (cr.kind === "barnacles") {
+      for (let i = 0; i < 6; i++) {
+        const bx = (i - 2.5) * 9, by = Math.sin(i * 2.4) * 4;
+        g.fillStyle = "rgba(230,220,200," + (0.9) + ")";
+        g.beginPath();
+        g.ellipse(bx, by, 5, 4 * (1 - hide * 0.8), 0, 0, 6.283);
+        g.fill();
+        g.fillStyle = "rgba(60,50,40," + (1 - hide * 0.2) + ")";
+        g.beginPath();
+        g.ellipse(bx, by, 2.4, 1.8, 0, 0, 6.283);
+        g.fill();
+      }
+    } else if (cr.kind === "sculpin") {
+      /* hides fast */
+      const off = hide * 26;
+      g.translate(off, 0);
+      g.fillStyle = "rgba(140,120,100," + (1 - hide * 0.8) + ")";
+      g.beginPath();
+      g.ellipse(0, 2, 16, 7, 0.1, 0, 6.283);
+      g.fill();
+      /* tail flick */
+      g.strokeStyle = "rgba(140,120,100,.8)"; g.lineWidth = 3;
+      g.beginPath();
+      g.moveTo(-14, 2);
+      g.lineTo(-22, 2 + Math.sin(now / 300 + cr.phase) * 3);
+      g.stroke();
+      /* eye */
+      g.fillStyle = "#2a1e14";
+      g.beginPath(); g.arc(9, 0, 1.6, 0, 6.283); g.fill();
+    } else {
+      /* coralline algae: pink crust */
+      g.fillStyle = "rgba(216,120,140,.5)";
+      g.beginPath();
+      g.ellipse(0, 6, 30, 10, 0, 0, 6.283);
+      g.fill();
+    }
+    g.restore();
+  }
+
+  /* ---------- guide card on creature click ---------- */
+  cv.addEventListener("click", (e) => {
+    for (const cr of creatures) {
+      if (Math.hypot(e.clientX - cr.x, e.clientY - cr.y) < 40) {
+        $("gName").textContent = cr.info.name;
+        $("gLat").textContent = cr.info.lat;
+        $("gBody").textContent = cr.info.body;
+        $("guide").classList.add("show");
+        clearTimeout($("guide")._t);
+        $("guide")._t = setTimeout(() => $("guide").classList.remove("show"), 6000);
+        return;
+      }
+    }
+    $("guide").classList.remove("show");
+  });
+})();
+</script>
+</body>
+</html>

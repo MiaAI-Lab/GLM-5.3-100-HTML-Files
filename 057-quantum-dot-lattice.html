@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPIN LATTICE — an Ising playground</title>
+<style>
+:root{
+  --bone:#EDE7D9; --bone2:#E3DCC9; --ink:#16130D; --verm:#E0491F;
+  --hair:#c9c0a9; --mut:#6f6754;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
+  background:var(--bone);color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;
+  min-height:100vh;padding:clamp(14px,3vw,34px) clamp(12px,3vw,40px) 40px;
+}
+header{width:100%;max-width:1180px;display:flex;align-items:baseline;
+  justify-content:space-between;gap:1rem;flex-wrap:wrap;border-bottom:2px solid var(--ink);
+  padding-bottom:.7rem;margin-bottom:clamp(14px,2.6vh,26px)}
+h1{font-size:clamp(1.5rem,4.6vw,2.6rem);letter-spacing:.06em;font-weight:800}
+h1 em{font-style:normal;color:var(--verm)}
+.sub{font-size:.66rem;letter-spacing:.26em;color:var(--mut);text-transform:uppercase}
+.stage{width:100%;max-width:1180px;display:grid;grid-template-columns:230px minmax(0,1fr) 230px;
+  gap:clamp(14px,2.4vw,30px);align-items:start}
+.rail{display:flex;flex-direction:column;gap:1.15rem}
+.rail h3{font-size:.6rem;letter-spacing:.3em;color:var(--mut);font-weight:700;
+  text-transform:uppercase;border-bottom:1px solid var(--hair);padding-bottom:.4rem}
+figure.tapestry{position:relative;margin:0}
+#lat{
+  width:100%;display:block;aspect-ratio:1/1;background:var(--bone2);
+  border:2px solid var(--ink);cursor:crosshair;touch-action:manipulation;
+  box-shadow:8px 8px 0 rgba(22,19,13,.14);
+}
+figcaption{position:absolute;left:10px;bottom:8px;font-size:.58rem;
+  letter-spacing:.22em;color:var(--mut);pointer-events:none}
+/* thermostat */
+#tslider{-webkit-appearance:none;appearance:none;width:100%;height:34px;
+  background:transparent;cursor:pointer}
+#tslider::-webkit-slider-runnable-track{height:6px;background:var(--ink);border-radius:0}
+#tslider::-moz-range-track{height:6px;background:var(--ink)}
+#tslider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:26px;
+  background:var(--verm);border:2px solid var(--ink);margin-top:-10px;
+  box-shadow:2px 2px 0 rgba(22,19,13,.35)}
+#tslider::-moz-range-thumb{width:14px;height:24px;background:var(--verm);
+  border:2px solid var(--ink);border-radius:0}
+.tscale{position:relative;height:30px;font-size:.58rem;color:var(--mut);letter-spacing:.08em}
+.tscale .tick{position:absolute;transform:translateX(-50%);text-align:center;top:0}
+.tscale .tick::before{content:"";display:block;width:1px;height:8px;background:var(--mut);
+  margin:0 auto 2px}
+.tscale .tc{color:var(--verm);font-weight:700}
+.tscale .tc::before{background:var(--verm);width:2px}
+#tread{font-size:1.5rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+#tread small{font-size:.5em;color:var(--mut);font-weight:400}
+button{font:inherit;cursor:pointer}
+.btn{background:var(--bone);border:2px solid var(--ink);color:var(--ink);
+  padding:.6rem .5rem;font-size:.64rem;letter-spacing:.22em;font-weight:700;
+  box-shadow:3px 3px 0 var(--ink);transition:transform .1s,box-shadow .1s;text-transform:uppercase}
+.btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.btn.hot{background:var(--verm);color:var(--bone);border-color:var(--ink)}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--bone)}
+/* meters */
+.meterbox{border:1px solid var(--ink);padding:.7rem .8rem;background:var(--bone2)}
+.bigread{font-size:1.34rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.bigread small{display:block;font-size:.56rem;letter-spacing:.26em;color:var(--mut);
+  font-weight:400;margin-top:.15rem}
+#mbar{height:14px;border:1px solid var(--ink);margin-top:.55rem;position:relative;
+  background:repeating-linear-gradient(90deg,transparent 0 9px,rgba(22,19,13,.08) 9px 10px)}
+#mfill{position:absolute;inset:0;width:50%;background:var(--verm);
+  transition:width .25s ease;transform-origin:left}
+#graph{width:100%;height:120px;display:block;border:1px solid var(--ink);background:var(--bone)}
+/* plaques */
+.plaques{width:100%;max-width:1180px;margin-top:clamp(16px,3vh,30px);
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:clamp(12px,2vw,24px)}
+.plaque{border:1px solid var(--ink);background:var(--bone2);padding:1rem 1.1rem;
+  box-shadow:5px 5px 0 rgba(22,19,13,.12)}
+.plaque h4{font-size:.62rem;letter-spacing:.28em;color:var(--verm);margin-bottom:.5rem;
+  text-transform:uppercase}
+.plaque p{font-size:.72rem;line-height:1.7;color:#3d3729}
+.plaque b{color:var(--ink)}
+footer{margin-top:1.6rem;font-size:.58rem;letter-spacing:.24em;color:var(--mut);
+  text-transform:uppercase;text-align:center}
+@media (max-width:900px){
+  .stage{grid-template-columns:1fr}
+  .rail{flex-direction:row;flex-wrap:wrap}
+  .rail>*{flex:1 1 150px}
+  .rail.left{order:2}.rail.right{order:3}figure.tapestry{order:1}
+}
+@media (prefers-reduced-motion:reduce){
+  #mfill{transition:none}
+  .btn{transition:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>SPIN <em>LATTICE</em></h1>
+  <span class="sub">Ising model · 2-D square · J = 1 · k<sub>B</sub> = 1</span>
+</header>
+
+<div class="stage">
+  <div class="rail left">
+    <div>
+      <h3>Thermostat</h3>
+      <div id="tread">2.27<small> T / T꜀</small></div>
+      <input id="tslider" type="range" min="0.4" max="4.4" step="0.01" value="2.269"
+        aria-label="temperature">
+      <div class="tscale">
+        <span class="tick" style="left:7%">0.4</span>
+        <span class="tick tc" style="left:49%">T꜀ 2.269</span>
+        <span class="tick" style="left:94%">4.4</span>
+      </div>
+    </div>
+    <div>
+      <h3>Protocol</h3>
+      <div style="display:flex;flex-direction:column;gap:.55rem">
+        <button class="btn hot" id="quench">Quench · T→0.4</button>
+        <button class="btn" id="sweep" aria-pressed="false">Sweep mode</button>
+        <button class="btn" id="reset">Reset · random</button>
+      </div>
+    </div>
+  </div>
+
+  <figure class="tapestry">
+    <canvas id="lat" aria-label="Ising spin lattice; click a dot to pin its spin"></canvas>
+    <figcaption>LATTICE 56 × 56 · PERIODIC · METROPOLIS</figcaption>
+  </figure>
+
+  <div class="rail right">
+    <div class="meterbox">
+      <div class="bigread" id="mread">0.00<small>MAGNETIZATION |m|</small></div>
+      <div id="mbar"><div id="mfill"></div></div>
+    </div>
+    <div class="meterbox">
+      <div class="bigread" id="fread">0<small>FLIPS · s⁻¹</small></div>
+    </div>
+    <div>
+      <h3>Order parameter</h3>
+      <canvas id="graph" aria-label="magnetization versus temperature plot"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="plaques">
+  <div class="plaque">
+    <h4>Plaque I — The wager</h4>
+    <p>Each dot carries a spin, <b>up or down</b>, and wants to agree with its
+    neighbours. Heat is noise: the chance to flip against the crowd. Warm half
+    up, cool half down — the tapestry is the argument between order and heat.</p>
+  </div>
+  <div class="plaque">
+    <h4>Plaque II — The critical point</h4>
+    <p>Below <b>T꜀ = 2.269</b> (Onsager's exact result, 1944) the lattice
+    spontaneously magnetizes: domains grow, dots align, |m| climbs. Above it,
+    thermal noise wins and the magnet melts to zero. Slide across the mark
+    and watch the phase change happen under your hand.</p>
+  </div>
+  <div class="plaque">
+    <h4>Plaque III — Your hand</h4>
+    <p><b>Click any dot</b> to pin its spin — a seed crystal for domains to
+    grow from. <b>QUENCH</b> flash-freezes the system so domains race across
+    the lattice like frost. <b>SWEEP</b> breathes temperature up and down
+    while the curve of |m| versus T is plotted live.</p>
+  </div>
+</div>
+
+<footer>64 × 64 would also work · this one is hand-set in ink &amp; vermilion</footer>
+
+<script>
+"use strict";
+/* ================= SPIN LATTICE — Ising / Metropolis ================= */
+var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+var N = 56;                 // lattice edge
+var TC = 2.269;             // Onsager critical temperature (J=1, kB=1)
+var spin = new Int8Array(N*N);
+var pinned = new Uint8Array(N*N);
+var ang = new Float32Array(N*N);   // render rotation per dot
+var angT = new Float32Array(N*N);  // target rotation
+
+var T = TC;
+var sweepMode = false, sweepDir = 1;
+var flips = 0, flipWindowT = performance.now();
+
+function idx(x,y){ return ((y+N)%N)*N + ((x+N)%N); }
+
+function resetLattice(){
+  for(var i=0;i<N*N;i++){
+    spin[i] = Math.random()<0.5 ? 1 : -1;
+    pinned[i] = 0;
+    ang[i] = spin[i]>0 ? 0 : Math.PI;
+    angT[i] = ang[i];
+  }
+}
+resetLattice();
+
+/* ---------- Metropolis sweep (checkerboard, vectorized-ish) ---------- */
+function metropolisStep(sweeps){
+  var beta = 1/T;
+  /* precompute acceptance thresholds for dE in {-8..8} step 4, dE=0 */
+  var accept = new Float64Array(17);
+  for(var d=0; d<=16; d+=4){
+    var de = d-8;
+    accept[d] = de<=0 ? 1 : Math.exp(-beta*de);
+  }
+  for(var s=0; s<sweeps; s++){
+    /* parity offset makes it checkerboard */
+    for(var parity=0; parity<2; parity++){
+      for(var y=0;y<N;y++){
+        var off = (y&1)^parity;
+        for(var x=off; x<N; x+=2){
+          var i = y*N+x;
+          if(pinned[i]) continue;
+          var nb = spin[idx(x+1,y)] + spin[idx(x-1,y)] +
+                   spin[idx(x,y+1)] + spin[idx(x,y-1)];
+          var dE = 2*spin[i]*nb;
+          if(dE<=0 || Math.random() < accept[dE+8]){
+            spin[i] = -spin[i];
+            flips++;
+            angT[i] = spin[i]>0 ? 0 : Math.PI;
+          }
+        }
+      }
+    }
+  }
+}
+
+function magnetization(){
+  var m=0;
+  for(var i=0;i<N*N;i++) m += spin[i];
+  return Math.abs(m)/(N*N);
+}
+
+/* ---------- rendering: op-art two-tone rotation dots ---------- */
+var cv = document.getElementById("lat"), ctx = cv.getContext("2d");
+var W=0,H=0,DPR=1,cell=0,cx=0;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  cell = W/N; cx = cell*0.34;
+}
+window.addEventListener("resize", resize, {passive:true});
+
+var INK="#16130D", VERM="#E0491F";
+function ease(a,b,t){ return a+(b-a)*(1-Math.pow(1-t,3)); }
+
+function render(){
+  var g = cell*0.5;
+  for(var y=0;y<N;y++){
+    for(var x=0;x<N;x++){
+      var i=y*N+x;
+      /* ease angle toward target; longer path when hot */
+      var speed = REDUCED ? 1 : Math.min(1, 0.05 + T*0.06);
+      ang[i] = ease(ang[i], angT[i], speed);
+      var a = ang[i];
+      var px = x*cell+g, py = y*cell+g;
+      ctx.save();
+      ctx.translate(px,py);
+      ctx.rotate(a);
+      /* two-tone disc: vermilion half / ink half */
+      ctx.beginPath(); ctx.arc(0,0,cx,0,6.2832); ctx.closePath();
+      ctx.fillStyle = VERM;
+      ctx.fill();
+      ctx.beginPath(); ctx.moveTo(0,0);
+      ctx.arc(0,0,cx, -Math.PI/2, Math.PI/2);
+      ctx.closePath();
+      ctx.fillStyle = INK;
+      ctx.fill();
+      if(pinned[i]){
+        ctx.strokeStyle = "#EDE7D9";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.arc(0,0,cx+1.2,0,6.2832); ctx.stroke();
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.arc(0,0,cx+2.8,0,6.2832); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+}
+/* ---------- graph: |m| vs T ---------- */
+var gcv = document.getElementById("graph"), gctx = gcv.getContext("2d");
+var curve = [];   // {t, m}
+function resizeGraph(){
+  var d = Math.min(window.devicePixelRatio||1,2);
+  var w = gcv.clientWidth, h = gcv.clientHeight;
+  gcv.width = Math.round(w*d); gcv.height = Math.round(h*d);
+  gctx.setTransform(d,0,0,d,0,0);
+}
+window.addEventListener("resize", resizeGraph, {passive:true});
+var TMIN=0.4, TMAX=4.4;
+function drawGraph(){
+  var w=gcv.clientWidth, h=gcv.clientHeight;
+  gctx.clearRect(0,0,w,h);
+  /* axes */
+  gctx.strokeStyle="#c9c0a9"; gctx.lineWidth=1;
+  gctx.beginPath();
+  gctx.moveTo(6,10.5); gctx.lineTo(6,h-6); gctx.lineTo(w-6,h-6.5);
+  gctx.stroke();
+  /* Tc marker line */
+  var xtc = 6 + (TC-TMIN)/(TMAX-TMIN)*(w-12);
+  gctx.strokeStyle="#E0491F"; gctx.setLineDash([3,3]);
+  gctx.beginPath(); gctx.moveTo(xtc,8); gctx.lineTo(xtc,h-6); gctx.stroke();
+  gctx.setLineDash([]);
+  gctx.fillStyle="#E0491F"; gctx.font="9px ui-monospace,Menlo,monospace";
+  gctx.fillText("T꜀", xtc+3, 14);
+  /* curve */
+  if(curve.length>1){
+    gctx.strokeStyle="#16130D"; gctx.lineWidth=1.6;
+    gctx.beginPath();
+    for(var i=0;i<curve.length;i++){
+      var px = 6 + (curve[i].t-TMIN)/(TMAX-TMIN)*(w-12);
+      var py = (h-8) - curve[i].m*(h-20);
+      if(i===0) gctx.moveTo(px,py); else gctx.lineTo(px,py);
+    }
+    gctx.stroke();
+    var last = curve[curve.length-1];
+    var lx = 6+(last.t-TMIN)/(TMAX-TMIN)*(w-12), ly=(h-8)-last.m*(h-20);
+    gctx.fillStyle="#E0491F";
+    gctx.beginPath(); gctx.arc(lx,ly,3,0,6.2832); gctx.fill();
+  }
+  gctx.fillStyle="#6f6754";
+  gctx.fillText("|m|", 10, 14);
+  gctx.fillText("T→", w-22, h-10);
+}
+
+/* ---------- controls ---------- */
+var slider=document.getElementById("tslider"), tread=document.getElementById("tread");
+var mread=document.getElementById("mread"), mfill=document.getElementById("mfill");
+var fread=document.getElementById("fread");
+function syncSliderUI(){
+  tread.innerHTML = T.toFixed(2)+'<small> T / T꜀</small>';
+  slider.value = T.toFixed(2);
+}
+slider.addEventListener("input", function(){
+  sweepOff();
+  T = parseFloat(slider.value);
+  syncSliderUI();
+});
+var quenchBtn=document.getElementById("quench");
+quenchBtn.addEventListener("click", function(){
+  sweepOff();
+  T = 0.4;
+  syncSliderUI();
+  /* zero out the system so frost domains race */
+  metropolisStep(3);
+});
+var sweepBtn=document.getElementById("sweep");
+function sweepOff(){
+  sweepMode=false;
+  sweepBtn.setAttribute("aria-pressed","false");
+}
+sweepBtn.addEventListener("click", function(){
+  sweepMode = !sweepMode;
+  sweepDir = 1;
+  sweepBtn.setAttribute("aria-pressed", sweepMode?"true":"false");
+});
+document.getElementById("reset").addEventListener("click", function(){
+  sweepOff();
+  curve.length=0;
+  resetLattice();
+});
+
+/* ---------- pin spins by clicking ---------- */
+function pinFromEvent(e){
+  var r = cv.getBoundingClientRect();
+  var x = Math.floor((e.clientX-r.left)/r.width*N);
+  var y = Math.floor((e.clientY-r.top)/r.height*N);
+  x = Math.max(0,Math.min(N-1,x)); y = Math.max(0,Math.min(N-1,y));
+  var i=y*N+x;
+  pinned[i] = 1;
+  /* clicking sets spin DOWN (ink half upright) as seed */
+  spin[i] = -1;
+  angT[i] = Math.PI;
+}
+cv.addEventListener("pointerdown", function(e){ pinFromEvent(e); });
+/* drag to paint pins */
+cv.addEventListener("pointermove", function(e){
+  if(e.buttons) pinFromEvent(e);
+});
+
+/* ---------- main loop ---------- */
+var acc=0, last=performance.now();
+var mDisp = 0;
+function frame(now){
+  var dt = Math.min(50, now-last); last=now;
+  if(sweepMode){
+    T += sweepDir * dt*0.00035 * 8;
+    if(T>=TMAX){T=TMAX;sweepDir=-1;}
+    if(T<=TMIN){T=TMIN;sweepDir=1;}
+    syncSliderUI();
+  }
+  /* physics substeps sized to temperature */
+  var steps = REDUCED ? 2 : (T<TC ? 1 : 2);
+  acc += dt;
+  var budget = REDUCED ? 40 : 16;   // ms of physics per frame
+  if(acc >= budget){
+    metropolisStep(steps);
+    acc = 0;
+  }
+  /* sample magnetization ~5x/s */
+  if(!frame.mt || now-frame.mt>200){
+    frame.mt = now;
+    var m = magnetization();
+    mDisp = mDisp*0.4 + m*0.6;
+    mread.firstChild.nodeValue = mDisp.toFixed(2);
+    mfill.style.width = (mDisp*100).toFixed(1)+"%";
+    if(sweepMode && curve.length<400) curve.push({t:T,m:mDisp});
+    if(!sweepMode && (frame.gt===undefined || now-frame.gt>1500)){
+      frame.gt=now;
+      /* keep a light live trace of user dragging too */
+      var dup=false;
+      for(var i=Math.max(0,curve.length-8);i<curve.length;i++){
+        if(Math.abs(curve[i].t-T)<0.02){dup=true;break;}
+      }
+      if(!dup) curve.push({t:T,m:mDisp});
+      if(curve.length>400) curve.shift();
+    }
+  }
+  /* flip rate per second */
+  if(now-flipWindowT>1000){
+    fread.firstChild.nodeValue = flips.toLocaleString("en-US");
+    flips=0; flipWindowT=now;
+  }
+  render();
+  drawGraph();
+  requestAnimationFrame(frame);
+}
+
+/* ---------- boot ---------- */
+resize(); resizeGraph(); syncSliderUI();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

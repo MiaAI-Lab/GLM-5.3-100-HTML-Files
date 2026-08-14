@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FUSE — shell designer</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background:linear-gradient(180deg, #060a14 0%, #0a1020 60%, #0c1424 100%);
+    color:#d8e2f0; touch-action:none; user-select:none; -webkit-user-select:none;
+  }
+  #sky { position:fixed; inset:0; }
+  canvas { width:100%; height:100%; display:block; }
+  .hud {
+    position:fixed; left:22px; top:18px; z-index:10;
+  }
+  .hud h1 { font-size:16px; font-weight:300; letter-spacing:.5em; text-transform:uppercase; color:#e8eef8; }
+  .hud p { font-size:9px; letter-spacing:.26em; text-transform:uppercase; color:#6a82a8; margin-top:5px; }
+
+  /* shell designer bench */
+  .bench {
+    position:fixed; left:50%; bottom:0; transform:translateX(-50%); z-index:20;
+    width:min(720px, 96vw);
+    background:rgba(8,14,26,.88); border:1px solid rgba(150,180,220,.2); border-bottom:none;
+    border-radius:18px 18px 0 0; padding:16px 20px 14px;
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    display:flex; flex-direction:column; gap:12px;
+  }
+  .row { display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  .row .lab { font-size:8.5px; letter-spacing:.24em; color:#6a82a8; text-transform:uppercase; width:52px; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; flex:1; }
+  .chips button {
+    background:rgba(150,180,220,.08); color:#c8d8ec; border:1px solid rgba(150,180,220,.28);
+    font:inherit; font-size:9.5px; letter-spacing:.1em; padding:7px 12px; border-radius:99px; cursor:pointer;
+    transition:all .13s;
+  }
+  .chips button:hover { background:rgba(150,180,220,.2); }
+  .chips button.on { border-color:#ffd9a0; color:#ffd9a0; background:rgba(255,217,160,.12); }
+  .bigbtn {
+    align-self:center; background:#c2492e; border:none; color:#fff; font:inherit; font-weight:700;
+    font-size:11px; letter-spacing:.24em; text-transform:uppercase; padding:13px 34px; border-radius:99px;
+    cursor:pointer; box-shadow:0 6px 20px rgba(194,73,46,.5); transition:all .15s;
+  }
+  .bigbtn:hover { background:#e05a3a; transform:translateY(-2px); }
+  .meta { text-align:center; font-size:9px; letter-spacing:.2em; color:#5a6a84; text-transform:uppercase; }
+  .counter { position:fixed; right:22px; top:18px; z-index:10; text-align:right;
+    font-size:10px; letter-spacing:.2em; color:#6a82a8; text-transform:uppercase; }
+  .counter b { display:block; font-size:22px; color:#ffd9a0; font-weight:400; }
+  @media (max-width:640px) { .counter { display:none; } }
+</style>
+</head>
+<body>
+  <canvas id="sky"></canvas>
+
+  <div class="hud">
+    <h1>Fuse</h1>
+    <p>shell designer · click the sky to launch</p>
+  </div>
+  <div class="counter">shells fired<b id="firedV">0</b></div>
+
+  <div class="bench">
+    <div class="row">
+      <span class="lab">burst</span>
+      <div class="chips" id="patterns">
+        <button data-p="peony" class="on">peony</button>
+        <button data-p="chrys">chrysanthemum</button>
+        <button data-p="willow">willow</button>
+        <button data-p="ring">ring</button>
+        <button data-p="palm">palm</button>
+        <button data-p="crossette">crossette</button>
+      </div>
+    </div>
+    <div class="row">
+      <span class="lab">palette</span>
+      <div class="chips" id="palettes">
+        <button data-c="gold" class="on">gold</button>
+        <button data-c="crimson">crimson</button>
+        <button data-c="jewel">jewel</button>
+        <button data-c="glacier">glacier</button>
+        <button data-c="iris">iris</button>
+      </div>
+    </div>
+    <div class="row">
+      <span class="lab">size</span>
+      <div class="chips" id="sizes">
+        <button data-s="0.7">small</button>
+        <button data-s="1" class="on">standard</button>
+        <button data-s="1.5">festival</button>
+      </div>
+      <button class="bigbtn" id="finaleBtn">finale ×20</button>
+    </div>
+    <div class="meta" id="metaLine">hold anywhere to charge a multi-break shell</div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const cv = $("sky"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let pattern = "peony", palette = "gold", sizeK = 1;
+  let shells = [], sparks = [], fired = 0;
+
+  const PALETTES = {
+    gold: ["#ffd98a", "#ffb347", "#ff8a3c", "#fff4d0"],
+    crimson: ["#ff8a8a", "#ff5a5a", "#c22a2a", "#ffd8c0"],
+    jewel: ["#7dd8ff", "#ff7dd8", "#ffd97d", "#a0ffd0"],
+    glacier: ["#d8f4ff", "#a0d8ff", "#ffffff", "#7db8d8"],
+    iris: ["#c9a0ff", "#a0c9ff", "#ffa0e8", "#e0d0ff"],
+  };
+
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  /* ---------- shells ---------- */
+  function launch(tx, ty, multi) {
+    const s = {
+      x: W * (0.3 + Math.random() * 0.4), y: H + 10,
+      tx, ty,
+      vx: 0, vy: 0,
+      trail: [],
+      burstAt: ty,
+      multi: multi || 1,
+      pattern, palette, sizeK,
+      asc: 0,
+    };
+    /* aim */
+    const dx = tx - s.x, dy = ty - s.y;
+    const T = 70;
+    s.vx = dx / T;
+    s.vy = dy / T - 0.5 * (-0.16) * T; /* ballistic solve */
+    shells.push(s);
+    fired++;
+    $("firedV").textContent = fired;
+    thump();
+  }
+
+  function burst(s) {
+    const cols = PALETTES[s.palette];
+    const N = Math.floor(90 * s.sizeK);
+    const cx = s.x, cy = s.y;
+    const addSpark = (ang, spd, col, life, w) => {
+      sparks.push({
+        x: cx, y: cy,
+        vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+        col, life: life || 1, w: w || 2,
+        glitter: Math.random() < 0.3,
+        child: null,
+      });
+    };
+    if (s.pattern === "peony") {
+      for (let i = 0; i < N; i++) {
+        const a = Math.random() * 6.283;
+        const spd = (2.6 + Math.random() * 2.2) * s.sizeK;
+        addSpark(a, spd, cols[i % cols.length], 1, 2.2);
+      }
+      boom(0.5);
+    } else if (s.pattern === "chrys") {
+      for (let i = 0; i < N; i++) {
+        const a = (6.283 / N) * i + Math.random() * 0.1;
+        const spd = (3.4 + Math.random() * 0.7) * s.sizeK;
+        addSpark(a, spd, cols[i % cols.length], 1.25, 1.4);
+      }
+      boom(0.55);
+    } else if (s.pattern === "willow") {
+      for (let i = 0; i < N * 0.7; i++) {
+        const a = Math.random() * 6.283;
+        const spd = (1.8 + Math.random() * 1.6) * s.sizeK;
+        addSpark(a, spd, cols[0], 2.4, 1.8);
+      }
+      boom(0.4);
+    } else if (s.pattern === "ring") {
+      for (let i = 0; i < 64; i++) {
+        const a = (6.283 / 64) * i;
+        const spd = 3.4 * s.sizeK;
+        addSpark(a, spd, cols[i % 2 ? 1 : 0], 1.2, 2);
+      }
+      boom(0.5);
+    } else if (s.pattern === "palm") {
+      /* few thick rising-then-falling fronds */
+      for (let i = 0; i < 10; i++) {
+        const a = -1.57 + (i / 9 - 0.5) * 2.2;
+        addSpark(a, (3.2 + Math.random()) * s.sizeK, cols[0], 2.2, 4);
+      }
+      boom(0.45);
+    } else {
+      /* crossette: fewer, splitting sparks */
+      for (let i = 0; i < 14; i++) {
+        const a = (6.283 / 14) * i;
+        const spd = 2.8 * s.sizeK;
+        addSpark(a, spd, cols[i % cols.length], 1, 2.4);
+        /* mark for split */
+        sparks[sparks.length - 1].child = true;
+      }
+      boom(0.5);
+    }
+    /* multi-break: chain smaller bursts */
+    if (s.multi > 1) {
+      for (let k = 1; k < s.multi; k++) {
+        setTimeout(() => {
+          const cols2 = PALETTES[Object.keys(PALETTES)[Math.floor(Math.random() * 5)]];
+          for (let i = 0; i < 40; i++) {
+            const a = Math.random() * 6.283;
+            const spd = (1.6 + Math.random() * 2) * s.sizeK;
+            sparks.push({ x: cx + (Math.random() - 0.5) * 60, y: cy + (Math.random() - 0.5) * 60, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, col: cols2[i % 4], life: 1, w: 2, glitter: Math.random() < 0.3 });
+          }
+          boom(0.35);
+        }, 260 * k);
+      }
+    }
+  }
+
+  /* ---------- audio ---------- */
+  let AC = null;
+  function boom(volK) {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      const t0 = AC.currentTime;
+      const dur = 1.2;
+      const buf = AC.createBuffer(1, AC.sampleRate * dur, AC.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2.2);
+      const src = AC.createBufferSource(); src.buffer = buf;
+      const f = AC.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 120; f.Q.value = 0.8;
+      const gn = AC.createGain(); gn.gain.value = 0.14 * volK;
+      src.connect(f); f.connect(gn); gn.connect(AC.destination);
+      src.start(t0);
+    } catch (e) {}
+  }
+  function thump() {
+    if (!AC) return;
+    try {
+      const t0 = AC.currentTime;
+      const o = AC.createOscillator(), gn = AC.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(160, t0);
+      o.frequency.exponentialRampToValueAtTime(50, t0 + 0.4);
+      gn.gain.setValueAtTime(0.07, t0);
+      gn.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.45);
+      o.connect(gn); gn.connect(AC.destination);
+      o.start(t0); o.stop(t0 + 0.5);
+    } catch (e) {}
+  }
+
+  /* ---------- main loop ---------- */
+  function loop() {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+
+    /* night harbor backdrop */
+    const sky = g.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, "#060a14");
+    sky.addColorStop(0.7, "#0a1020");
+    sky.addColorStop(1, "#101a2e");
+    g.fillStyle = sky;
+    g.fillRect(0, 0, W, H);
+    /* stars */
+    g.fillStyle = "rgba(220,230,250,.5)";
+    for (let i = 0; i < 60; i++) {
+      const x = (i * 197) % W, y = (i * 89) % (H * 0.5);
+      g.fillRect(x, y, 1.2, 1.2);
+    }
+    /* city silhouette */
+    g.fillStyle = "#04060c";
+    let bx = -10;
+    let seed = 7;
+    while (bx < W + 20) {
+      const bw = 30 + (seed * 13 % 70);
+      const bh = 24 + (seed * 29 % 90);
+      g.fillRect(bx, H - bh, bw, bh);
+      /* lit windows */
+      g.fillStyle = "rgba(255,220,150,.35)";
+      for (let wy = H - bh + 6; wy < H - 8; wy += 10) {
+        for (let wx = bx + 5; wx < bx + bw - 5; wx += 9) {
+          if ((wx * wy) % 3 < 1) g.fillRect(wx, wy, 2.4, 3.4);
+        }
+      }
+      g.fillStyle = "#04060c";
+      bx += bw + 4;
+      seed++;
+    }
+    /* water strip */
+    g.fillStyle = "rgba(20,40,70,.5)";
+    g.fillRect(0, H - 16, W, 16);
+
+    /* shells ascend */
+    shells.forEach(s => {
+      s.vy += -0.16; /* gravity up-negative */
+      s.vy += 0.16; /* net: applied below properly */
+    });
+    shells = shells.filter(s => s.y > s.burstAt - 40);
+    shells.forEach(s => {
+      /* proper ballistic: gravity +0.16/frame */
+      s.x += s.vx;
+      s.y += s.vy;
+      s.vy += 0.16;
+      /* exhaust trail */
+      sparks.push({ x: s.x, y: s.y + 6, vx: (Math.random() - 0.5) * 0.6, vy: 1 + Math.random(), col: "#ffb347", life: 0.4, w: 1.6 });
+      /* draw shell head */
+      g.fillStyle = "#fff4d0";
+      g.beginPath(); g.arc(s.x, s.y, 2.6, 0, 6.283); g.fill();
+      if (s.y <= s.burstAt || s.vy > 0) {
+        burst(s);
+        s.dead = true;
+      }
+    });
+    shells = shells.filter(s => !s.dead);
+
+    /* sparks */
+    sparks = sparks.filter(p => p.life > 0);
+    sparks.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      p.vy += 0.045;                 /* gravity */
+      p.vx *= 0.985; p.vy *= 0.985;  /* drag */
+      p.life -= 0.011;
+      /* crossette split */
+      if (p.child && p.life < 0.55) {
+        p.child = false;
+        for (let k = 0; k < 4; k++) {
+          const a = Math.random() * 6.283;
+          sparks.push({ x: p.x, y: p.y, vx: p.vx * 0.4 + Math.cos(a) * 1.4, vy: p.vy * 0.4 + Math.sin(a) * 1.4, col: p.col, life: 0.7, w: 1.6, glitter: true });
+        }
+      }
+      const a = Math.max(0, p.life);
+      g.fillStyle = p.col;
+      g.globalAlpha = p.glitter ? a * (0.4 + 0.6 * Math.random()) : a;
+      g.beginPath();
+      g.arc(p.x, p.y, p.w, 0, 6.283);
+      g.fill();
+      /* reflection on water */
+      if (p.y > H - 60) {
+        g.globalAlpha = a * 0.2;
+        g.fillRect(p.x - p.w, H - 15 + (H - p.y) * 0.05, p.w * 2, 1.4);
+      }
+    });
+    g.globalAlpha = 1;
+  }
+  requestAnimationFrame(loop);
+
+  /* ---------- input ---------- */
+  let holdT = null;
+  cv.addEventListener("pointerdown", (e) => {
+    holdT = setTimeout(() => {
+      launch(e.clientX, e.clientY, 3);
+      holdT = null;
+      $("metaLine").textContent = "multi-break charged ×3";
+    }, 550);
+  });
+  cv.addEventListener("pointerup", (e) => {
+    if (holdT) {
+      clearTimeout(holdT);
+      launch(e.clientX, e.clientY, 1);
+      holdT = null;
+      $("metaLine").textContent = "hold anywhere to charge a multi-break shell";
+    }
+  });
+
+  /* chips */
+  function chips(id, cb) {
+    $(id).querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      $(id).querySelectorAll("button").forEach(x => x.classList.remove("on"));
+      b.classList.add("on");
+      cb(b.dataset);
+    }));
+  }
+  chips("patterns", d => pattern = d.p);
+  chips("palettes", d => palette = d.c);
+  chips("sizes", d => sizeK = parseFloat(d.s));
+
+  /* finale */
+  let finaleRunning = false;
+  $("finaleBtn").addEventListener("click", () => {
+    if (finaleRunning) return;
+    finaleRunning = true;
+    for (let i = 0; i < 20; i++) {
+      setTimeout(() => {
+        launch(
+          W * (0.12 + Math.random() * 0.76),
+          H * (0.14 + Math.random() * 0.3),
+          Math.random() < 0.3 ? 2 : 1
+        );
+      }, i * 340);
+    }
+    setTimeout(() => { finaleRunning = false; }, 8000);
+  });
+
+  /* welcome shell */
+  setTimeout(() => launch(W * 0.5, H * 0.3, 1), 900);
+})();
+</script>
+</body>
+</html>

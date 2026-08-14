@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMBER — a focus ritual</title>
+<style>
+:root{
+  --ember:#2A1614; --terra:#C4552D; --apricot:#E8A87C; --cream:#F4E9DC;
+  --dim:#8A6F60; --line:rgba(232,168,124,.2);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%}
+body{
+  font-family:Georgia,"Times New Roman",serif;
+  color:var(--cream);
+  background:
+    radial-gradient(900px 640px at 50% -10%, #3B1F1A 0%, transparent 62%),
+    radial-gradient(1200px 900px at 50% 120%, #241110 0%, transparent 60%),
+    var(--ember);
+  min-height:100vh; overflow-x:hidden;
+  transition:background 1.2s ease;
+  display:flex; flex-direction:column; align-items:center;
+  padding:clamp(16px,4vh,40px) 16px 30px;
+}
+.room{position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:radial-gradient(620px 520px at 50% 44%, rgba(232,168,124,.14), transparent 70%);
+  transition:opacity 1.4s ease; opacity:.55}
+body.lit .room{opacity:1}
+body.lit{background:
+  radial-gradient(1000px 720px at 50% -6%, #4A281E 0%, transparent 62%),
+  radial-gradient(1300px 960px at 50% 118%, #2E1714 0%, transparent 60%),
+  #2A1614}
+.stage{position:relative; z-index:1; width:100%; max-width:760px;
+  display:flex; flex-direction:column; align-items:center; gap:clamp(12px,2.6vh,24px)}
+.masthead{text-align:center}
+.masthead h1{
+  font-size:clamp(24px,4.4vw,42px); font-weight:400; letter-spacing:.42em;
+  text-indent:.42em; color:var(--apricot);
+}
+.masthead .rune{font-size:12px; letter-spacing:.34em; color:var(--dim); margin-top:6px; font-family:"Courier New",monospace}
+/* ---------- arc assembly ---------- */
+.arcwrap{position:relative; width:min(84vw,400px); aspect-ratio:1;
+  display:grid; place-items:center; touch-action:none; cursor:pointer}
+.arcwrap svg{position:absolute; inset:0; width:100%; height:100%; overflow:visible}
+.coal-void{fill:none; stroke:rgba(232,168,124,.13); stroke-width:10}
+.coal-track{fill:none; stroke:rgba(196,85,45,.22); stroke-width:10; stroke-linecap:round}
+.coal-heat{fill:none; stroke:url(#heatgrad); stroke-width:10; stroke-linecap:round;
+  filter:drop-shadow(0 0 9px rgba(232,140,80,.55))}
+.coal-ghost{fill:none; stroke:rgba(244,233,220,.34); stroke-width:2; stroke-dasharray:3 7; stroke-linecap:round}
+.tick{stroke:rgba(232,168,124,.28); stroke-width:1.4}
+.tickm{stroke:rgba(232,168,124,.5); stroke-width:2.4}
+.emberdot{fill:var(--apricot); filter:drop-shadow(0 0 7px rgba(232,168,124,.9))}
+/* inner glow coal */
+.coal{
+  position:absolute; width:38%; aspect-ratio:1; border-radius:50%;
+  background:radial-gradient(circle at 42% 38%, #6E2F1D 0%, #48201A 58%, #2A1614 100%);
+  box-shadow:inset 0 6px 22px rgba(0,0,0,.6);
+  display:grid; place-items:center; overflow:hidden;
+}
+.coal::before{ /* breathing hot core */
+  content:""; position:absolute; width:64%; aspect-ratio:1; border-radius:50%;
+  background:radial-gradient(circle at 46% 42%, #FFD9A0 0%, #F4A45C 34%, rgba(196,85,45,.65) 62%, transparent 78%);
+  filter:blur(3px); opacity:.42; transform:scale(.94);
+  transition:opacity .6s, transform .6s;
+}
+body.breathing .coal::before{animation:breathe 3.4s ease-in-out infinite}
+@keyframes breathe{
+  0%,100%{opacity:.44; transform:scale(.94)}
+  50%{opacity:.85; transform:scale(1.08)}
+}
+body.stoked .coal::before{opacity:.95; transform:scale(1.14); filter:blur(2px)}
+/* readout */
+.readout{position:relative; text-align:center; z-index:2; pointer-events:none}
+.readout .time{
+  font-family:"Courier New",monospace; font-weight:700;
+  font-size:clamp(34px,7vw,52px); letter-spacing:.06em; color:var(--cream);
+  text-shadow:0 0 24px rgba(232,140,80,.35);
+}
+.readout .phase{
+  font-size:11px; letter-spacing:.4em; text-indent:.4em; color:var(--apricot);
+  font-family:"Courier New",monospace; margin-top:2px; text-transform:uppercase;
+}
+/* sparks canvas */
+.sparks{position:absolute; inset:0; width:100%; height:100%; pointer-events:none}
+/* ---------- controls ---------- */
+.controls{display:flex; gap:12px; flex-wrap:wrap; justify-content:center}
+.btn{
+  font-family:Georgia,serif; font-size:13px; letter-spacing:.22em; text-indent:.22em;
+  color:var(--cream); background:rgba(196,85,45,.16); cursor:pointer;
+  border:1px solid var(--line); border-radius:99px; padding:12px 26px;
+  transition:.25s; text-transform:uppercase;
+}
+.btn:hover{background:rgba(196,85,45,.32); border-color:rgba(232,168,124,.5)}
+.btn.primary{background:var(--terra); border-color:transparent}
+.btn.primary:hover{filter:brightness(1.12)}
+.btn:disabled{opacity:.35; cursor:default}
+/* candles row */
+.candles{
+  display:flex; align-items:flex-end; gap:14px; min-height:44px; padding:8px 6px 2px;
+  border-top:1px solid var(--line); width:min(84vw,400px); justify-content:center;
+  flex-wrap:wrap;
+}
+.candles .lbl{width:100%; text-align:center; font-family:"Courier New",monospace;
+  font-size:9px; letter-spacing:.34em; color:var(--dim); margin-bottom:6px}
+.candle{
+  position:relative; width:10px; height:26px; border-radius:3px 3px 2px 2px;
+  background:linear-gradient(180deg,#E9D8C4,#C9B49B 70%,#8A6F60);
+  box-shadow:0 2px 4px rgba(0,0,0,.4);
+  animation:rise .5s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes rise{from{transform:translateY(10px) scale(.6); opacity:0}}
+.candle i{
+  position:absolute; left:50%; top:-9px; width:7px; height:11px;
+  transform:translateX(-50%); border-radius:50% 50% 42% 42%;
+  background:radial-gradient(circle at 50% 62%, #FFF4D6 0%, #F4B45C 52%, rgba(196,85,45,0) 78%);
+  animation:flick 1.3s ease-in-out infinite;
+}
+@keyframes flick{
+  0%,100%{transform:translateX(-50%) scale(1); opacity:.95}
+  30%{transform:translateX(-54%) scale(.92); opacity:.8}
+  60%{transform:translateX(-46%) scale(1.06); opacity:1}
+}
+/* session log / hints */
+.hints{
+  display:flex; gap:18px; flex-wrap:wrap; justify-content:center;
+  font-family:"Courier New",monospace; font-size:10px; letter-spacing:.18em; color:var(--dim);
+}
+.hints b{color:var(--apricot); font-weight:700}
+/* toast */
+.toast{
+  position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(8px);
+  background:rgba(244,233,220,.94); color:#2A1614; font-family:Georgia,serif;
+  font-size:13px; padding:10px 20px; border-radius:99px; z-index:30; opacity:0;
+  transition:.35s; pointer-events:none; letter-spacing:.04em;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+@media (prefers-reduced-motion:reduce){
+  .candle i, body.breathing .coal::before, .candle{animation:none!important}
+}
+@media (max-width:480px){
+  .hints{gap:10px}
+  .candles{gap:10px}
+}
+</style>
+</head>
+<body>
+<div class="room" aria-hidden="true"></div>
+<div class="stage">
+  <div class="masthead">
+    <h1>EMBER</h1>
+    <div class="rune">A FOCUS RITUAL · TEND THE FIRE</div>
+  </div>
+
+  <div class="arcwrap" id="arcwrap" role="application"
+       aria-label="Session arc — drag to set duration, press Enter or Space to start">
+    <svg viewBox="0 0 300 300" aria-hidden="true">
+      <defs>
+        <linearGradient id="heatgrad" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stop-color="#7A3320"/>
+          <stop offset=".5" stop-color="#C4552D"/>
+          <stop offset="1" stop-color="#F4B45C"/>
+        </linearGradient>
+      </defs>
+      <circle class="coal-void" cx="150" cy="150" r="122"></circle>
+      <path class="coal-track" id="coaltrack"></path>
+      <path class="coal-heat" id="coalheat"></path>
+      <path class="coal-ghost" id="coalghost"></path>
+      <g id="arcticks"></g>
+      <circle class="emberdot" id="emberdot" r="7"></circle>
+    </svg>
+    <canvas class="sparks" id="sparks"></canvas>
+    <div class="coal" aria-hidden="true"></div>
+    <div class="readout">
+      <div class="time" id="time">25:00</div>
+      <div class="phase" id="phase">SET THE DURATION</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn primary" id="start">Begin</button>
+    <button class="btn" id="stoke" disabled>Stoke</button>
+    <button class="btn" id="reset">Reset</button>
+  </div>
+
+  <div class="candles" id="candles">
+    <span class="lbl">SESSIONS TENDED</span>
+  </div>
+
+  <div class="hints">
+    <span><b>DRAG</b> THE ARC TO SET 5–60 MIN</span>
+    <span><b>S</b> START/PAUSE</span>
+    <span><b>K</b> STOKE</span>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+/* EMBER — chunk 1: arc geometry, drag-to-set duration, spark physics */
+"use strict";
+const gid = s => document.getElementById(s);
+const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- geometry: arc from 135° to 405° (270° sweep) ---------- */
+const R = 122, CX = 150, CY = 150;
+const A0 = 0.75 * Math.PI, A1 = 2.25 * Math.PI;   /* radians */
+const SWEEP = A1 - A0;
+function polar(a) { return [CX + Math.cos(a) * R, CY - Math.sin(a) * R]; }
+function arcPath(u0, u1) {
+  /* u in 0..1 along the sweep */
+  const a0 = A0 + SWEEP * u0, a1 = A0 + SWEEP * u1;
+  const [x0, y0] = polar(a0), [x1, y1] = polar(a1);
+  const large = (a1 - a0) > Math.PI ? 1 : 0;
+  return "M " + x0.toFixed(2) + " " + y0.toFixed(2) +
+    " A " + R + " " + R + " 0 " + large + " 1 " + x1.toFixed(2) + " " + y1.toFixed(2);
+}
+/* state */
+const state = {
+  minutes: 25,          /* chosen duration */
+  remainMs: 25 * 60000,
+  running: false,
+  progress: 0,          /* 0..1 of session elapsed */
+  stoked: false,
+  sessions: 0
+};
+/* paint track + ghost marker */
+const coalTrack = gid("coaltrack");
+const coalHeat = gid("coalheat");
+const coalGhost = gid("coalghost");
+const emberDot = gid("emberdot");
+function paintArc() {
+  coalTrack.setAttribute("d", arcPath(0, 1));
+  coalHeat.setAttribute("d", arcPath(0, Math.max(0.0015, state.progress)));
+  const a = A0 + SWEEP * state.progress;
+  const [dx, dy] = polar(a);
+  emberDot.setAttribute("cx", dx.toFixed(2));
+  emberDot.setAttribute("cy", dy.toFixed(2));
+}
+/* ticks every 5 min with labels at 15s */
+(function ticks() {
+  const g = gid("arcticks");
+  let h = "";
+  for (let m = 0; m <= 60; m += 5) {
+    const a = A0 + SWEEP * (m / 60);
+    const major = m % 15 === 0;
+    const r1 = R - 13, r2 = R - (major ? 25 : 19);
+    const x1 = CX + Math.cos(a) * r1, y1 = CY - Math.sin(a) * r1;
+    const x2 = CX + Math.cos(a) * r2, y2 = CY - Math.sin(a) * r2;
+    h += '<line class="' + (major ? "tickm" : "tick") + '" x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) +
+      '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '"></line>';
+  }
+  g.innerHTML = h;
+})();
+/* ---------- readouts ---------- */
+const timeEl = gid("time"), phaseEl = gid("phase");
+function fmt(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+}
+function paintReadout() {
+  timeEl.textContent = fmt(state.remainMs);
+  const ph = state.running ? "BURNING" : state.progress > 0 ? "HOLDING" : "SET THE DURATION";
+  phaseEl.textContent = ph + (state.stoked ? " · STOKED" : "");
+}
+/* ---------- drag to set duration ---------- */
+const arcwrap = gid("arcwrap");
+let dragging = false;
+function setFromPointer(ev) {
+  const r = arcwrap.getBoundingClientRect();
+  const px = (ev.clientX - r.left) / r.width * 300 - CX;
+  const py = -((ev.clientY - r.top) / r.height * 300 - CY);
+  let a = Math.atan2(py, px);
+  /* normalize into arc domain */
+  while (a < A0 - Math.PI / 2) a += Math.PI * 2;
+  let u = (a - A0) / SWEEP;
+  if (u < -0.08 || u > 1.08) return;
+  u = Math.max(0, Math.min(1, u));
+  let mins = Math.round(u * 60);
+  mins = Math.max(5, Math.min(60, mins));    /* 5..60 */
+  /* snap to 5-min ring */
+  const snapped = Math.round(mins / 5) * 5;
+  const use = (Math.abs(mins - snapped) < 2) ? Math.max(5, snapped) : mins;
+  if (use !== state.minutes) {
+    state.minutes = use;
+    state.remainMs = use * 60000;
+    state.progress = 0;
+    paintArc(); paintReadout(); paintGhost();
+    drawSparksBurst(6);
+  }
+}
+function paintGhost() {
+  const u = state.minutes / 60;
+  coalGhost.setAttribute("d", arcPath(u, 1));
+  coalGhost.setAttribute("stroke-dasharray", "3 7");
+}
+arcwrap.addEventListener("pointerdown", e => {
+  if (state.running) return;
+  dragging = true;
+  arcwrap.setPointerCapture(e.pointerId);
+  setFromPointer(e);
+});
+arcwrap.addEventListener("pointermove", e => { if (dragging) setFromPointer(e); });
+arcwrap.addEventListener("pointerup", () => dragging = false);
+arcwrap.addEventListener("pointercancel", () => dragging = false);
+arcwrap.addEventListener("keydown", e => {
+  if (e.key === "Enter" || e.key === " ") { toggleStart(); e.preventDefault(); }
+});
+/* ---------- sparks canvas ---------- */
+const sparksCv = gid("sparks");
+const sctx = sparksCv.getContext("2d");
+let SW = 0, SH = 0, DPRS = 1;
+function sizeSparks() {
+  DPRS = Math.min(2, window.devicePixelRatio || 1);
+  const r = sparksCv.getBoundingClientRect();
+  SW = sparksCv.width = Math.max(2, Math.round(r.width * DPRS));
+  SH = sparksCv.height = Math.max(2, Math.round(r.height * DPRS));
+}
+const embers = [];
+function drawSparksBurst(n) {
+  if (calm) return;
+  for (let i = 0; i < n; i++) {
+    const a = A0 + SWEEP * Math.random();
+    const [x, y] = polar(a);
+    embers.push({
+      x: x / 300 * SW, y: y / 300 * SH,
+      vx: (Math.random() - 0.5) * 0.2 * DPRS,
+      vy: (-(0.22 + Math.random() * 0.4)) * DPRS,
+      life: 1, r: (0.8 + Math.random() * 1.6) * DPRS
+    });
+  }
+}
+function stepSparks(dt, intensity) {
+  sctx.clearRect(0, 0, SW, SH);
+  for (let i = embers.length - 1; i >= 0; i--) {
+    const p = embers[i];
+    p.x += p.vx * dt * 60 * DPRS * 0.5;
+    p.y += p.vy * dt * 60 * DPRS * 0.5;
+    p.vy += -0.004 * dt * 60 * DPRS;      /* buoyancy */
+    p.vx += Math.sin(p.y * 0.05 + p.life * 6) * 0.02 * DPRS;
+    p.life -= dt * (0.5 + (1 - intensity) * 0.4);
+    if (p.life <= 0) { embers.splice(i, 1); continue; }
+    const g = sctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 3.4);
+    g.addColorStop(0, "rgba(255,222,168," + (0.9 * p.life).toFixed(3) + ")");
+    g.addColorStop(0.45, "rgba(232,140,80," + (0.55 * p.life).toFixed(3) + ")");
+    g.addColorStop(1, "rgba(196,85,45,0)");
+    sctx.fillStyle = g;
+    sctx.beginPath();
+    sctx.arc(p.x, p.y, p.r * 3.4, 0, 7);
+    sctx.fill();
+  }
+}
+/* EMBER — chunk 2: session engine, breathing room, candles, chime, loop */
+/* ---------- toast ---------- */
+let toastH = null;
+function toast(msg) {
+  const t = gid("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastH);
+  toastH = setTimeout(() => t.classList.remove("show"), 2300);
+}
+/* ---------- gesture-gated chime ---------- */
+let acE = null;
+function audioE() {
+  if (acE) return acE;
+  try { acE = new (window.AudioContext || window.webkitAudioContext)(); }
+  catch (e) { acE = null; }
+  return acE;
+}
+function chime() {
+  const a = audioE();
+  if (!a) return;
+  try {
+    if (a.state === "suspended") a.resume().catch(() => {});
+    const t0 = a.currentTime;
+    [523.25, 659.25, 783.99].forEach((f, i) => {
+      const o = a.createOscillator();
+      const g = a.createGain();
+      o.type = "sine";
+      o.frequency.value = f;
+      const st = t0 + i * 0.16;
+      g.gain.setValueAtTime(0, st);
+      g.gain.linearRampToValueAtTime(0.11, st + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + 1.9);
+      o.connect(g); g.connect(a.destination);
+      o.start(st); o.stop(st + 2);
+    });
+  } catch (e) { /* silent */ }
+}
+/* ---------- candles ---------- */
+function addCandle() {
+  const host = gid("candles");
+  const c = document.createElement("span");
+  c.className = "candle";
+  c.innerHTML = "<i></i>";
+  host.appendChild(c);
+}
+/* ---------- controls ---------- */
+const startBtn = gid("start");
+const stokeBtn = gid("stoke");
+const resetBtn = gid("reset");
+function toggleStart() {
+  if (state.running) {
+    state.running = false;
+    startBtn.textContent = "Resume";
+    document.body.classList.remove("breathing");
+    toast("The ember holds — paused");
+  } else {
+    if (state.remainMs <= 0) return;
+    state.running = true;
+    startBtn.textContent = "Pause";
+    stokeBtn.disabled = false;
+    document.body.classList.add("breathing");
+    audioE();                        /* create context inside the gesture */
+    toast("The session burns");
+  }
+  paintReadout();
+}
+startBtn.addEventListener("click", toggleStart);
+stokeBtn.addEventListener("click", () => {
+  state.stoked = true;
+  document.body.classList.add("stoked");
+  drawSparksBurst(26);
+  toast("Stoked — the glow deepens");
+  paintReadout();
+  setTimeout(() => {
+    state.stoked = false;
+    document.body.classList.remove("stoked");
+    paintReadout();
+  }, 24000);
+});
+resetBtn.addEventListener("click", () => {
+  state.running = false;
+  state.progress = 0;
+  state.remainMs = state.minutes * 60000;
+  startBtn.textContent = "Begin";
+  stokeBtn.disabled = true;
+  document.body.classList.remove("breathing", "lit", "stoked");
+  paintArc(); paintReadout();
+  toast("Fresh coal — " + state.minutes + " minutes");
+});
+document.addEventListener("keydown", e => {
+  if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+  if (e.key === "s" || e.key === "S") toggleStart();
+  if ((e.key === "k" || e.key === "K") && !stokeBtn.disabled) stokeBtn.click();
+});
+/* ---------- session engine ---------- */
+let lastMs = performance.now();
+let emberAccum = 0;
+function tickE(now) {
+  const dt = Math.min(0.08, (now - lastMs) / 1000);
+  lastMs = now;
+  if (state.running) {
+    state.remainMs -= dt * 1000;
+    const total = state.minutes * 60000;
+    state.progress = Math.min(1, 1 - state.remainMs / total);
+    if (state.remainMs <= 0) {
+      state.remainMs = 0;
+      state.running = false;
+      state.sessions++;
+      startBtn.textContent = "Begin";
+      stokeBtn.disabled = true;
+      document.body.classList.remove("breathing");
+      document.body.classList.add("lit");
+      addCandle();
+      chime();
+      drawSparksBurst(60);
+      toast("The session is complete — a candle is lit");
+      /* re-arm for another round */
+      setTimeout(() => {
+        state.progress = 0;
+        state.remainMs = state.minutes * 60000;
+        paintArc(); paintReadout();
+      }, 2600);
+    }
+    /* sparks drift as the session progresses */
+    emberAccum += dt;
+    const rate = 0.5 + state.progress * 2.2 + (state.stoked ? 2 : 0);
+    if (emberAccum > 0.55 / rate) {
+      drawSparksBurst(1 + (Math.random() * 2 | 0));
+      emberAccum = 0;
+    }
+    paintArc(); paintReadout();
+  }
+  const intensity = state.running
+    ? 0.4 + state.progress * 0.6
+    : 0.15;
+  stepSparks(dt, intensity);
+  /* room brightens toward completion */
+  document.body.classList.toggle("lit",
+    !state.running && state.sessions > 0 || state.progress > 0.72 && state.running);
+  requestAnimationFrame(tickE);
+}
+/* ---------- boot ---------- */
+sizeSparks();
+paintArc(); paintGhost(); paintReadout();
+addEventListener("resize", sizeSparks);
+requestAnimationFrame(tickE);
+toast("Set the arc, then begin");
+</script>
+</body>
+</html>

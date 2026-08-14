@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WAVEFORM — the shape of sound</title>
+<style>
+:root{
+  --bone:#f3eee2; --bone2:#eae3d2; --ink:#26241f; --ink-soft:#6b675c;
+  --cobalt:#1c47c8; --cobalt-hi:#3f6bff; --verm:#d4402a;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  background:
+    radial-gradient(140% 100% at 50% 0%, var(--bone) 55%, var(--bone2) 100%);
+  color:var(--ink); overflow:hidden;
+  display:grid; grid-template-rows:auto 1fr auto; user-select:none; -webkit-user-select:none;
+}
+header{
+  padding:clamp(12px,2vh,20px) clamp(18px,4vw,48px);
+  display:flex; align-items:baseline; gap:18px; flex-wrap:wrap;
+}
+header h1{font-size:clamp(17px,2.6vw,27px); font-weight:600; letter-spacing:.06em}
+header h1 em{font-style:italic; color:var(--cobalt)}
+header p{font-size:clamp(9px,1.3vw,12px); letter-spacing:.22em; color:var(--ink-soft)}
+main{
+  position:relative; display:grid;
+  grid-template-columns:1fr clamp(84px,12vw,132px);
+  gap:clamp(10px,2vw,26px); padding:0 clamp(18px,4vw,48px);
+  min-height:0;
+}
+.scope{
+  position:relative; border:1px solid #26241f2e; border-radius:6px;
+  background:linear-gradient(180deg,#fbf8ef,#f1ead9);
+  box-shadow:inset 0 0 0 4px #fff9, 0 10px 30px -18px #0004;
+  overflow:hidden;
+}
+canvas{display:block; width:100%; height:100%}
+/* annotations */
+.ann{position:absolute; font-size:clamp(9px,1.35vw,12.5px); letter-spacing:.05em;
+  color:var(--verm); font-style:italic; line-height:1.35; pointer-events:none}
+.ann b{font-style:normal; font-weight:700; color:var(--ink)}
+.ann::after{content:""; position:absolute; background:#d4402a88; height:1px}
+#annCrest{top:6%; left:16%}
+#annWave{bottom:12%; right:6%; text-align:right}
+#annAmp{top:38%; left:2.5%; text-align:right; width:34%}
+.leaderV{position:absolute; width:1px; background:#d4402a66; pointer-events:none}
+/* readouts */
+.readout{
+  position:absolute; top:8px; left:10px; display:flex; gap:18px; flex-wrap:wrap;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:clamp(10px,1.4vw,13px);
+  color:var(--ink-soft); pointer-events:none;
+}
+.readout b{color:var(--cobalt); font-weight:600}
+/* spectrum */
+.spectrum{
+  border:1px solid #26241f2e; border-radius:6px; position:relative;
+  background:linear-gradient(180deg,#fbf8ef,#efe8d6);
+  box-shadow:inset 0 0 0 4px #fff9; overflow:hidden;
+  display:flex; align-items:flex-end; justify-content:center; gap:3px;
+  padding:8% 10% 12%;
+}
+.spectrum .bar{
+  flex:1; background:linear-gradient(180deg,var(--cobalt-hi),var(--cobalt));
+  border-radius:2px 2px 0 0; height:4%; transition:height .09s linear;
+  opacity:.9;
+}
+.spectrum .lbl{
+  position:absolute; bottom:4%; left:0; right:0; text-align:center;
+  font-size:9px; letter-spacing:.28em; color:var(--ink-soft);
+}
+.spectrum .hz{
+  position:absolute; top:4%; left:0; right:0; text-align:center;
+  font-family:ui-monospace,Menlo,monospace; font-size:10px; color:var(--verm);
+}
+/* dials */
+.dials{
+  position:absolute; right:12px; top:10px; display:flex; gap:10px;
+}
+.dial{
+  width:clamp(44px,6vw,62px); aspect-ratio:1; border-radius:50%;
+  border:1.5px solid #26241f55; background:radial-gradient(circle at 35% 30%,#fffef8,#e6dec9);
+  box-shadow:0 4px 10px -4px #0005, inset 0 1px 0 #fff;
+  position:relative; cursor:grab; touch-action:none;
+}
+.dial:active{cursor:grabbing}
+.dial .needle{
+  position:absolute; left:50%; top:6%; width:2.5px; height:44%;
+  margin-left:-1.25px; border-radius:2px; transform-origin:50% 100%;
+  background:var(--verm); box-shadow:0 0 6px #d4402a88;
+}
+.dial .tag{
+  position:absolute; bottom:-19px; left:50%; transform:translateX(-50%);
+  font-family:ui-monospace,Menlo,monospace; font-size:9.5px; color:var(--ink-soft);
+  white-space:nowrap;
+}
+.dial .val{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:ui-monospace,Menlo,monospace; font-size:clamp(8px,1vw,10px);
+  color:var(--ink); padding-top:14%;
+}
+/* footer controls */
+footer{
+  display:flex; align-items:center; justify-content:center; gap:clamp(8px,1.8vw,18px);
+  padding:clamp(10px,2vh,18px) clamp(18px,4vw,48px); flex-wrap:wrap;
+}
+.shapechips{display:flex; gap:8px}
+button.chip{
+  font-family:inherit; font-size:clamp(10px,1.35vw,12.5px); letter-spacing:.14em;
+  padding:8px 15px; border-radius:3px; cursor:pointer;
+  color:var(--ink-soft); background:transparent; border:1px solid #26241f3d;
+  transition:all .22s;
+}
+button.chip:hover{border-color:var(--cobalt); color:var(--cobalt)}
+button.chip.on{
+  background:var(--cobalt); border-color:var(--cobalt); color:var(--bone);
+  box-shadow:0 4px 12px -4px var(--cobalt);
+}
+button.chip.act{
+  color:var(--verm); border-color:var(--verm);
+}
+button.chip.act.on{background:var(--verm); border-color:var(--verm); color:var(--bone)}
+footer .typediv{display:flex; align-items:center; gap:8px;
+  font-size:10px; letter-spacing:.18em; color:var(--ink-soft)}
+footer input[type=number]{
+  width:clamp(64px,8vw,86px); font:inherit; font-size:12px;
+  padding:7px 8px; border:1px solid #26241f3d; border-radius:3px;
+  background:#fffdf6; color:var(--ink);
+}
+footer input[type=number]:focus{outline:2px solid var(--cobalt); outline-offset:1px}
+footer .hint{font-size:9.5px; letter-spacing:.2em; color:#a39c8b}
+@media (max-width:760px){
+  main{grid-template-columns:1fr clamp(60px,14vw,90px)}
+  #annWave,#annCrest{display:none}
+  .dials{top:auto; bottom:10px}
+  footer .hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){ *{transition-duration:.01s !important} }
+</style>
+</head>
+<body>
+<header>
+  <h1>WAVEFORM <em>— the shape of sound</em></h1>
+  <p>AN INTERACTIVE FIELD GUIDE TO OSCILLATION</p>
+</header>
+<main>
+  <section class="scope" id="scope">
+    <canvas id="cv"></canvas>
+    <div class="readout">
+      <span>f = <b id="roF">220.0 Hz</b></span>
+      <span>A = <b id="roA">−6.0 dB</b></span>
+      <span id="roMode" style="color:#d4402a">LIVE</span>
+    </div>
+    <div class="dials">
+      <div class="dial" id="dialF" role="slider" tabindex="0" aria-label="Frequency dial">
+        <div class="needle" id="needleF"></div><div class="val" id="valF">220</div>
+        <div class="tag">FREQ Hz</div>
+      </div>
+      <div class="dial" id="dialA" role="slider" tabindex="0" aria-label="Amplitude dial">
+        <div class="needle" id="needleA"></div><div class="val" id="valA">−6</div>
+        <div class="tag">AMP dB</div>
+      </div>
+    </div>
+    <div class="ann" id="annCrest"><b>crest</b> — the wave at its fullest</div>
+    <div class="ann" id="annWave"><b>wavelength λ</b> — one full cycle, crest to crest</div>
+    <div class="ann" id="annAmp"><b>amplitude</b> —<br>loudness, in height</div>
+    <div class="leaderV" id="leadA1"></div>
+    <div class="leaderV" id="leadA2"></div>
+  </section>
+  <aside class="spectrum" id="spectrum">
+    <div class="hz" id="specHz">220 Hz</div>
+    <div class="lbl">SPECTRUM</div>
+  </aside>
+</main>
+<footer>
+  <div class="shapechips" id="shapes">
+    <button class="chip on" data-s="sine">SINE</button>
+    <button class="chip" data-s="square">SQUARE</button>
+    <button class="chip" data-s="saw">SAW</button>
+    <button class="chip" data-s="triangle">TRIANGLE</button>
+    <button class="chip" data-s="noise">NOISE</button>
+  </div>
+  <button class="chip act" id="listenBtn">LISTEN ▸</button>
+  <button class="chip act" id="freezeBtn">FREEZE</button>
+  <div class="typediv">
+    <label for="fjump">JUMP&nbsp;TO&nbsp;Hz</label>
+    <input type="number" id="fjump" min="20" max="8000" step="1" value="220">
+  </div>
+  <span class="hint">TYPE A NUMBER · DRAG THE DIALS · HOVER TO MEASURE</span>
+</footer>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const cv=$("cv"), ctx=cv.getContext("2d");
+const scope=$("scope");
+const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+let W=0,H=0;
+function resize(){
+  const dpr=Math.min(2,devicePixelRatio||1);
+  W=cv.clientWidth; H=cv.clientHeight;
+  cv.width=W*dpr; cv.height=H*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  layoutLeaders();
+}
+addEventListener("resize",resize);
+
+/* ---------- state ---------- */
+const SHAPES=["sine","square","saw","triangle","noise"];
+let shape="sine", prevShape="sine", morph=1;
+let freq=220, ampDB=-6, phase=0;
+let frozen=false;
+function ampLin(){return Math.pow(10,ampDB/20)}
+
+/* ---------- wave functions (x in 0..1 across scope) ---------- */
+function sample(shapeN,ph){
+  const t=ph%1;
+  switch(shapeN){
+    case "sine": return Math.sin(ph*Math.PI*2);
+    case "square": return t<.5?1:-1;
+    case "saw": return t*2-1;
+    case "triangle": return t<.5?t*4-1:3-t*4;
+    case "noise": return 0;
+  }
+  return 0;
+}
+let noiseSeed=1;
+function noiseAt(ph){
+  /* value-noise: smooth hash blend, continuous in ph */
+  const i=Math.floor(ph), f=ph-i;
+  const h=n=>{let x=(n*2654435761)>>>0; x^=x>>>13; x=(x*1274126177)>>>0;
+    return ((x>>>8)&0xffff)/0xffff*2-1};
+  const a=h(i), b=h(i+1);
+  const u=f*f*(3-2*f);
+  return a+(b-a)*u;
+}
+function wave(x, t){
+  /* cycles across screen scaled with freq */
+  const cyc=3+ (Math.log2(freq/55));
+  const ph=x*cyc+t;
+  if(morph>=1||prevShape===shape){
+    if(shape==="noise") return noiseAt(ph)*.85;
+    return sample(shape,ph);
+  }
+  const A=prevShape==="noise"?noiseAt(ph)*.85:sample(prevShape,ph);
+  const B=shape==="noise"?noiseAt(ph)*.85:sample(shape,ph);
+  return A+(B-A)*morph;
+}
+
+/* ---------- draw grid ---------- */
+function drawGrid(){
+  ctx.strokeStyle="#26241f14"; ctx.lineWidth=1;
+  const cols=12, rows=8;
+  for(let i=1;i<cols;i++){const x=W*i/cols;
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke()}
+  for(let i=1;i<rows;i++){const y=H*i/rows;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke()}
+  ctx.strokeStyle="#26241f2c";
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+}
+
+/* ---------- trace ---------- */
+function drawTrace(t){
+  const A=H*0.36*ampLin();
+  ctx.save();
+  ctx.strokeStyle="#1c47c8";
+  ctx.lineWidth=2.2; ctx.lineJoin="round";
+  ctx.shadowColor="#3f6bff88"; ctx.shadowBlur=8;
+  ctx.beginPath();
+  const N=Math.max(240,Math.floor(W));
+  for(let i=0;i<=N;i++){
+    const x=i/N;
+    const y=H/2 - wave(x,t)*A;
+    i===0?ctx.moveTo(x*W,y):ctx.lineTo(x*W,y);
+  }
+  ctx.stroke();
+  /* phosphor echo */
+  ctx.globalAlpha=.25; ctx.lineWidth=5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* ---------- crosshair measurement ---------- */
+let mouse=null;
+scope.addEventListener("pointermove",e=>{
+  const r=scope.getBoundingClientRect();
+  mouse={x:e.clientX-r.left, y:e.clientY-r.top};
+});
+scope.addEventListener("pointerleave",()=>mouse=null);
+function drawCross(){
+  if(!mouse) return;
+  const A=H*0.36*ampLin();
+  const y=H/2-wave(mouse.x/W, animT)*A;
+  ctx.save();
+  ctx.strokeStyle="#d4402a"; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(mouse.x,0); ctx.lineTo(mouse.x,H); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(mouse.x,y,4,0,7); ctx.stroke();
+  ctx.fillStyle="#d4402a";
+  ctx.font="11px ui-monospace,Menlo,monospace";
+  const cyc=3+(Math.log2(freq/55));
+  const per=1/freq*1000;
+  ctx.fillText(`Δt ${per.toFixed(2)} ms · V ${(wave(mouse.x/W,animT)*ampLin()).toFixed(2)}`,
+    Math.min(mouse.x+10,W-160), Math.max(14,y-12));
+  ctx.restore();
+}
+
+/* ---------- annotation leader lines ---------- */
+function layoutLeaders(){
+  const A=H*0.36*ampLin();
+  const l1=$("leadA1"), l2=$("leadA2");
+  l1.style.left="38%"; l1.style.top=(H/2-A)+"px";
+  l1.style.height=A+"px";
+  l2.style.left="38%"; l2.style.top=(H/2)+"px";
+  l2.style.height=A+"px";
+  l2.style.top=(H/2-A)+"px"; l2.style.height=(A*2)+"px"; l2.style.opacity=".5";
+  l1.style.top=(H/2-A-14)+"px"; l1.style.height="14px";
+}
+
+/* ---------- spectrum ---------- */
+const spectrum=$("spectrum");
+const BARS=16;
+const bars=[];
+for(let i=0;i<BARS;i++){
+  const b=document.createElement("div");
+  b.className="bar"; spectrum.appendChild(b); bars.push(b);
+}
+let specT=0;
+function updateSpectrum(){
+  const f0=freq;
+  $("specHz").textContent=Math.round(f0)+" Hz";
+  const binW=f0/ (BARS*0.6);
+  for(let i=0;i<BARS;i++){
+    let h;
+    if(shape==="noise"){ h=Math.max(6, 42+Math.random()*22) }
+    else{
+      const f=(i+1)*binW;
+      const peak=Math.abs(f-f0)<binW*1.4;
+      h=peak?70+Math.random()*24: Math.max(4, 14*Math.exp(-Math.abs(f-f0)/(f0*.4)));
+    }
+    bars[i].style.height=h.toFixed(0)+"%";
+  }
+}
+/* ---------- dials (drag + keyboard) ---------- */
+function makeDial(el, needle, valEl, get, set, fmt, minV, maxV){
+  let drag=null;
+  const render=()=>{
+    const k=(get()-minV)/(maxV-minV);
+    needle.style.transform=`rotate(${-135+k*270}deg)`;
+    valEl.textContent=fmt(get());
+    layoutLeaders();
+  };
+  el.addEventListener("pointerdown",e=>{
+    drag={y:e.clientY,v:get()};
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener("pointermove",e=>{
+    if(!drag) return;
+    const k=(drag.y-e.clientY)/180;
+    set(drag.v+k*(maxV-minV));
+    render();
+  });
+  el.addEventListener("pointerup",()=>drag=null);
+  el.addEventListener("wheel",e=>{
+    e.preventDefault();
+    set(get()+(e.deltaY<0?1:-1)*(maxV-minV)/40);
+    render();
+  },{passive:false});
+  el.addEventListener("keydown",e=>{
+    const step=(maxV-minV)/30;
+    if(e.key==="ArrowUp"||e.key==="ArrowRight"){set(get()+step);render();e.preventDefault()}
+    if(e.key==="ArrowDown"||e.key==="ArrowLeft"){set(get()-step);render();e.preventDefault()}
+  });
+  return render;
+}
+const clampF=v=>Math.min(2000,Math.max(40,Math.round(v)));
+const renderF=makeDial($("dialF"),$("needleF"),$("valF"),
+  ()=>freq, v=>{freq=clampF(v);updateAudioFreq();updateReadouts()},
+  v=>Math.round(v), 40, 2000);
+const renderA=makeDial($("dialA"),$("needleA"),$("valA"),
+  ()=>ampDB, v=>{ampDB=Math.min(0,Math.max(-40,Math.round(v*2)/2));updateAudioAmp();updateReadouts()},
+  v=>Math.round(v), -40, 0);
+
+function updateReadouts(){
+  $("roF").textContent=freq.toFixed(1)+" Hz";
+  $("roA").textContent=(ampDB>0?"+":"")+ampDB.toFixed(1)+" dB";
+  $("fjump").value=freq;
+  renderF(); renderA();
+}
+
+/* ---------- shape chips + morph ---------- */
+$("shapes").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b||b.dataset.s===shape) return;
+  prevShape=shape; shape=b.dataset.s; morph=0;
+  document.querySelectorAll("#shapes .chip").forEach(c=>c.classList.toggle("on",c===b));
+  updateAudioShape();
+});
+$("fjump").addEventListener("change",e=>{
+  const v=clampF(+e.target.value||220);
+  freq=v; updateAudioFreq(); updateReadouts();
+});
+
+/* ---------- freeze ---------- */
+$("freezeBtn").addEventListener("click",()=>{
+  frozen=!frozen;
+  $("freezeBtn").classList.toggle("on",frozen);
+  $("roMode").textContent=frozen?"FROZEN":"LIVE";
+});
+
+/* ---------- audio: gesture-gated, volume-capped ---------- */
+let AC=null, osc=null, osc2=null, noiseNode=null, gainNode=null, filter=null, listening=false;
+function ensureAudio(){
+  if(AC) return true;
+  try{
+    AC=new (window.AudioContext||window.webkitAudioContext)();
+    gainNode=AC.createGain();
+    gainNode.gain.value=Math.min(.12, Math.pow(10,ampDB/20)*.15);
+    filter=AC.createBiquadFilter(); filter.type="lowpass"; filter.frequency.value=4000;
+    gainNode.connect(filter).connect(AC.destination);
+    return true;
+  }catch(e){return false}
+}
+function stopTone(){
+  if(osc){try{osc.stop()}catch(e){} osc=null}
+  if(osc2){try{osc2.stop()}catch(e){} osc2=null}
+  if(noiseNode){try{noiseNode.stop()}catch(e){} noiseNode=null}
+}
+function buildTone(){
+  stopTone();
+  try{
+    if(shape==="noise"){
+      const len=AC.sampleRate*2;
+      const buf=AC.createBuffer(1,len,AC.sampleRate);
+      const d=buf.getChannelData(0);
+      for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+      noiseNode=AC.createBufferSource();
+      noiseNode.buffer=buf; noiseNode.loop=true;
+      noiseNode.connect(gainNode); noiseNode.start();
+    }else{
+      osc=AC.createOscillator(); osc.type=shape==="saw"?"sawtooth":shape;
+      osc.frequency.value=freq;
+      osc.connect(gainNode); osc.start();
+    }
+  }catch(e){}
+}
+function updateAudioFreq(){ if(osc) try{osc.frequency.setTargetAtTime(freq,AC.currentTime,.02)}catch(e){} }
+function updateAudioAmp(){ if(gainNode) try{gainNode.gain.setTargetAtTime(Math.min(.12,Math.pow(10,ampDB/20)*.15),AC.currentTime,.02)}catch(e){} }
+function updateAudioShape(){ if(listening) buildTone() }
+$("listenBtn").addEventListener("click",()=>{
+  if(!ensureAudio()) return;
+  try{if(AC.state==="suspended")AC.resume()}catch(e){}
+  listening=!listening;
+  $("listenBtn").classList.toggle("on",listening);
+  $("listenBtn").textContent=listening?"STOP ■":"LISTEN ▸";
+  if(listening) buildTone(); else stopTone();
+});
+
+/* ---------- main loop ---------- */
+let animT=0, lastFrame=0;
+function frame(now){
+  const dt=Math.min(50,now-lastFrame)/1000; lastFrame=now;
+  if(!frozen){
+    animT+=dt*(0.4+freq/900);
+    if(morph<1) morph=Math.min(1,morph+dt*2.2);
+    specT+=dt;
+    if(specT>.09){specT=0;updateSpectrum()}
+  }
+  ctx.clearRect(0,0,W,H);
+  drawGrid();
+  drawTrace(animT);
+  drawCross();
+  requestAnimationFrame(frame);
+}
+resize();
+updateReadouts();
+updateSpectrum();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LECTURE 3 — on pendulums</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { height:100%; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:#20301f; color:#e8ecd8; min-height:100vh;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  /* chalkboard with wooden rail */
+  .boardwrap { position:relative; width:min(880px, 95vw); }
+  .board {
+    position:relative; background:
+      radial-gradient(ellipse at 30% 30%, rgba(255,255,255,.03), transparent 55%),
+      #26381f;
+    border-radius:6px; padding:44px 46px 52px;
+    box-shadow:inset 0 0 60px rgba(0,0,0,.45), 0 24px 60px rgba(0,0,0,.5);
+    min-height:520px;
+  }
+  .board::after { /* chalk dust */
+    content:""; position:absolute; inset:0; border-radius:6px; pointer-events:none; opacity:.35;
+    background-image:radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.4px), radial-gradient(rgba(255,255,255,.03) 1px, transparent 1.4px);
+    background-size:9px 9px, 13px 13px;
+  }
+  .rail {
+    position:absolute; left:-8px; right:-8px; bottom:-14px; height:16px;
+    background:repeating-linear-gradient(90deg, #7a5a34 0 26px, #6a4a2a 26px 52px);
+    border-radius:3px; box-shadow:0 6px 16px rgba(0,0,0,.5);
+  }
+  h1 { font-size:22px; font-weight:400; color:#f0f4e8; letter-spacing:.08em; margin-bottom:6px; }
+  .sub { font-family:system-ui, sans-serif; font-size:9.5px; letter-spacing:.3em; color:#9ab088; text-transform:uppercase; margin-bottom:28px; }
+
+  .lecture { display:flex; gap:36px; align-items:flex-start; flex-wrap:wrap; }
+  .diagram { flex:1; min-width:280px; text-align:center; }
+  .diagram svg { width:100%; max-width:360px; }
+  .notes { flex:1; min-width:240px; font-size:15px; line-height:1.9; color:#d4ddc4; }
+  .notes .formula { font-family:"Courier New", monospace; font-size:16px; color:#ffe9b0; background:rgba(255,233,176,.06); padding:10px 14px; border-radius:8px; display:block; margin:14px 0; }
+  .notes .chalk-pink { color:#f0c9d8; }
+
+  /* the working pendulum */
+  .pendzone { position:relative; margin-top:8px; }
+  #pendC { width:100%; max-width:360px; height:240px; background:transparent; cursor:grab; touch-action:none; }
+  #pendC:active { cursor:grabbing; }
+  .readout { font-family:"Courier New", monospace; font-size:12px; color:#9ab088; margin-top:6px; }
+  .readout b { color:#ffe9b0; font-weight:400; }
+
+  /* eraser */
+  .eraser {
+    position:absolute; right:22px; top:18px; width:64px; height:26px; cursor:pointer;
+    background:linear-gradient(180deg, #4a3a30, #332620); border-radius:4px;
+    box-shadow:0 4px 8px rgba(0,0,0,.4), inset 0 2px 0 rgba(255,255,255,.1);
+    transform:rotate(-6deg);
+  }
+  .eraser::after { content:""; position:absolute; left:0; right:0; bottom:0; height:7px; background:#c9c2b0; border-radius:0 0 4px 4px; }
+  .erasing .eraser { animation:eraseMove .7s ease-in-out; }
+  @keyframes eraseMove { 50% { transform:rotate(-6deg) translate(-60px, 26px); } }
+
+  .chalks { position:absolute; left:22px; top:16px; display:flex; gap:6px; }
+  .chalks i { width:26px; height:7px; border-radius:3px; background:#e8e4d8; opacity:.85; }
+  .chalks i.pink { background:#f0c9d8; }
+  .chalks i.yellow { background:#ffe9a0; }
+  @media (max-width:700px) { .lecture { flex-direction:column; } .board { padding:30px 22px 46px; } }
+</style>
+</head>
+<body>
+  <div class="boardwrap">
+    <div class="board" id="board">
+      <div class="chalks" aria-hidden="true"><i></i><i class="pink"></i><i class="yellow"></i></div>
+      <div class="eraser" id="eraser" title="erase the board"></div>
+
+      <h1>Lecture III — On Pendulums</h1>
+      <div class="sub">natural philosophy · mr. whitfield · michaelmas term</div>
+
+      <div class="lecture">
+        <div class="diagram">
+          <!-- hand-drawn static diagram (dash-animated draw) -->
+          <svg viewBox="0 0 360 240" id="diagSvg" aria-hidden="true">
+            <g stroke="#e8ecd8" stroke-width="2" fill="none" stroke-linecap="round">
+              <!-- ceiling hatch -->
+              <path d="M60 20 L300 20" />
+              <path d="M70 20 l-8 10 M110 20 l-8 10 M150 20 l-8 10 M190 20 l-8 10 M230 20 l-8 10 M270 20 l-8 10" stroke-width="1.4" opacity=".6"/>
+              <!-- pivot + two swing positions -->
+              <path d="M180 20 L120 170" opacity=".4" stroke-dasharray="5 6"/>
+              <path d="M180 20 L240 170" opacity=".4" stroke-dasharray="5 6"/>
+              <path d="M180 20 L180 170" />
+              <!-- arcs -->
+              <path d="M120 170 Q180 130 240 170" stroke-dasharray="3 6" opacity=".7"/>
+              <!-- bob -->
+              <circle cx="180" cy="180" r="12" fill="rgba(232,236,216,.2)"/>
+              <!-- length label -->
+              <path d="M300 20 L300 170" stroke-width="1" opacity=".5"/>
+              <path d="M296 24 l4 -8 l4 8 M296 166 l4 8 l4 -8" stroke-width="1" opacity=".5"/>
+              <text x="308" y="100" fill="#e8ecd8" font-size="13" font-family="Georgia" font-style="italic">L</text>
+              <!-- angle -->
+              <path d="M180 60 L206 60 A26 26 0 0 1 197 80" stroke="#f0c9d8" stroke-width="1.4"/>
+              <text x="212" y="70" fill="#f0c9d8" font-size="12" font-family="Georgia" font-style="italic">θ</text>
+            </g>
+          </svg>
+          <!-- live pendulum -->
+          <div class="pendzone">
+            <canvas id="pendC" width="360" height="240"></canvas>
+            <div class="readout">T measured: <b id="Tv">—</b> s · theory: <b id="TcalcV">—</b> s · L = <b id="Lv">1.00</b> m</div>
+          </div>
+        </div>
+
+        <div class="notes" id="notes">
+          <p class="chalk-pink">A pendulum, gentlemen, is gravity made visible.</p>
+          <p>Draw the bob aside and release. It swings; it returns; it swings again.
+          Time one full journey — there and back — and you have its <em>period</em>, T.</p>
+          <span class="formula" id="formulaLine">T = 2π √(L / g)</span>
+          <p>Notice what the formula does <em>not</em> contain. Not the weight of the bob.
+          Not how far you drew it back. Only the length of the string, and g itself.
+          <span class="chalk-pink">The clock doesn't care about the mass.</span></p>
+          <p style="font-family:system-ui,sans-serif;font-size:10px;letter-spacing:.2em;color:#9ab088;text-transform:uppercase;margin-top:18px;">
+            drag the bob to try · slide L · tap the board to chalk a dot
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="rail"></div>
+  </div>
+
+  <!-- L slider floats under board -->
+  <div style="max-width:880px;margin:26px auto 0;display:flex;align-items:center;gap:14px;justify-content:center;">
+    <span style="font-family:system-ui,sans-serif;font-size:10px;letter-spacing:.24em;color:#9ab088;text-transform:uppercase;">string length L</span>
+    <input type="range" id="LR" min="20" max="180" value="100" style="width:180px;accent-color:#ffe9b0;">
+    <span style="font-family:'Courier New',monospace;font-size:12px;color:#ffe9b0;" id="LoutV">1.00 m</span>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById($id(id));
+  function $id(id) { return id; }
+  const cv = $("pendC"), g = cv.getContext("2d");
+  const W = 360, H = 240;
+  let L = 100;             /* px */
+  let ang = 0.6, angV = 0;
+  let dragging = false;
+  let crossTimes = [];      /* zero-crossing timestamps for period */
+  let lastSign = 1;
+
+  /* physics: simple pendulum, g scaled */
+  const gPx = 340; /* px/s^2 scaled for taste */
+
+  function step(dt) {
+    if (dragging) return;
+    const acc = -(gPx / L) * Math.sin(ang);
+    angV += acc * dt;
+    angV *= 0.999;
+    ang += angV * dt;
+    /* zero crossings */
+    const s2 = Math.sign(ang);
+    if (s2 !== 0 && s2 !== lastSign) {
+      crossTimes.push(performance.now());
+      if (crossTimes.length > 3) crossTimes.shift();
+      if (crossTimes.length >= 2) {
+        const halfs = crossTimes[crossTimes.length - 1] - crossTimes[crossTimes.length - 2];
+        const T = halfs / 500; /* full period = two half swings */
+        $("Tv").textContent = T.toFixed(2);
+      }
+      lastSign = s2;
+    }
+  }
+
+  function draw() {
+    g.clearRect(0, 0, W, H);
+    const px = W / 2, py = 14;
+    const bx = px + Math.sin(ang) * L;
+    const by = py + Math.cos(ang) * L;
+    /* ceiling */
+    g.strokeStyle = "rgba(232,236,216,.7)";
+    g.lineWidth = 2;
+    g.beginPath(); g.moveTo(px - 50, py); g.lineTo(px + 50, py); g.stroke();
+    /* string */
+    g.strokeStyle = "rgba(232,236,216,.8)";
+    g.beginPath(); g.moveTo(px, py); g.lineTo(bx, by); g.stroke();
+    /* bob (chalk circle) */
+    g.fillStyle = "rgba(232,236,216,.15)";
+    g.strokeStyle = "#ffe9b0";
+    g.lineWidth = 2.4;
+    g.beginPath(); g.arc(bx, by, 13, 0, 6.283); g.fill(); g.stroke();
+    /* arc guide */
+    g.strokeStyle = "rgba(232,236,216,.25)";
+    g.setLineDash([3, 6]);
+    g.beginPath(); g.arc(px, py, L, Math.PI * 0.35, Math.PI * 0.65); g.stroke();
+    g.setLineDash([]);
+    /* velocity arrow */
+    if (!dragging && Math.abs(angV) > 0.05) {
+      const vDir = angV > 0 ? 1 : -1;
+      const ax = bx + vDir * 24, ay = by;
+      g.strokeStyle = "#f0c9d8";
+      g.lineWidth = 1.6;
+      g.beginPath(); g.moveTo(bx, by); g.lineTo(ax, ay); g.stroke();
+      g.beginPath(); g.moveTo(ax, ay); g.lineTo(ax - vDir * 6, ay - 4); g.moveTo(ax, ay); g.lineTo(ax - vDir * 6, ay + 4); g.stroke();
+    }
+  }
+
+  let last = performance.now();
+  function loop(now) {
+    requestAnimationFrame(loop);
+    const dt = Math.min(0.033, (now - last) / 1000);
+    last = now;
+    if (!document.hidden) { step(dt); draw(); }
+  }
+  requestAnimationFrame(loop);
+
+  /* dragging the bob */
+  function pos(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
+  }
+  cv.addEventListener("pointerdown", (e) => {
+    const p = pos(e);
+    const bx = W / 2 + Math.sin(ang) * L, by = 14 + Math.cos(ang) * L;
+    if (Math.hypot(p.x - bx, p.y - by) < 34) {
+      dragging = true;
+      angV = 0;
+      cv.setPointerCapture && cv.setPointerCapture(e.pointerId);
+    }
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const p = pos(e);
+    const px = W / 2, py = 14;
+    ang = Math.atan2(p.x - px, p.y - py);
+    ang = Math.max(-1.3, Math.min(1.3, ang));
+  });
+  addEventListener("pointerup", () => { if (dragging) { dragging = false; lastSign = Math.sign(ang) || 1; crossTimes = []; } });
+
+  /* L slider */
+  $("LR").addEventListener("input", (e) => {
+    L = parseInt(e.target.value, 10);
+    $("Lv").textContent = (L / 100).toFixed(2);
+    $("LoutV").textContent = (L / 100).toFixed(2) + " m";
+    $("TcalcV").textContent = (2 * Math.PI * Math.sqrt((L / 100) / 9.81)).toFixed(2);
+  });
+  $("TcalcV").textContent = (2 * Math.PI * Math.sqrt(1 / 9.81)).toFixed(2);
+
+  /* diagram draw-on */
+  const paths = document.querySelectorAll("#diagSvg path, #diagSvg circle");
+  paths.forEach((p, i) => {
+    const len = p.getTotalLength ? p.getTotalLength() : 100;
+    if (len > 0 && p.getTotalLength) {
+      p.style.strokeDasharray = p.getAttribute("stroke-dasharray") || len;
+      if (!p.getAttribute("stroke-dasharray")) {
+        p.style.strokeDasharray = len;
+        p.style.strokeDashoffset = len;
+        p.style.transition = "stroke-dashoffset 1.2s ease " + (i * 0.14) + "s";
+        requestAnimationFrame(() => { p.style.strokeDashoffset = "0"; });
+      }
+    }
+  });
+
+  /* eraser: wipes the board to a farewell line */
+  $("eraser").addEventListener("click", () => {
+    document.body.classList.add("erasing");
+    setTimeout(() => document.body.classList.remove("erasing"), 800);
+    const notes = $("notes");
+    notes.style.transition = "opacity .6s";
+    notes.style.opacity = "0";
+    setTimeout(() => {
+      notes.innerHTML = "<p class='chalk-pink' style='font-size:20px;'>next week: on falling bodies.</p>" +
+        "<p style='margin-top:10px;'>— and bring your own chalk.</p>";
+      notes.style.opacity = "1";
+      $("formulaLine").style.display = "none";
+    }, 700);
+  });
+
+  /* tap board → chalk dots */
+  $("board").addEventListener("click", (e) => {
+    if (e.target.closest("canvas, input, .eraser")) return;
+    const r = $("board").getBoundingClientRect();
+    const d = document.createElement("div");
+    d.style.cssText = "position:absolute;width:5px;height:5px;border-radius:50%;background:rgba(240,201,216,.8);pointer-events:none;left:" + (e.clientX - r.left - 2) + "px;top:" + (e.clientY - r.top - 2) + "px;";
+    $("board").appendChild(d);
+    setTimeout(() => d.remove(), 9000);
+  });
+})();
+</script>
+</body>
+</html>

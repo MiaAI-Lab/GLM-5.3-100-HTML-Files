@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AFTERHOURS — MIAMI 1986</title>
+<style>
+  :root{
+    --pink:#FF2E88; --tangerine:#FF8A3D; --violet:#6C2BD9; --teal:#19E3D2;
+    --grade-a:#FF2E88; --grade-b:#FF8A3D; --grade-c:#6C2BD9; --grade-d:#19E3D2;
+    --sky-top:#1A0B34; --ink:#0B0618;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    background:var(--ink); color:#FFF6F0; overflow:hidden;
+    -webkit-user-select:none; user-select:none;
+  }
+  .scene{
+    position:fixed; inset:0; overflow:hidden; perspective:900px; perspective-origin:50% 42%;
+    touch-action:none; cursor:grab;
+  }
+  .scene.grabbing{cursor:grabbing}
+  /* ---------- sky ---------- */
+  .sky{
+    position:absolute; inset:0; z-index:0;
+    background:linear-gradient(180deg,
+      var(--sky-top) 0%, #3A1160 26%, var(--grade-c) 48%,
+      var(--grade-a) 68%, var(--grade-b) 84%, #FFC46B 100%);
+    transition:background 1.2s;
+  }
+  .haze{
+    position:absolute; z-index:6; left:-30%; width:160%; height:38%;
+    top:18%; pointer-events:none; mix-blend-mode:screen; opacity:.5;
+    background:radial-gradient(50% 60% at 30% 50%, rgba(255,138,61,.5), rgba(255,138,61,0) 70%),
+               radial-gradient(45% 55% at 72% 40%, rgba(255,46,136,.4), rgba(255,46,136,0) 70%);
+    animation:hazeDrift 26s ease-in-out infinite alternate;
+    filter:blur(2px);
+  }
+  .haze.h2{ top:34%; animation-duration:34s; animation-direction:alternate-reverse;
+    background:radial-gradient(55% 60% at 55% 60%, rgba(105,43,217,.45), rgba(105,43,217,0) 70%); }
+  @keyframes hazeDrift{
+    from{transform:translateX(-6%) translateY(0) scaleX(1)}
+    to{transform:translateX(7%) translateY(-3%) scaleX(1.15)}
+  }
+  .stars{position:absolute; inset:0 0 46% 0; z-index:1}
+  /* ---------- sun ---------- */
+  .sun-wrap{
+    position:absolute; z-index:2; left:50%; top:44%;
+    width:min(46vmin, 480px); aspect-ratio:1;
+    transform:translate(-50%,-50%);
+    transition:top 2.6s cubic-bezier(.4,0,.2,1);
+  }
+  .sun{
+    position:absolute; inset:0; border-radius:50%;
+    background:linear-gradient(180deg,#FFF3B0 0%, #FFD26B 18%, var(--grade-b) 40%, var(--grade-a) 74%, #C4176B 100%);
+    box-shadow:0 0 90px rgba(255,90,120,.55), 0 0 200px rgba(255,46,136,.35);
+    transition:background 1.2s, box-shadow 1.2s;
+  }
+  /* scanline slits: mask the sun with stripes that eat more toward the bottom */
+  .sun::after{
+    content:""; position:absolute; inset:-1px; border-radius:50%;
+    background:linear-gradient(180deg,
+      transparent 0, transparent 46%, var(--sky-top) 46%);
+    opacity:.0;
+  }
+  .sun-slits{
+    position:absolute; inset:-2px; border-radius:50%; overflow:hidden; pointer-events:none;
+    -webkit-mask-image:radial-gradient(circle, #000 99%, transparent 100%);
+    mask-image:radial-gradient(circle, #000 99%, transparent 100%);
+  }
+  .sun-slits i{
+    position:absolute; left:-4%; width:108%; background:var(--ink);
+    height:calc(2.2% + var(--i) * 0.5%);
+  }
+  .sun-core-glow{
+    position:absolute; inset:-24%; border-radius:50%; z-index:-1;
+    background:radial-gradient(circle, rgba(255,180,120,.35), rgba(255,46,136,.12) 55%, transparent 72%);
+    filter:blur(6px);
+  }
+  /* ---------- grid floor (CSS 3D) ---------- */
+  .floor{
+    position:absolute; z-index:3; left:-60%; bottom:-2px; width:220%; height:62%;
+    transform-origin:50% 0%;
+    transform:rotateX(84.5deg);
+  }
+  .floor-scroll{
+    position:absolute; inset:0;
+    background-image:
+      repeating-linear-gradient(90deg,
+        color-mix(in srgb, var(--grade-d) 85%, white) 0 2px, transparent 2px 7.5%),
+      repeating-linear-gradient(0deg,
+        color-mix(in srgb, var(--grade-d) 85%, white) 0 2px, transparent 2px 56px);
+    background-size:100% 100%, 100% 100%;
+    animation:gridScroll 2.4s linear infinite;
+    animation-play-state:paused;
+    opacity:.95;
+  }
+  .scene.cruise .floor-scroll{animation-play-state:running}
+  @keyframes gridScroll{ to{background-position:0 0, 0 56px} }
+  .floor-glow{
+    position:absolute; left:0; right:0; bottom:0; height:70%; z-index:4; pointer-events:none;
+    background:linear-gradient(0deg, color-mix(in srgb, var(--grade-d) 22%, transparent), transparent 80%);
+    mix-blend-mode:screen;
+  }
+  /* horizon line */
+  .horizon{
+    position:absolute; z-index:5; left:0; right:0; top:calc(100% - 38%); height:2px;
+    background:linear-gradient(90deg, transparent, var(--grade-d) 18%, #AFFFF6 50%, var(--grade-d) 82%, transparent);
+    box-shadow:0 0 18px var(--grade-d), 0 0 60px rgba(25,227,210,.5);
+    opacity:.9;
+  }
+  /* ---------- palms ---------- */
+  .palm{
+    position:absolute; z-index:6; bottom:34%; pointer-events:none;
+    transform-origin:50% 100%;
+    filter:drop-shadow(0 0 12px rgba(0,0,0,.6));
+    color:#0B0618;
+  }
+  .palm svg{display:block; width:100%; height:auto}
+  .palm.l{left:-3%;  width:clamp(140px, 24vw, 420px);}
+  .palm.r{right:-4%; width:clamp(150px, 26vw, 470px); bottom:32%;}
+  .palm.l2{left:9%; width:clamp(90px, 13vw, 230px); bottom:35.5%; opacity:.9;}
+  .palm.r2{right:10%; width:clamp(80px, 12vw, 210px); bottom:36%; opacity:.85;}
+  /* ---------- chrome headline ---------- */
+  .headline{
+    position:absolute; z-index:8; left:50%; top:20%;
+    transform:translateX(-50%);
+    text-align:center; pointer-events:none;
+  }
+  .headline h1{
+    font-weight:900; font-stretch:ultra-condensed;
+    font-family:"Arial Narrow", system-ui, sans-serif;
+    font-size:clamp(3rem, 13vw, 11rem);
+    line-height:.9; letter-spacing:.04em;
+    background:linear-gradient(180deg,
+      #FFFFFF 0%, #D8F6FF 18%, #9BE8FF 30%,
+      #4A9FD8 44%, #FFFFFF 52%, #B7D9F2 60%,
+      #7A5F3A 74%, #E8C987 88%, #FFF6D8 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(3px 0 0 rgba(255,46,136,.8)) drop-shadow(-3px 0 0 rgba(25,227,210,.8));
+  }
+  .headline .sub{
+    display:block; margin-top:.5rem;
+    font-family:"Courier New",monospace; font-size:clamp(.6rem,1.6vw,.95rem);
+    letter-spacing:.62em; text-indent:.62em; color:#FFE8F3;
+    text-shadow:0 0 12px rgba(255,46,136,.8);
+  }
+  .vhs-jitter{animation:jitter 7s steps(1) infinite}
+  @keyframes jitter{
+    0%,93.6%,100%{transform:translateX(-50%)}
+    94%{transform:translateX(calc(-50% - 3px)) skewX(1.5deg)}
+    94.4%{transform:translateX(calc(-50% + 4px))}
+    94.8%{transform:translateX(-50%) skewX(-1deg)}
+    95.2%{transform:translateX(calc(-50% - 2px))}
+  }
+  /* ---------- VHS tracking bar ---------- */
+  .tracking{
+    position:absolute; z-index:9; left:0; right:0; height:64px; top:-80px;
+    background:linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.16) 35%, rgba(255,255,255,.5) 50%, rgba(255,255,255,.16) 65%, rgba(255,255,255,0) 100%);
+    mix-blend-mode:overlay; pointer-events:none;
+    filter:drop-shadow(0 0 6px rgba(25,227,210,.6));
+  }
+  .scanlines{
+    position:fixed; inset:0; z-index:10; pointer-events:none;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px);
+    opacity:.55;
+  }
+  .vignette{
+    position:fixed; inset:0; z-index:10; pointer-events:none;
+    background:radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(5,2,12,.55) 100%);
+  }
+  /* ---------- HUD / controls ---------- */
+  .hud{
+    position:fixed; z-index:12; left:0; right:0; bottom:0;
+    display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;
+    padding:.7rem clamp(.8rem, 3vw, 1.6rem);
+    font-family:"Courier New",monospace; font-size:.66rem; letter-spacing:.18em;
+    background:linear-gradient(0deg, rgba(11,6,24,.85), rgba(11,6,24,0));
+  }
+  .hud .brand{color:var(--grade-d); text-shadow:0 0 8px rgba(25,227,210,.7); margin-right:auto}
+  .chips{display:flex; gap:.4rem; flex-wrap:wrap}
+  .chip{
+    font-family:inherit; font-size:inherit; letter-spacing:inherit;
+    color:#FFE8F3; background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.28); border-radius:999px;
+    padding:.42rem .85rem; cursor:pointer; text-transform:uppercase;
+    transition:background .15s, box-shadow .15s, transform .15s;
+  }
+  .chip:hover{background:rgba(255,255,255,.14); transform:translateY(-1px)}
+  .chip:focus-visible{outline:2px solid var(--teal); outline-offset:2px}
+  .chip[aria-pressed="true"]{
+    background:var(--grade-a); border-color:transparent;
+    box-shadow:0 0 16px color-mix(in srgb, var(--grade-a) 60%, transparent);
+  }
+  .chip.cruise[aria-pressed="true"]{
+    background:var(--grade-d); color:#04231F;
+    box-shadow:0 0 16px rgba(25,227,210,.6);
+  }
+  .readout{
+    position:fixed; z-index:12; top:.8rem; right:1rem;
+    font-family:"Courier New",monospace; font-size:.62rem; letter-spacing:.2em;
+    color:rgba(255,232,243,.75); text-align:right; pointer-events:none;
+    text-shadow:0 0 8px rgba(0,0,0,.6);
+  }
+  .readout b{color:#AFFFF6; font-weight:400}
+  .ticker{
+    position:fixed; z-index:12; left:0; right:0; bottom:2.9rem;
+    font-family:"Courier New",monospace; font-size:.6rem; letter-spacing:.32em;
+    color:rgba(255,232,243,.66); text-transform:uppercase; white-space:nowrap;
+    overflow:hidden; pointer-events:none;
+    border-top:1px solid rgba(255,255,255,.14);
+    border-bottom:1px solid rgba(255,255,255,.14);
+    padding:.32rem 0;
+  }
+  .ticker span{
+    display:inline-block; padding-right:5rem;
+    animation:tick 38s linear infinite;
+  }
+  @keyframes tick{ from{transform:translateX(0)} to{transform:translateX(-50%)} }
+  @media (max-width:560px){
+    .hud .brand{width:100%; margin-bottom:.2rem}
+    .headline{top:16%}
+    .readout{font-size:.55rem}
+    .ticker{font-size:.52rem; letter-spacing:.22em}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .haze,.floor-scroll,.vhs-jitter{animation:none !important}
+    .sun-wrap,.sky,.sun{transition:none}
+  }
+</style>
+</head>
+<body>
+  <div class="scene" id="scene">
+    <div class="sky"></div>
+    <canvas class="stars" id="stars"></canvas>
+    <div class="sun-wrap" id="sunWrap">
+      <div class="sun-core-glow"></div>
+      <div class="sun"><div class="sun-slits" id="sunSlits"></div></div>
+    </div>
+    <div class="floor">
+      <div class="floor-scroll" id="floorScroll"></div>
+    </div>
+    <div class="horizon"></div>
+    <div class="haze"></div>
+    <div class="haze h2"></div>
+    <div class="palm l" data-depth="1.0" id="palmL"></div>
+    <div class="palm l2" data-depth="0.55" id="palmL2"></div>
+    <div class="palm r" data-depth="1.0" id="palmR"></div>
+    <div class="palm r2" data-depth="0.5" id="palmR2"></div>
+    <div class="headline vhs-jitter" id="headline">
+      <h1>AFTER<br>HOURS</h1>
+      <span class="sub">MIAMI · 1986 · CH.47</span>
+    </div>
+    <div class="tracking" id="tracking"></div>
+  </div>
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+  <div class="readout" id="readout">SUN <b id="rSun">+38</b> · PAN <b id="rPan">000</b><br>GRADE <b id="rGrade">SUNSET</b> · SP <b id="rSp">0.0</b></div>
+  <div class="ticker" id="ticker" aria-hidden="true"><span id="tickerText"></span></div>
+  <div class="hud">
+    <span class="brand">◍ VHS · AFTERHOURS BROADCAST</span>
+    <div class="chips" role="group" aria-label="Color grade">
+      <button class="chip grade" data-grade="sunset" aria-pressed="true">Sunset</button>
+      <button class="chip grade" data-grade="midnight" aria-pressed="false">Midnight</button>
+      <button class="chip grade" data-grade="vapor" aria-pressed="false">Vapor</button>
+    </div>
+    <button class="chip cruise" id="btnCruise" aria-pressed="false">▷ Cruise</button>
+  </div>
+<script>
+"use strict";
+(function(){
+  const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const scene = document.getElementById("scene");
+  const sunWrap = document.getElementById("sunWrap");
+  const rootStyle = document.documentElement.style;
+  const readout = {
+    sun: document.getElementById("rSun"),
+    pan: document.getElementById("rPan"),
+    grade: document.getElementById("rGrade"),
+    sp: document.getElementById("rSp")
+  };
+
+  /* ---------- color grades ---------- */
+  const GRADES = {
+    sunset:   { a:"#FF2E88", b:"#FF8A3D", c:"#6C2BD9", d:"#19E3D2",
+                sky:"#1A0B34", label:"SUNSET", ink:"#0B0618" },
+    midnight: { a:"#3D6BFF", b:"#7FD4FF", c:"#101B4D", d:"#54F2C8",
+                sky:"#04081C", label:"MIDNIGHT", ink:"#01030E" },
+    vapor:    { a:"#FF5F1F", b:"#FFD31F", c:"#8A2BE2", d:"#00F5D4",
+                sky:"#2B0A45", label:"VAPOR", ink:"#140428" }
+  };
+  let grade = "sunset";
+  function applyGrade(name){
+    const g = GRADES[name]; if(!g) return;
+    grade = name;
+    rootStyle.setProperty("--grade-a", g.a);
+    rootStyle.setProperty("--grade-b", g.b);
+    rootStyle.setProperty("--grade-c", g.c);
+    rootStyle.setProperty("--grade-d", g.d);
+    rootStyle.setProperty("--sky-top", g.sky);
+    rootStyle.setProperty("--ink", g.ink);
+    document.querySelectorAll(".chip.grade").forEach(b=>
+      b.setAttribute("aria-pressed", String(b.dataset.grade===name)));
+    readout.grade.textContent = g.label;
+  }
+  document.querySelectorAll(".chip.grade").forEach(b=>{
+    b.addEventListener("click", ()=> applyGrade(b.dataset.grade));
+  });
+
+  /* ---------- sun scanline slits ---------- */
+  const slits = document.getElementById("sunSlits");
+  (function buildSlits(){
+    let html = "";
+    for(let i=0;i<9;i++){
+      const top = 47 + i*5.6;
+      html += '<i style="top:'+top.toFixed(1)+'%; --i:'+i+'"></i>';
+    }
+    slits.innerHTML = html;
+  })();
+
+  /* ---------- stars canvas ---------- */
+  const starCvs = document.getElementById("stars");
+  const sctx = starCvs.getContext("2d");
+  let stars=[], SW=0, SH=0;
+  function seedStars(){
+    const r = starCvs.getBoundingClientRect();
+    SW = r.width; SH = r.height;
+    starCvs.width = SW; starCvs.height = SH;
+    stars = [];
+    const n = Math.floor(SW*SH/9000)+40;
+    for(let i=0;i<n;i++){
+      stars.push({
+        x: Math.random()*SW, y: Math.random()*SH*0.9,
+        r: Math.random()<0.9 ? Math.random()*1.1+0.3 : Math.random()*1.8+1,
+        tw: Math.random()*Math.PI*2, sp: 0.4+Math.random()*1.2
+      });
+    }
+  }
+  function drawStars(t, panPx){
+    sctx.clearRect(0,0,SW,SH);
+    const g = GRADES[grade];
+    for(const s of stars){
+      const tw = REDUCED ? 0.8 : 0.55+0.45*Math.sin(t*0.001*s.sp + s.tw);
+      sctx.globalAlpha = Math.max(0.05, tw * (1 - s.y/SH));
+      sctx.fillStyle = "#FFF7FF";
+      sctx.fillRect(s.x - (panPx*0.12) % SW, s.y, s.r, s.r);
+    }
+    sctx.globalAlpha = 1;
+  }
+
+  /* ---------- palms (procedural SVG silhouettes) ---------- */
+  function palmSVG(seed, lean){
+    let fronds = "";
+    const n = 7;
+    for(let i=0;i<n;i++){
+      const a = -168 + (i/(n-1))*196 + Math.sin(seed*3+i)*10;
+      const len = 46 + Math.sin(seed*7+i*2.3)*14;
+      const rad = a*Math.PI/180;
+      const tipx = Math.sin(rad)*len, tipy = -Math.cos(rad)*len;
+      const cx1 = Math.sin(rad)*len*0.45 + (lean>0?10:-10);
+      const cy1 = -len*0.75;
+      fronds += '<path d="M0 0 C '+cx1.toFixed(1)+' '+cy1.toFixed(1)+', '+(tipx*0.9).toFixed(1)+' '+(tipy-len*0.18).toFixed(1)+', '+tipx.toFixed(1)+' '+tipy.toFixed(1)+'" '+
+        'stroke="currentColor" stroke-width="'+(3.4-i*0.18).toFixed(1)+'" fill="none" stroke-linecap="round"/>';
+      // leaflets
+      for(let k=1;k<=5;k++){
+        const u=k/6;
+        const bx = cx1+(tipx-cx1)*u*1.2, by = cy1+(tipy-cy1)*u*1.2;
+        const ll = (1-u)*9+3;
+        const deg = a + (k%2? 38:-38);
+        const dr = deg*Math.PI/180;
+        fronds += '<line x1="'+bx.toFixed(1)+'" y1="'+by.toFixed(1)+'" '+
+          'x2="'+(bx+Math.sin(dr)*ll).toFixed(1)+'" y2="'+(by-Math.cos(dr)*ll).toFixed(1)+'" '+
+          'stroke="currentColor" stroke-width="1.6"/>';
+      }
+    }
+    const trunkBend = lean*26;
+    return '<svg viewBox="-60 -100 120 110" aria-hidden="true">'+
+      '<path d="M0 8 C '+(trunkBend*0.4).toFixed(1)+' -30, '+(trunkBend*0.8).toFixed(1)+' -62, '+trunkBend+' -92" '+
+      'stroke="currentColor" stroke-width="5.5" fill="none" stroke-linecap="round"/>'+
+      '<g transform="translate('+trunkBend+' -92)">'+fronds+'</g>'+
+      '<path d="M-14 9 Q 0 -4 14 9 L 12 11 L -12 11 Z" fill="currentColor"/>'+
+      '</svg>';
+  }
+  document.getElementById("palmL").innerHTML  = palmSVG(1.7, -1);
+  document.getElementById("palmL2").innerHTML = palmSVG(4.2, -1);
+  document.getElementById("palmR").innerHTML  = palmSVG(2.9, 1);
+  document.getElementById("palmR2").innerHTML = palmSVG(5.5, 1);
+  const palms = Array.from(document.querySelectorAll(".palm"));
+
+  /* ---------- horizontal pan ---------- */
+  let pan = 0, panTarget = 0;   // px offsets
+  let cruise = false, cruiseT = 0;
+  function applyPan(){
+    // parallax by data-depth; pan clamped
+    const clamped = Math.max(-160, Math.min(160, pan));
+    palms.forEach(p=>{
+      const d = parseFloat(p.dataset.depth);
+      p.style.transform = "translateX("+(clamped*d*-0.6)+"px)";
+    });
+    scene.style.backgroundPositionX = (clamped*0.2)+"px";
+    sunWrap.style.marginLeft = (clamped*0.45)+"px";
+    document.getElementById("floorScroll").style.marginLeft = (clamped*0.28)+"px";
+    readout.pan.textContent = String(Math.round(clamped)).padStart(3,"0");
+  }
+  let dragOn=false, dragX0=0, pan0=0;
+  scene.addEventListener("pointerdown",e=>{
+    if(e.target.closest(".hud,button")) return;
+    dragOn=true; dragX0=e.clientX; pan0=panTarget;
+    scene.classList.add("grabbing"); scene.setPointerCapture(e.pointerId);
+  });
+  scene.addEventListener("pointermove",e=>{
+    if(!dragOn) return;
+    panTarget = pan0 + (e.clientX-dragX0)*0.85;
+  });
+  const endDrag=()=>{dragOn=false; scene.classList.remove("grabbing");};
+  scene.addEventListener("pointerup",endDrag);
+  scene.addEventListener("pointercancel",endDrag);
+
+  /* ---------- cruise mode ---------- */
+  const btnCruise = document.getElementById("btnCruise");
+  let sunTop = 44;
+  function setSunTop(v){
+    sunTop = v;
+    sunWrap.style.top = v+"%";
+    readout.sun.textContent = (v<50?"+":"")+(Math.round((50-v)*2));
+  }
+  btnCruise.addEventListener("click", ()=>{
+    cruise = !cruise;
+    btnCruise.setAttribute("aria-pressed", String(cruise));
+    btnCruise.textContent = cruise ? "❚❚ Cruise" : "▷ Cruise";
+    scene.classList.toggle("cruise", cruise);
+    if(cruise) cruiseT = 0;
+  });
+
+  /* ---------- VHS tracking bar ---------- */
+  const track = document.getElementById("tracking");
+  let trackY = -100, trackActive = false, trackTimer = 0;
+  function fireTracking(){
+    if(trackActive) return;
+    trackActive = true;
+    trackY = -80;
+    track.style.transition = "none";
+    track.style.top = "-80px";
+    requestAnimationFrame(()=>{
+      const dur = REDUCED ? 0.35 : 1.15;
+      track.style.transition = "top "+dur+"s cubic-bezier(.3,.6,.4,1)";
+      track.style.top = "110%";
+    });
+    setTimeout(()=>{ trackActive=false; }, (REDUCED?350:1150)+80);
+  }
+  let nextTrack = 4200;   // ms until first artifact
+
+  /* ---------- broadcast ticker ---------- */
+  const TICK="AFTERHOURS BROADCAST · CH.47 MIAMI · SUNSET 19:42 · WATER TEMP 84°F · NOW PLAYING: NIGHT DRIVE FM · ORANGE COUNTY LINE 6 MI · STAY TUNED AFTER THE STATIC · ";
+  (function ticker(){
+    const t=document.getElementById("tickerText");
+    t.textContent=TICK+TICK;
+  })();
+
+  /* ---------- main loop ---------- */
+  let last = performance.now(), running = true;
+  function loop(now){
+    requestAnimationFrame(loop);
+    if(!running){ last = now; return; }
+    const dt = Math.min(64, now-last); last = now;
+
+    // ease pan toward target
+    pan += (panTarget-pan)*Math.min(1, dt*0.006);
+    applyPan();
+
+    // cruise: sun slowly descends, speed readout breathes
+    if(cruise){
+      cruiseT += dt;
+      if(sunTop < 78) setSunTop(sunTop + dt*0.0045);
+      const sp = 42 + Math.sin(cruiseT*0.0004)*10;
+      readout.sp.textContent = sp.toFixed(1);
+    } else {
+      readout.sp.textContent = "0.0";
+    }
+
+    // tracking artifacts on a loose schedule
+    trackTimer += dt;
+    if(trackTimer > nextTrack){
+      trackTimer = 0;
+      nextTrack = 5200 + Math.random()*6800;
+      fireTracking();
+    }
+    drawStars(now, pan);
+  }
+  document.addEventListener("visibilitychange", ()=>{
+    running = !document.hidden;
+  });
+
+  /* ---------- init ---------- */
+  function relayout(){
+    seedStars();
+    applyPan();
+  }
+  window.addEventListener("resize", relayout);
+  applyGrade("sunset");
+  setSunTop(38);
+  relayout();
+  setTimeout(fireTracking, 2600);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

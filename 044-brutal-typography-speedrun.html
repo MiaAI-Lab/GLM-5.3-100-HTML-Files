@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TYPE RUNNER — 30 second dash</title>
+<style>
+  :root{
+    --bone:#f2efe6; --ink:#141414; --red:#e32636; --rule:4px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:"Arial Narrow","Helvetica Neue",Arial,sans-serif;
+    background:var(--bone);color:var(--ink);
+    display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden;
+  }
+  /* marching labels strip */
+  .march{
+    background:var(--ink);color:var(--bone);overflow:hidden;white-space:nowrap;
+    border-bottom:var(--rule) solid var(--ink);user-select:none;
+  }
+  .march span{
+    display:inline-block;padding:4px 0;font-size:11px;letter-spacing:.35em;
+    text-transform:uppercase;
+  }
+  .march.top span{animation:march 18s linear infinite}
+  .march.bot span{animation:march 22s linear infinite reverse}
+  @keyframes march{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  header{
+    border-bottom:var(--rule) solid var(--ink);
+    display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+    padding:10px 16px;gap:10px;
+  }
+  h1{
+    font-size:clamp(22px,5vw,42px);font-weight:900;letter-spacing:-.02em;
+    text-transform:uppercase;line-height:.9;
+  }
+  h1 em{color:var(--red);font-style:normal}
+  .clock{
+    font-size:clamp(26px,5vw,44px);font-weight:900;font-variant-numeric:tabular-nums;
+    padding:2px 14px;border:var(--rule) solid var(--ink);background:var(--bone);
+    text-align:center;min-width:2.2em;
+  }
+  .clock.hot{background:var(--red);color:var(--bone)}
+  .scorebox{justify-self:end;text-align:right;font-weight:700}
+  .scorebox .n{font-size:clamp(18px,3.4vw,28px);font-weight:900;font-variant-numeric:tabular-nums}
+  .scorebox .l{font-size:10px;letter-spacing:.3em;text-transform:uppercase}
+  /* word stack */
+  main{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:18px 12px;gap:16px;position:relative;width:100%;
+    transition:translate .08s;
+  }
+  main.shake{animation:shake .18s linear}
+  @keyframes shake{
+    0%{translate:0}25%{translate:-6px 2px}50%{translate:5px -2px}75%{translate:-3px 1px}100%{translate:0}
+  }
+  .stack{
+    display:flex;flex-direction:column-reverse;align-items:center;gap:2px;
+    min-height:46vh;justify-content:flex-start;width:100%;
+  }
+  .word{
+    font-weight:900;text-transform:uppercase;line-height:1.02;
+    letter-spacing:.02em;position:relative;white-space:nowrap;
+    text-shadow:2px 2px 0 var(--bone);
+  }
+  .word .done{color:var(--red)}
+  .word .caret{border-bottom:6px solid var(--red)}
+  .word.active{z-index:2}
+  .word.killed{animation:kill .3s steps(4) forwards}
+  @keyframes kill{
+    to{transform:translateY(60px) rotate(6deg);opacity:0;filter:blur(1px)}
+  }
+  /* glyph debris */
+  .debris{
+    position:fixed;font-weight:900;text-transform:uppercase;pointer-events:none;
+    z-index:40;will-change:transform;
+  }
+  /* flash border */
+  .flashborder{position:fixed;inset:0;pointer-events:none;z-index:30;
+    box-shadow:inset 0 0 0 0 var(--red)}
+  body.err .flashborder{animation:borderflash .25s steps(2)}
+  @keyframes borderflash{
+    0%{box-shadow:inset 0 0 0 14px var(--red)}
+    100%{box-shadow:inset 0 0 0 0 var(--red)}
+  }
+  /* start / result overlay */
+  .overlay{
+    position:fixed;inset:0;background:#141414f0;color:var(--bone);
+    display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;
+  }
+  .overlay.hide{display:none}
+  .panel{
+    border:var(--rule) solid var(--bone);background:var(--ink);
+    padding:26px 28px;max-width:520px;width:100%;text-align:center;
+    box-shadow:10px 10px 0 var(--red);
+  }
+  .panel h2{font-size:clamp(24px,5vw,40px);font-weight:900;text-transform:uppercase;
+    letter-spacing:.02em;margin-bottom:6px}
+  .panel .red{color:var(--red)}
+  .panel p{font-size:13px;line-height:1.6;margin:10px 0;letter-spacing:.04em}
+  .stats{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin:16px 0}
+  .stat{border:3px solid var(--bone);padding:10px 14px;min-width:96px}
+  .stat .n{font-size:26px;font-weight:900;font-variant-numeric:tabular-nums}
+  .stat .l{font-size:9px;letter-spacing:.28em;text-transform:uppercase;margin-top:2px}
+  .go{
+    margin-top:8px;font-family:inherit;font-weight:900;text-transform:uppercase;
+    letter-spacing:.2em;font-size:15px;padding:12px 30px;cursor:pointer;
+    background:var(--red);color:var(--bone);border:var(--rule) solid var(--bone);
+    box-shadow:6px 6px 0 var(--bone);transition:translate .06s,box-shadow .06s;
+  }
+  .go:active{translate:4px 4px;box-shadow:2px 2px 0 var(--bone)}
+  /* difficulty chips */
+  .chips{display:flex;gap:0;border:var(--rule) solid var(--ink);width:max-content;
+    margin:0 auto}
+  .chip{
+    font-family:inherit;font-weight:900;font-size:11px;letter-spacing:.22em;
+    text-transform:uppercase;padding:8px 14px;background:var(--bone);color:var(--ink);
+    border:0;border-right:var(--rule) solid var(--ink);cursor:pointer;
+  }
+  .chip:last-child{border-right:0}
+  .chip[aria-pressed=true]{background:var(--ink);color:var(--bone)}
+  /* touch keyboard */
+  .touchrow{
+    display:none;flex-wrap:wrap;gap:6px;justify-content:center;padding:0 10px 12px;
+  }
+  .touchrow button{
+    font-family:inherit;font-weight:900;font-size:15px;width:34px;height:42px;
+    border:3px solid var(--ink);background:var(--bone);cursor:pointer;
+  }
+  .touchrow button:active{background:var(--ink);color:var(--bone)}
+  @media (pointer:coarse){.touchrow{display:flex}}
+  /* footer tape */
+  .tape{
+    border-top:var(--rule) solid var(--ink);background:var(--ink);color:var(--bone);
+    min-height:44px;display:flex;align-items:center;gap:14px;overflow:hidden;
+    padding:8px 14px;font-weight:900;text-transform:uppercase;font-size:12px;
+    letter-spacing:.14em;
+  }
+  .tape .lbl{color:var(--red);flex:none;font-size:10px;letter-spacing:.3em}
+  .tape .w{border:2px solid var(--bone);padding:3px 8px;flex:none}
+  .tape .w.bad{border-color:var(--red);color:var(--red);text-decoration:line-through}
+  .hintbar{
+    font-size:10px;letter-spacing:.25em;text-transform:uppercase;text-align:center;
+    padding:6px;border-top:3px solid var(--ink);user-select:none;
+  }
+  @media (prefers-reduced-motion:reduce){
+    .march span{animation:none}
+    .word.killed{animation:none;opacity:0}
+    main.shake{animation:none}
+    body.err .flashborder{animation:none;box-shadow:inset 0 0 0 8px var(--red)}
+  }
+</style>
+</head>
+<body>
+  <div class="march top" aria-hidden="true"><span id="marchTop"></span></div>
+
+  <header>
+    <div>
+      <h1>TYPE<br>RUNNER<em>.</em></h1>
+    </div>
+    <div class="clock" id="clock">30</div>
+    <div class="scorebox">
+      <div class="l">score</div>
+      <div class="n" id="score">0</div>
+    </div>
+  </header>
+
+  <div class="chips" role="group" aria-label="difficulty">
+    <button class="chip" data-d="0" aria-pressed="false">slow</button>
+    <button class="chip" data-d="1" aria-pressed="true">standard</button>
+    <button class="chip" data-d="2" aria-pressed="false">brutal</button>
+  </div>
+
+  <main id="main">
+    <div class="stack" id="stack" aria-live="off"></div>
+  </main>
+  <div class="flashborder" aria-hidden="true"></div>
+
+  <div class="touchrow" id="touchrow" aria-label="touch keyboard"></div>
+
+  <div class="tape">
+    <span class="lbl">last words ▸</span>
+    <span id="tapeWords"></span>
+  </div>
+  <div class="hintbar">type to destroy · enter restarts · pure keyboard, no mercy</div>
+
+  <div class="march bot" aria-hidden="true"><span id="marchBot"></span></div>
+
+  <div class="overlay" id="overlay">
+    <div class="panel" id="panel">
+      <h2 id="ovTitle">TYPE RUNNER<span class="red">.</span></h2>
+      <p id="ovText">30 seconds. Words rise. Type them into dust.
+        Every letter stamps red; every word shatters. Mistype and the frame bites back.</p>
+      <div class="stats" id="ovStats" style="display:none">
+        <div class="stat"><div class="n" id="stWpm">0</div><div class="l">wpm</div></div>
+        <div class="stat"><div class="n" id="stAcc">0%</div><div class="l">accuracy</div></div>
+        <div class="stat"><div class="n" id="stStreak">0</div><div class="l">streak</div></div>
+      </div>
+      <button class="go" id="goBtn" type="button">start dash</button>
+    </div>
+  </div>
+
+<script>
+"use strict";
+const el=id=>document.getElementById(id);
+const rmotion=matchMedia("(prefers-reduced-motion:reduce)").matches;
+// ---- word corpus (typable, punchy) ----
+const WORDS=("dash punch stack slab grid brute crush punchy speed type ink red run " +
+  "blast stack stark shock shift stamp strike thrust vault whip zigzag arc band blitz " +
+  "claw crack dusk ember flint glyph harsh iron jolt klick lime mint neon oxide plumb " +
+  "quartz rife slash tick tock unit vast wired xray yonder zine bolt clast debris " +
+  "echo forge grind haste impact jolt karma loop march null orbit pulse quest rush " +
+  "snap trace ultra vibe warp xenon yield zone apex brute cadence delta flux").split(" ");
+const DIFF=[ // size scale, rise interval ms, font px base
+  {size:1.0, interval:1500, px:44},
+  {size:1.15, interval:1050, px:52},
+  {size:1.3, interval:720, px:60}
+];
+let diff=1;
+// ---- state ----
+let running=false, timeLeft=30, score=0, streak=0, bestStreak=0;
+let hits=0, misses=0, spawned=0;
+let activeWord=null; // {el, text, typed}
+let riseTimer=null, clockTimer=null;
+const tape=[];
+// ---- marching labels ----
+(function(){
+  const t="TYPE RUNNER ·· BRUTAL TYPE ARCADE ·· NO MERCY ·· 30 SECONDS ·· ";
+  el("marchTop").textContent=(t+t).repeat(2);
+  const b="ACCURACY ·· STREAK ·· WPM ·· SMASH THE STACK ·· ";
+  el("marchBot").textContent=(b+b).repeat(2);
+})();
+// ---- audio ----
+let actx=null, muted=false;
+function ac(){
+  if(!actx){try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){actx=null;}}
+  if(actx&&actx.state==="suspended")actx.resume();
+  return actx;
+}
+function tone(freq,dur,type,vol,when){
+  const c=ac(); if(!c||muted)return;
+  const t=c.currentTime+(when||0);
+  const o=c.createOscillator(),g=c.createGain();
+  o.type=type||"square";o.frequency.setValueAtTime(freq,t);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol||.04,t+.005);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g).connect(c.destination);o.start(t);o.stop(t+dur+.02);
+}
+const sfx={
+  stamp(){tone(220+Math.random()*60,.05,"square",.035);},
+  kill(){tone(160,.12,"sawtooth",.05);tone(90,.18,"sawtooth",.04,.03);},
+  err(){tone(110,.14,"square",.05);},
+  end(){[196,262,330,392,523].forEach((f,i)=>tone(f,.22,"square",.04,i*.1));}
+};
+// ---- spawn & render ----
+function spawnWord(){
+  if(!running) return;
+  const d=DIFF[diff];
+  const stack=el("stack");
+  const text=WORDS[Math.floor(Math.random()*WORDS.length)];
+  const w=document.createElement("div");
+  w.className="word";
+  const px=d.px*(0.8+Math.random()*0.5);
+  w.style.fontSize=px+"px";
+  w.style.opacity=String(0.35+Math.random()*0.55);
+  w._data={text:text, typed:""};
+  w.innerHTML='<b class="done"></b><span class="rest"></span>';
+  w.querySelector(".rest").textContent=text;
+  stack.appendChild(w);
+  spawned++;
+  // words drift upward as column grows; trim old
+  while(stack.children.length>14) stack.removeChild(stack.firstChild);
+  riseTimer=setTimeout(spawnWord, d.interval*(0.7+Math.random()*0.6));
+}
+function renderActive(){
+  if(!activeWord) return;
+  const {text,typed}=activeWord._data;
+  const done=activeWord.querySelector(".done");
+  const rest=activeWord.querySelector(".rest");
+  done.textContent=typed;
+  rest.textContent=text.slice(typed.length);
+  // caret underline on next letter
+  rest.classList.toggle("caret",true);
+}
+function setActive(w){
+  if(activeWord) activeWord.classList.remove("active");
+  activeWord=w;
+  if(w){w.classList.add("active");renderActive();}
+}
+function findTarget(){
+  // lowest unfinished word = first child in column-reverse container
+  const stack=el("stack");
+  for(const w of stack.children){ if(!w._data.dead) return w; }
+  return null;
+}
+// ---- debris ----
+function shatter(w){
+  const {text,typed}=w._data;
+  const r=w.getBoundingClientRect();
+  w._data.dead=true;
+  w.classList.add("killed");
+  setTimeout(()=>w.remove(),rmotion?0:320);
+  if(!rmotion){
+    for(const ch of text){
+      const d=document.createElement("span");
+      d.className="debris";
+      d.textContent=ch;
+      d.style.fontSize=w.style.fontSize;
+      d.style.color=Math.random()<.5?"var(--red)":"var(--ink)";
+      d.style.left=(r.left+r.width*Math.random())+"px";
+      d.style.top=(r.top+r.height/2)+"px";
+      document.body.appendChild(d);
+      const dx=(Math.random()*160-80), dy=-(60+Math.random()*140),
+            rot=(Math.random()*540-270);
+      d.animate(
+        [{transform:"translate(0,0) rotate(0)",opacity:1},
+         {transform:"translate("+dx+"px,"+(dy+260)+"px) rotate("+rot+"deg)",opacity:0}],
+        {duration:700+Math.random()*300,easing:"cubic-bezier(.2,.6,.4,1)",fill:"forwards"}
+      );
+      setTimeout(()=>d.remove(),1050);
+    }
+    // screen kick
+    el("main").animate(
+      [{transform:"translateY(0)"},{transform:"translateY(5px)"},{transform:"translateY(0)"}],
+      {duration:110,easing:"ease-out"}
+    );
+  }
+}
+function pushTape(word,bad){
+  tape.push({w:word,bad:bad});
+  while(tape.length>5) tape.shift();
+  el("tapeWords").innerHTML=tape.map(t=>
+    '<span class="w'+(t.bad?' bad':'')+'">'+t.w+'</span>').join(" ");
+}
+// ---- input handling ----
+function handleChar(ch){
+  if(!running) return;
+  if(!activeWord||activeWord._data.dead) setActive(findTarget());
+  if(!activeWord) return;
+  const d=activeWord._data;
+  if(ch===d.text[d.typed.length]){
+    d.typed+=ch; hits++;
+    score+=streak>=5?2:1;
+    streak++; bestStreak=Math.max(bestStreak,streak);
+    sfx.stamp();
+    if(d.typed===d.text){
+      shatter(activeWord);
+      pushTape(d.text,false);
+      sfx.kill();
+      score+=d.text.length;
+      setActive(findTarget());
+    } else renderActive();
+  } else {
+    misses++; streak=0;
+    sfx.err();
+    document.body.classList.add("err");
+    setTimeout(()=>document.body.classList.remove("err"),260);
+    if(!rmotion){
+      el("main").classList.remove("shake");
+      void el("main").offsetWidth;
+      el("main").classList.add("shake");
+    }
+  }
+  el("score").textContent=score;
+}
+document.addEventListener("keydown",e=>{
+  if(e.key==="Enter"){ startDash(); return; }
+  if(e.key==="Backspace"){ e.preventDefault(); return; }
+  if(e.key.length===1 && /[a-z]/i.test(e.key)){ handleChar(e.key.toLowerCase()); }
+});
+// touch row
+(function(){
+  const row=el("touchrow");
+  const keys="qwertyuiopasdfghjklzxcvbnm".split("");
+  keys.forEach(k=>{
+    const b=document.createElement("button");
+    b.type="button"; b.textContent=k;
+    b.addEventListener("click",()=>handleChar(k));
+    row.appendChild(b);
+  });
+})();
+// difficulty chips
+document.querySelectorAll(".chip").forEach(c=>{
+  c.addEventListener("click",()=>{
+    diff=+c.dataset.d;
+    document.querySelectorAll(".chip").forEach(x=>
+      x.setAttribute("aria-pressed",String(x===c)));
+  });
+});
+// ---- game flow ----
+function startDash(){
+  clearTimeout(riseTimer); clearInterval(clockTimer);
+  el("overlay").classList.add("hide");
+  el("stack").innerHTML="";
+  running=true; timeLeft=30; score=0; streak=0; bestStreak=0;
+  hits=0; misses=0; spawned=0; tape.length=0;
+  el("tapeWords").innerHTML="";
+  el("score").textContent="0";
+  el("clock").textContent="30";
+  el("clock").classList.remove("hot");
+  activeWord=null;
+  ac(); // unlock audio on gesture
+  spawnWord();
+  clockTimer=setInterval(()=>{
+    timeLeft--;
+    el("clock").textContent=timeLeft;
+    if(timeLeft<=5) el("clock").classList.add("hot");
+    if(timeLeft<=0) endDash();
+  },1000);
+}
+function endDash(){
+  running=false;
+  clearInterval(clockTimer); clearTimeout(riseTimer);
+  const mins=30/60;
+  const wpm=Math.round((hits/5)/mins);
+  const acc=hits+misses>0?Math.round(hits*100/(hits+misses)):0;
+  el("stWpm").textContent=wpm;
+  el("stAcc").textContent=acc+"%";
+  el("stStreak").textContent=bestStreak;
+  el("ovTitle").innerHTML='DASH OVER<span class="red">.</span>';
+  el("ovText").textContent=spawned+" words rose from the slab. "+
+    (acc>=95?"Surgical. The stack never stood a chance.":
+     acc>=80?"Solid striking. Watch the red flashes.":
+     "The frame bit back. Type cleaner, hit harder.");
+  el("ovStats").style.display="flex";
+  el("goBtn").textContent="run it again";
+  el("overlay").classList.remove("hide");
+  sfx.end();
+}
+el("goBtn").addEventListener("click",startDash);
+// space toggles sound (mute)
+document.addEventListener("keydown",e=>{
+  if(e.code==="Space"&&e.target===document.body){
+    e.preventDefault(); muted=!muted;
+  }
+});
+</script>
+</body>
+</html>

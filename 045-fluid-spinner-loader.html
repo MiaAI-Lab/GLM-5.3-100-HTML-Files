@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SUSPENSION — a study of beautiful waiting</title>
+<style>
+  :root{
+    --bg:#17181c; --bg2:#101116;
+    --accent:#ff7a3d; --accent2:#ffb43d;
+    --text:#c9cbd4; --dim:#6a6d78;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    background:
+      radial-gradient(90% 70% at 50% 42%, var(--bg) 0%, var(--bg2) 78%);
+    color:var(--text);
+    display:flex;align-items:center;justify-content:center;min-height:100vh;
+    overflow:hidden;
+  }
+  .stage{
+    position:relative;width:min(92vw,620px);
+    display:flex;flex-direction:column;align-items:center;gap:34px;
+    user-select:none;-webkit-user-select:none;
+  }
+  .art{position:relative;width:340px;height:340px;max-width:80vw;max-height:80vw;
+    touch-action:none}
+  canvas{width:100%;height:100%;display:block}
+  /* overlay HUD */
+  .readout{
+    position:absolute;top:10px;left:12px;font-size:11px;color:var(--dim);
+    letter-spacing:.14em;line-height:1.8;pointer-events:none;
+  }
+  .readout b{color:var(--text);font-weight:normal}
+  .percent{
+    position:absolute;top:10px;right:12px;font-size:26px;color:var(--text);
+    font-variant-numeric:tabular-nums;pointer-events:none;letter-spacing:-.02em;
+  }
+  .status{
+    min-height:22px;font-size:13px;letter-spacing:.22em;text-align:center;
+    color:var(--text);text-transform:lowercase;
+  }
+  .status::after{content:"▍";color:var(--accent);animation:caret 1s steps(1) infinite}
+  @keyframes caret{50%{opacity:0}}
+  /* controls */
+  .controls{
+    display:flex;gap:10px;flex-wrap:wrap;justify-content:center;
+  }
+  .controls button{
+    font-family:inherit;font-size:11px;letter-spacing:.28em;text-transform:uppercase;
+    color:var(--text);background:transparent;border:1px solid #3a3d47;
+    padding:10px 18px;cursor:pointer;transition:border-color .2s,color .2s;
+  }
+  .controls button:hover{border-color:var(--accent);color:#fff}
+  .controls button:active{transform:translateY(1px)}
+  .controls button[aria-pressed=false]{
+    color:var(--dim);
+  }
+  /* scrubber revealed on hover of art */
+  .scrub{
+    position:relative;width:100%;height:26px;opacity:0;transition:opacity .3s;
+    cursor:ew-resize;
+  }
+  .art:hover + .scrub, .scrub:hover, .scrub.dragging{opacity:1}
+  .scrub .rail{
+    position:absolute;left:0;right:0;top:12px;height:2px;background:#33363f;
+  }
+  .scrub .fill{
+    position:absolute;left:0;top:12px;height:2px;width:0%;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+  }
+  .scrub .knob{
+    position:absolute;top:8px;width:2px;height:10px;background:var(--accent2);
+    left:0%;margin-left:-1px;
+  }
+  .scrub .tipline{
+    position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+    font-size:9px;color:var(--dim);letter-spacing:.2em;white-space:nowrap;
+    opacity:0;transition:opacity .2s;
+  }
+  .scrub:hover .tipline{opacity:1}
+  .foot{
+    font-size:10px;color:#4c4f59;letter-spacing:.2em;text-align:center;line-height:2;
+  }
+  .foot kbd{
+    border:1px solid #3a3d47;padding:1px 6px;border-radius:3px;color:var(--dim);
+    font-family:inherit;
+  }
+  @media (max-width:420px){
+    .art{width:270px;height:270px}
+    .stage{gap:24px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .status::after{animation:none}
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="art" id="art">
+      <canvas id="cv" width="680" height="680" aria-label="morphing blob with orbiting satellite dots and a deforming progress ring"></canvas>
+      <div class="readout">
+        seq <b id="seqN">01</b><br>
+        ease <b id="easeName">—</b><br>
+        phase <b id="phaseName">boot</b>
+      </div>
+      <div class="percent" id="pct">0%</div>
+    </div>
+
+    <div class="scrub" id="scrub" aria-label="progress scrubber">
+      <div class="rail"></div>
+      <div class="fill" id="scrubFill"></div>
+      <div class="knob" id="scrubKnob"></div>
+      <div class="tipline">drag to scrub the sequence</div>
+    </div>
+
+    <div class="status" id="status">warming caches</div>
+
+    <div class="controls">
+      <button id="reloadBtn" type="button">⟲ reload</button>
+      <button id="pauseBtn" type="button" aria-pressed="true">pause: off</button>
+      <button id="soundBtn" type="button" aria-pressed="true">sound: off</button>
+    </div>
+
+    <div class="foot">
+      <kbd>space</kbd> pause · hover the canvas for the scrubber · re<kbd>enter</kbd> to reload
+    </div>
+  </div>
+
+<script>
+"use strict";
+const el=id=>document.getElementById(id);
+const cv=el("cv"), ctx=cv.getContext("2d");
+const rmotion=matchMedia("(prefers-reduced-motion:reduce)").matches;
+// ---- easing library (randomized per run) ----
+const EASINGS={
+  "easeInOutCubic":t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2,
+  "easeOutQuint":t=>1-Math.pow(1-t,5),
+  "easeInOutQuart":t=>t<.5?8*t*t*t*t:1-Math.pow(-2*t+2,4)/2,
+  "easeOutBack":t=>{const c=1.70158;return 1+(c+1)*Math.pow(t-1,3)+c*Math.pow(t-1,2);},
+  "easeOutElastic":t=>t===0?0:t===1?1:Math.pow(2,-10*t)*Math.sin((t*10-.75)*(2*Math.PI/3))+1,
+  "easeInOutSine":t=>-(Math.cos(Math.PI*t)-1)/2
+};
+const EASE_NAMES=Object.keys(EASINGS);
+let easeFns=[], easeName="";
+function pickEasings(){
+  const pool=[...EASE_NAMES].sort(()=>Math.random()-.5);
+  easeFns=pool.slice(0,3).map(n=>EASINGS[n]);
+  easeName=pool.slice(0,3).join(" / ");
+  el("easeName").textContent=pool.slice(0,3).map(n=>n.replace("ease","")).join("+").toLowerCase();
+}
+// ---- sequence data ----
+const PHRASES=[
+  "warming caches","aligning satellites","consulting the oracle","counting photons",
+  "negotiating with entropy","untangling concepts","polishing quarks",
+  "persuading the scheduler","interviewing electrons","stretching spacetime",
+  "folding the map","listening to the machine"
+];
+let phraseI=0, phraseText="", phrasePos=0, phraseTick=0;
+function nextPhrase(){
+  phraseI=(phraseI+1+Math.floor(Math.random()*3))%PHRASES.length;
+  phraseText=PHRASES[phraseI]; phrasePos=0;
+}
+// ---- audio: gentle evolving pad, gesture-gated ----
+let actx=null, master=null, soundOn=false, padOsc=null, padGain=null, padLfo=null;
+function ac(){
+  if(!actx){
+    try{
+      actx=new (window.AudioContext||window.webkitAudioContext)();
+      master=actx.createGain(); master.gain.value=.05; master.connect(actx.destination);
+    }catch(e){actx=null;}
+  }
+  if(actx&&actx.state==="suspended")actx.resume();
+  return actx;
+}
+function padStart(){
+  const c=ac(); if(!c||!soundOn||padOsc) return;
+  padOsc=c.createOscillator(); padGain=c.createGain(); padLfo=c.createOscillator();
+  const lfoG=c.createGain(), filt=c.createBiquadFilter();
+  padOsc.type="triangle"; padOsc.frequency.value=110;
+  padLfo.frequency.value=.13; lfoG.gain.value=14;
+  padLfo.connect(lfoG).connect(padOsc.frequency);
+  filt.type="lowpass"; filt.frequency.value=620; filt.Q.value=2;
+  padGain.gain.setValueAtTime(0.0001,c.currentTime);
+  padGain.gain.linearRampToValueAtTime(.5,c.currentTime+1.2);
+  padOsc.connect(filt).connect(padGain).connect(master);
+  padOsc.start(); padLfo.start();
+}
+function padPitch(p){ // p in 0..1 -> slight rise with progress
+  if(padOsc&&actx) padOsc.frequency.setTargetAtTime(105+p*46,actx.currentTime,.4);
+}
+function padStop(){
+  if(!padOsc) return;
+  try{
+    padGain.gain.setTargetAtTime(0.0001,actx.currentTime,.2);
+    const o=padOsc,l=padLfo;
+    setTimeout(()=>{try{o.stop();l.stop();}catch(e){}},700);
+  }catch(e){}
+  padOsc=null;
+}
+function ding(){ // completion chime
+  const c=ac(); if(!c||!soundOn)return;
+  [880,1320].forEach((f,i)=>{
+    const o=c.createOscillator(),g=c.createGain();
+    o.frequency.value=f; o.type="sine";
+    g.gain.setValueAtTime(0.0001,c.currentTime+i*.12);
+    g.gain.exponentialRampToValueAtTime(.5,c.currentTime+i*.12+.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+i*.12+.6);
+    o.connect(g).connect(master);
+    o.start(c.currentTime+i*.12); o.stop(c.currentTime+i*.12+.7);
+  });
+}
+// ---- choreography state ----
+let seq=1, progress=0, paused=false, scrubbing=false, done=false;
+let duration=9; // seconds, randomized slightly per run
+let satellites=[];
+function makeSatellites(){
+  satellites=[];
+  const n=5;
+  for(let i=0;i<n;i++){
+    satellites.push({
+      ax:120+Math.random()*60, ay:90+Math.random()*50,
+      fx:.5+Math.random()*.7, fy:.5+Math.random()*.7,   // lissajous freqs
+      ph:Math.random()*Math.PI*2,
+      r:3+Math.random()*3.5, trail:[]
+    });
+  }
+}
+function reload(){
+  seq++;
+  el("seqN").textContent=String(seq).padStart(2,"0");
+  progress=0; done=false;
+  duration=rmotion?4:(8+Math.random()*4);
+  pickEasings(); makeSatellites(); nextPhrase(); nextPhrase();
+  el("phaseName").textContent="boot";
+  padStop();
+  if(soundOn) padStart();
+  el("pauseBtn").textContent="pause: off";
+  el("pauseBtn").setAttribute("aria-pressed","true");
+  paused=false;
+}
+// ---- blob rendering ----
+// Organic blob: radius modulated by drifting sinusoids (a "breathing" metaball-ish form)
+function blobRadius(ang,t){
+  return 96
+    + Math.sin(ang*3+t*1.1)*9
+    + Math.sin(ang*5-t*0.7)*6
+    + Math.sin(ang*2+t*0.43)*12*(1+progress*.6)
+    + Math.sin(ang*7+t*1.9)*3;
+}
+function hueBase(t){ // molten accent slowly rotating hue
+  return (18 + t*4)%360;
+}
+function draw(now){
+  const t=now/1000;
+  const W=cv.width, H=cv.height, cx=W/2, cy=H/2;
+  ctx.clearRect(0,0,W,H);
+  const h=hueBase(t);
+  const grad=ctx.createLinearGradient(cx-160,cy-160,cx+160,cy+160);
+  grad.addColorStop(0,"hsl("+h+",92%,62%)");
+  grad.addColorStop(1,"hsl("+((h+70)%360)+",95%,55%)");
+  // ---- deforming progress ring ----
+  // ring is a circle whose radius wobbles elastically with progress
+  const ease=easeFns.length?easeFns[0](Math.min(1,progress)):progress;
+  const baseR=150;
+  ctx.lineWidth=2.5;
+  ctx.strokeStyle="hsla("+((h+40)%360)+",90%,65%,.28)";
+  ctx.beginPath();
+  for(let a=0;a<=Math.PI*2+.01;a+=Math.PI/90){
+    const wob=Math.sin(a*(6+progress*6)+t*3)*3*(1.3-progress*.8);
+    const r=baseR+wob;
+    const x=cx+Math.cos(a)*r, y=cy+Math.sin(a)*r;
+    a===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  // filled arc portion (elastic fill)
+  ctx.lineWidth=4;
+  ctx.strokeStyle=grad;
+  ctx.beginPath();
+  const sweep=Math.PI*2*ease;
+  for(let a=-Math.PI/2;a<=-Math.PI/2+sweep;a+=Math.PI/120){
+    const wob=Math.sin(a*(6+progress*6)+t*3)*3*(1.3-progress*.8);
+    const r=baseR+wob;
+    const x=cx+Math.cos(a)*r, y=cy+Math.sin(a)*r;
+    a===-Math.PI/2?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  // ---- satellites on lissajous orbits with trails ----
+  satellites.forEach((s,i)=>{
+    const px=cx+Math.sin(t*s.fx*Math.PI+s.ph)*s.ax*(0.55+progress*.5);
+    const py=cy+Math.sin(t*s.fy*Math.PI+s.ph*1.7)*s.ay*(0.55+progress*.5);
+    s.trail.push([px,py]); if(s.trail.length>26)s.trail.shift();
+    ctx.beginPath();
+    for(let k=0;k<s.trail.length;k++){
+      const q=s.trail[k];
+      k===0?ctx.moveTo(q[0],q[1]):ctx.lineTo(q[0],q[1]);
+    }
+    ctx.strokeStyle="hsla("+((h+i*22)%360)+",85%,70%,.22)";
+    ctx.lineWidth=1.2; ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(px,py,s.r,0,Math.PI*2);
+    ctx.fillStyle="hsl("+((h+i*22)%360)+",90%,72%)";
+    ctx.fill();
+  });
+  // ---- the blob ----
+  ctx.beginPath();
+  const squash=done?1:(1+Math.sin(t*2.2)*.02);
+  for(let a=0;a<=Math.PI*2+.01;a+=Math.PI/120){
+    const r=blobRadius(a,t);
+    const x=cx+Math.cos(a)*r;
+    const y=cy+Math.sin(a)*r*squash;
+    a===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.closePath();
+  const bg=ctx.createRadialGradient(cx-30,cy-40,20,cx,cy,140);
+  bg.addColorStop(0,"hsla("+h+",95%,70%,.95)");
+  bg.addColorStop(.65,"hsla("+((h+45)%360)+",92%,55%,.92)");
+  bg.addColorStop(1,"hsla("+((h+80)%360)+",90%,45%,.95)");
+  ctx.fillStyle=bg;
+  ctx.shadowColor="hsla("+h+",95%,60%,.5)";
+  ctx.shadowBlur=40*(1+Math.sin(t*1.7)*.3);
+  ctx.fill();
+  ctx.shadowBlur=0;
+  // inner sheen
+  ctx.beginPath();
+  ctx.ellipse(cx-28,cy-38,34,20,-0.6,0,Math.PI*2);
+  ctx.fillStyle="rgba(255,255,255,.22)";
+  ctx.fill();
+}
+// ---- main loop ----
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(60,now-last)/1000; last=now;
+  if(!paused&&!scrubbing&&!done){
+    progress+=dt/duration;
+    if(progress>=1){progress=1;done=true;el("phaseName").textContent="complete";ding();}
+  }
+  // status typing effect
+  if(phraseText){
+    phraseTick+=dt;
+    const want=Math.floor(phraseTick/(rmotion?0.001:0.045));
+    if(want>phrasePos&&phrasePos<phraseText.length){
+      phrasePos=Math.min(phraseText.length,want);
+      el("status").textContent=phraseText.slice(0,phrasePos);
+    }
+  }
+  // rotate phrase every so often while loading
+  if(!done&&progress>0&&(phrasePos>=phraseText.length)&&
+     Math.floor(progress*6)!==Math.floor((progress-dt/duration)*6)){
+    nextPhrase(); phraseTick=0;
+  }
+  // hud
+  el("pct").textContent=Math.round(progress*100)+"%";
+  el("scrubFill").style.width=(progress*100)+"%";
+  el("scrubKnob").style.left=(progress*100)+"%";
+  if(!done){
+    const ph=progress<.33?"boot":progress<.66?"sync":"polish";
+    if(el("phaseName").textContent!==ph) el("phaseName").textContent=ph;
+  }
+  padPitch(progress);
+  draw(now);
+  requestAnimationFrame(frame);
+}
+// ---- scrubber ----
+(function(){
+  const scrub=el("scrub");
+  function setFromEvent(e){
+    const r=scrub.getBoundingClientRect();
+    const x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+    progress=Math.max(0,Math.min(1,x/r.width));
+    done=progress>=1;
+  }
+  function down(e){scrubbing=true;scrub.classList.add("dragging");setFromEvent(e);
+    e.preventDefault();}
+  function move(e){if(scrubbing)setFromEvent(e);}
+  function up(){scrubbing=false;scrub.classList.remove("dragging");}
+  scrub.addEventListener("mousedown",down);
+  window.addEventListener("mousemove",move);
+  window.addEventListener("mouseup",up);
+  scrub.addEventListener("touchstart",down,{passive:false});
+  scrub.addEventListener("touchmove",e=>{if(scrubbing){setFromEvent(e);e.preventDefault();}},{passive:false});
+  window.addEventListener("touchend",up);
+})();
+// ---- controls ----
+el("reloadBtn").addEventListener("click",()=>{ac();reload();});
+el("pauseBtn").addEventListener("click",function(){
+  paused=!paused;
+  this.textContent="pause: "+(paused?"on":"off");
+  this.setAttribute("aria-pressed",String(!paused));
+  el("phaseName").textContent=paused?"held":(done?"complete":(progress<.33?"boot":progress<.66?"sync":"polish"));
+});
+el("soundBtn").addEventListener("click",function(){
+  ac();
+  soundOn=!soundOn;
+  this.textContent="sound: "+(soundOn?"on":"off");
+  this.setAttribute("aria-pressed",String(soundOn));
+  if(soundOn){padStart();}else{padStop();}
+});
+document.addEventListener("keydown",e=>{
+  if(e.code==="Space"){e.preventDefault();el("pauseBtn").click();}
+  else if(e.key==="Enter"){e.preventDefault();el("reloadBtn").click();}
+});
+// ---- init ----
+pickEasings(); makeSatellites(); nextPhrase();
+phraseText=PHRASES[0]; phraseI=0;
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGNAL LOST — channel 47</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family:"Courier New", Courier, monospace;
+    background:#050505; color:#c8c8c8;
+  }
+  #noise { position:fixed; inset:0; z-index:0; }
+  .scanlines { position:fixed; inset:0; z-index:40; pointer-events:none;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,.28) 0 1px, transparent 1px 3px); }
+  .vig { position:fixed; inset:0; z-index:41; pointer-events:none;
+    background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.6) 100%); }
+
+  .chrome {
+    position:fixed; top:0; left:0; right:0; z-index:30;
+    display:flex; align-items:center; gap:18px; padding:12px 22px;
+    background:rgba(5,5,5,.72); border-bottom:1px solid #222;
+    font-size:11px; letter-spacing:.18em; text-transform:uppercase;
+  }
+  .bug {
+    display:inline-flex; align-items:center; gap:8px; color:#e8e8e8;
+  }
+  .bug i { width:9px; height:9px; border-radius:50%; background:#c23b22; animation:bugblink 2s infinite; }
+  @keyframes bugblink { 0%,80% { opacity:1; } 90% { opacity:.2; } }
+  #ts { margin-left:auto; color:#7a7a7a; font-variant-numeric:tabular-nums; }
+
+  .hall {
+    position:fixed; inset:0; z-index:10; overflow-y:auto; padding:86px 5vw 120px;
+    display:flex; flex-direction:column; gap:64px;
+  }
+  .exhibit { max-width:860px; }
+  .exhibit:nth-child(even) { margin-left:auto; }
+  .lower3rd { display:flex; align-items:center; gap:14px; margin-bottom:14px;
+    font-size:10px; letter-spacing:.3em; text-transform:uppercase; color:#7a7a7a; }
+  .lower3rd::before { content:""; width:38px; height:2px; background:#c23b22; }
+
+  .frame {
+    position:relative; aspect-ratio:16/9; background:#0a0a0a; overflow:hidden;
+    border:1px solid #222;
+  }
+  .frame .art { position:absolute; inset:0; }
+  .frame .rgb { position:absolute; inset:0; mix-blend-mode:screen; opacity:.55; }
+  .frame .rgb.r { background:inherit; filter:none; }
+  .glitchslices { position:absolute; inset:0; pointer-events:none; }
+
+  /* broadcast lower third caption */
+  .cap {
+    position:absolute; left:0; bottom:0; right:0; padding:14px 18px 12px;
+    background:linear-gradient(180deg, transparent, rgba(0,0,0,.85));
+    font-family: system-ui, sans-serif; font-size:13px; letter-spacing:.04em; color:#e8e8e8;
+  }
+  .cap b { color:#ffd9a0; }
+  .cap .sub { font-size:9.5px; color:#8a8a8a; letter-spacing:.24em; text-transform:uppercase; margin-top:3px; }
+
+  /* interference storm */
+  body.storm .frame { animation:stormshake .1s infinite; }
+  @keyframes stormshake { 0%{transform:translate(0,0)} 25%{transform:translate(2px,-1px)} 50%{transform:translate(-2px,1px)} 75%{transform:translate(1px,2px)} 100%{transform:translate(0,0)} }
+  body.storm #noise { filter:contrast(1.6) brightness(1.3); }
+
+  .studio {
+    position:fixed; left:50%; bottom:0; transform:translateX(-50%); z-index:35;
+    display:flex; gap:12px; align-items:center; padding:12px 20px;
+    background:rgba(8,8,8,.85); border:1px solid #222; border-bottom:none; border-radius:14px 14px 0 0;
+  }
+  .studio button {
+    background:#141414; color:#c8c8c8; border:1px solid #333; font:inherit;
+    font-size:10px; letter-spacing:.2em; text-transform:uppercase; padding:10px 18px; cursor:pointer;
+    border-radius:6px; transition:all .15s;
+  }
+  .studio button:hover { border-color:#c23b22; color:#fff; }
+  .studio button.big { background:#c23b22; border-color:#c23b22; color:#fff; font-weight:700; padding:10px 26px; }
+  .studio button.big:hover { background:#e04a2e; }
+  .dial { display:flex; gap:6px; align-items:center; }
+  .dial button { width:34px; padding:10px 0; }
+
+  .toast {
+    position:fixed; top:64px; left:50%; transform:translate(-50%,-90px); z-index:50;
+    background:#111; border:1px solid #c23b22; color:#ffd9a0; padding:9px 20px; border-radius:99px;
+    font-size:10.5px; letter-spacing:.24em; text-transform:uppercase;
+    transition:transform .35s cubic-bezier(.2,1.4,.4,1);
+  }
+  .toast.show { transform:translate(-50%,0); }
+
+  @media (max-width:640px) {
+    .hall { padding:76px 4vw 140px; gap:48px; }
+    .exhibit:nth-child(even) { margin-left:0; }
+    .studio { width:94%; flex-wrap:wrap; justify-content:center; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body.storm .frame { animation:none; }
+    .bug i { animation:none; }
+  }
+</style>
+</head>
+<body>
+  <canvas id="noise"></canvas>
+  <div class="scanlines"></div><div class="vig"></div>
+
+  <div class="chrome">
+    <span class="bug"><i></i> ch·47 signal lost</span>
+    <span id="ts">--:--:--</span>
+  </div>
+
+  <main class="hall" id="hall"></main>
+
+  <div class="studio">
+    <button class="big" id="broadcastBtn">◉ broadcast</button>
+    <div class="dial" id="dial">
+      <button data-ch="0">2</button><button data-ch="1">5</button><button data-ch="2">9</button><button data-ch="3">47</button>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------- static noise ---------- */
+  const nz = $("noise"), nctx = nz.getContext("2d");
+  function noiseLoop() {
+    if (!document.hidden) {
+      const w = nz.width = 160, h = nz.height = 90;
+      const img = nctx.createImageData(w, h);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const v = Math.random() * 255;
+        d[i] = v; d[i + 1] = v; d[i + 2] = v;
+        d[i + 3] = Math.random() < 0.5 ? 26 : 54;
+      }
+      nctx.putImageData(img, 0, 0);
+    }
+    requestAnimationFrame(noiseLoop);
+  }
+  requestAnimationFrame(noiseLoop);
+
+  /* ---------- exhibits ---------- */
+  const EXHIBITS = [
+    { title: "Test Card D", sub: "transmission · 04:12:07 · unreadable", art: "card",
+      cap: "The card they left running when everyone went home.", palette: ["#2a6ea4", "#e8b84a", "#c23b22"] },
+    { title: "Weather, Maybe", sub: "broadcast fragment · isobar drift", art: "weather",
+      cap: "A front that never arrived, drawn by a hand that never tired.", palette: ["#2a8ea4", "#d4d4c8", "#8a5a2e"] },
+    { title: "The Anchorman Smiles", sub: "lost footage · 1974–?", art: "anchor",
+      cap: "Nobody remembers the show. Everybody remembers the smile.", palette: ["#8a2e3c", "#e8c98f", "#2a2a3a"] },
+    { title: "Color Bars at 3 A.M.", sub: "engineering · sustained tone", art: "bars",
+      cap: "Seventy-five percent saturation. One hundred percent loneliness.", palette: ["#c8c8c8", "#ffffff", "#5a5a5a"] },
+    { title: "Signed Off", sub: "end of transmission · carrier only", art: "signed",
+      cap: "The last thing sent was the sound of nothing being sent.", palette: ["#3a3a4a", "#8a8a9a", "#1a1a24"] },
+  ];
+  const CHANNEL_TINTS = [
+    ["#7dd8ff", "#0a141c"], ["#ffd98a", "#14100a"], ["#b8ff9a", "#0a140a"], ["#ff8a8a", "#140a0a"],
+  ];
+  let channel = 3;
+
+  /* art generators: pure gradient compositions */
+  function makeArt(cnv, kind, pal) {
+    const c = cnv.getContext("2d");
+    const w = cnv.width = 480, h = cnv.height = 270;
+    if (kind === "card") {
+      c.fillStyle = "#0c0c14"; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 6; i++) {
+        c.fillStyle = ["#fff", "#ffd9a0", "#2a6ea4", "#2a9d6e", "#c96a2e", "#c23b22"][i];
+        c.fillRect(i * (w / 6), 0, w / 6, h * 0.68);
+      }
+      c.fillStyle = "#0c0c14";
+      c.beginPath(); c.arc(w / 2, h * 0.34, 52, 0, 6.283); c.fill();
+      c.strokeStyle = "#fff"; c.lineWidth = 3;
+      for (let i = 0; i < 8; i++) {
+        const a = (6.283 / 8) * i;
+        c.beginPath();
+        c.moveTo(w / 2 + Math.cos(a) * 20, h * 0.34 + Math.sin(a) * 20);
+        c.lineTo(w / 2 + Math.cos(a) * 50, h * 0.34 + Math.sin(a) * 50);
+        c.stroke();
+      }
+      c.fillStyle = pal[0]; c.fillRect(0, h * 0.68, w, h * 0.32);
+      c.fillStyle = "#111"; c.fillRect(w * 0.1, h * 0.78, w * 0.8, 4);
+    } else if (kind === "weather") {
+      const g = c.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, "#0a1a24"); g.addColorStop(1, "#142430");
+      c.fillStyle = g; c.fillRect(0, 0, w, h);
+      /* isobars */
+      c.strokeStyle = "rgba(220,230,235,.5)"; c.lineWidth = 1.4;
+      for (let i = 0; i < 7; i++) {
+        c.beginPath();
+        for (let x = 0; x <= w; x += 12) {
+          const y = 30 + i * 30 + Math.sin(x * 0.02 + i) * 16 + Math.sin(x * 0.005 + i * 2) * 20;
+          x ? c.lineTo(x, y) : c.moveTo(x, y);
+        }
+        c.stroke();
+      }
+      /* H and L */
+      c.fillStyle = "#e8b84a"; c.font = "900 30px Georgia";
+      c.fillText("H", w * 0.22, h * 0.4);
+      c.fillStyle = "#c23b22";
+      c.fillText("L", w * 0.68, h * 0.66);
+    } else if (kind === "anchor") {
+      const g = c.createRadialGradient(w * 0.5, h * 0.4, 20, w * 0.5, h * 0.5, w * 0.6);
+      g.addColorStop(0, "#3a2430"); g.addColorStop(1, "#0e0a10");
+      c.fillStyle = g; c.fillRect(0, 0, w, h);
+      /* desk + silhouette */
+      c.fillStyle = "#141018";
+      c.fillRect(w * 0.2, h * 0.66, w * 0.6, h * 0.34);
+      c.beginPath(); c.ellipse(w * 0.5, h * 0.5, 46, 58, 0, 0, 6.283); c.fill();
+      /* smile */
+      c.strokeStyle = "#e8c98f"; c.lineWidth = 3; c.lineCap = "round";
+      c.beginPath(); c.arc(w * 0.5, h * 0.52, 18, 0.25, 2.9); c.stroke();
+      /* signal flash behind */
+      c.fillStyle = "rgba(232,201,143,.12)";
+      for (let i = 0; i < 5; i++) c.fillRect(0, h * (0.1 + i * 0.06), w, 3);
+    } else if (kind === "bars") {
+      const cols = ["#c8c8c8", "#c8c000", "#00c8c8", "#00c800", "#c000c8", "#c00000", "#0000c8"];
+      cols.forEach((cl, i) => {
+        c.fillStyle = cl; c.fillRect(i * (w / 7), 0, w / 7 + 1, h * 0.75);
+      });
+      c.fillStyle = "#141414"; c.fillRect(0, h * 0.75, w, h * 0.25);
+      for (let i = 0; i < 12; i++) {
+        const v = Math.floor((i / 12) * 255);
+        c.fillStyle = "rgb(" + v + "," + v + "," + v + ")";
+        c.fillRect(i * (w / 12), h * 0.75, w / 12 + 1, h * 0.25);
+      }
+    } else {
+      /* signed off: carrier wave only */
+      c.fillStyle = "#08080c"; c.fillRect(0, 0, w, h);
+      c.strokeStyle = "rgba(140,140,160,.7)"; c.lineWidth = 1.6;
+      c.beginPath();
+      for (let x = 0; x <= w; x += 3) {
+        const y = h / 2 + Math.sin(x * 0.09) * 2 + (Math.random() - 0.5) * 2;
+        x ? c.lineTo(x, y) : c.moveTo(x, y);
+      }
+      c.stroke();
+      c.fillStyle = "rgba(160,160,180,.5)"; c.font = "12px 'Courier New'";
+      c.fillText("· · · end of transmission · · ·", w * 0.32, h * 0.2);
+    }
+    return cnv;
+  }
+
+  /* ---------- build hall ---------- */
+  const hall = $("hall");
+  const frames = [];
+  EXHIBITS.forEach((ex, i) => {
+    const sec = document.createElement("section");
+    sec.className = "exhibit";
+    sec.innerHTML =
+      '<div class="lower3rd">' + ex.sub + '</div>' +
+      '<div class="frame">' +
+        '<canvas class="art"></canvas>' +
+        '<canvas class="rgb"></canvas>' +
+        '<div class="glitchslices"></div>' +
+        '<div class="cap"><b>' + ex.title + '</b> — ' + ex.cap +
+        '<div class="sub">hover to stabilize</div></div>' +
+      '</div>';
+    hall.appendChild(sec);
+    makeArt(sec.querySelector(".art"), ex.art, ex.palette);
+    const rgb = sec.querySelector(".rgb");
+    rgb.width = 480; rgb.height = 270;
+    frames.push({ sec, frameEl: sec.querySelector(".frame"), art: sec.querySelector(".art"), rgb, slices: sec.querySelector(".glitchslices"), ex });
+    /* hover repairs briefly */
+    sec.addEventListener("mouseenter", () => { frames[i].repair = 60; });
+  });
+
+  /* ---------- glitch engine ---------- */
+  function glitchLoop(t) {
+    if (!document.hidden) {
+      frames.forEach((f, i) => {
+        if (f.repair > 0) f.repair--;
+        const intensity = f.repair > 0 ? 0.06 : (0.4 + 0.6 * Math.abs(Math.sin(t / 3000 + i * 2))) * (document.body.classList.contains("storm") ? 2.2 : 1);
+        /* rgb split: redraw art offset into r/g/b channels */
+        const rc = f.rgb.getContext("2d");
+        rc.clearRect(0, 0, 480, 270);
+        rc.globalCompositeOperation = "source-over";
+        const dx = intensity * 3;
+        rc.globalAlpha = 0.5; rc.globalCompositeOperation = "lighter";
+        rc.drawImage(f.art, -dx, 0);
+        rc.drawImage(f.art, dx, 0);
+        rc.globalAlpha = 1; rc.globalCompositeOperation = "source-over";
+        /* slice jitter: random horizontal displacement bands */
+        if (Math.random() < 0.24 + intensity * 0.2) {
+          const n = 1 + Math.floor(Math.random() * 3 * intensity);
+          f.slices.innerHTML = "";
+          for (let k = 0; k < n; k++) {
+            const y = Math.random() * 270, h2 = 4 + Math.random() * 26;
+            const off = (Math.random() - 0.5) * 60 * intensity;
+            const d = document.createElement("div");
+            d.style.cssText =
+              "position:absolute;left:0;right:0;height:" + h2 + "px;top:" + y + "px;" +
+              "background:rgba(255,255,255,.05);backdrop-filter:none;" +
+              "transform:translateX(" + off + "px);mix-blend-mode:overlay;";
+            /* copy the art slice */
+            const cc = document.createElement("canvas");
+            cc.width = 480; cc.height = h2;
+            cc.getContext("2d").drawImage(f.art, 0, y, 480, h2, 0, 0, 480, h2);
+            d.style.background = "url(" + cc.toDataURL() + ")";
+            d.style.backgroundSize = "100% 100%";
+            f.slices.appendChild(d);
+          }
+        } else if (Math.random() < 0.1) {
+          f.slices.innerHTML = "";
+        }
+      });
+    }
+    requestAnimationFrame(glitchLoop);
+  }
+  requestAnimationFrame(glitchLoop);
+
+  /* ---------- datamosh channel switch ---------- */
+  function setChannel(ch) {
+    channel = ch;
+    const [tint, dark] = CHANNEL_TINTS[ch];
+    document.documentElement.style.setProperty("--tint", tint);
+    frames.forEach((f, i) => {
+      /* re-tint art via filter */
+      f.art.style.filter = "sepia(.3) hue-rotate(" + (ch * 70 + i * 10) + "deg) saturate(" + (1 + ch * 0.2) + ") contrast(1.08)";
+      /* datamosh burst */
+      f.repair = -40; /* force heavy glitch briefly */
+      setTimeout(() => { f.repair = 0; }, 600);
+    });
+    toast("channel " + ["2", "5", "9", "47"][ch] + " · retuned");
+  }
+  document.querySelectorAll("#dial button").forEach(b => {
+    b.addEventListener("click", () => {
+      document.querySelectorAll("#dial button").forEach(x => x.classList.remove("big"));
+      b.classList.add("big");
+      setChannel(parseInt(b.dataset.ch, 10));
+    });
+  });
+  document.querySelector('#dial button[data-ch="3"]').classList.add("big");
+
+  /* ---------- broadcast storm ---------- */
+  let storm = false;
+  $("broadcastBtn").addEventListener("click", () => {
+    storm = !storm;
+    document.body.classList.toggle("storm", storm);
+    $("broadcastBtn").textContent = storm ? "◉ broadcasting" : "◉ broadcast";
+    toast(storm ? "interference storm incoming" : "storm subsided");
+    if (storm) setTimeout(() => {
+      if (storm) { storm = false; document.body.classList.remove("storm"); $("broadcastBtn").textContent = "◉ broadcast"; }
+    }, 7000);
+  });
+
+  /* ---------- toast ---------- */
+  let toastTimer = null;
+  function toast(m) {
+    const t = $("toast");
+    t.textContent = m; t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 1900);
+  }
+
+  /* ---------- clock ---------- */
+  setInterval(() => {
+    const d = new Date();
+    $("ts").textContent = [d.getHours(), d.getMinutes(), d.getSeconds()].map(x => String(x).padStart(2, "0")).join(":") + " · off-air";
+  }, 1000);
+})();
+</script>
+</body>
+</html>

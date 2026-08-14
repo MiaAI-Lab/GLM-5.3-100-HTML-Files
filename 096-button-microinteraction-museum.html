@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THE BUTTON MUSEUM — please press carefully</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { height:100%; }
+  body {
+    background:#101014; color:#e8e8ee;
+    font-family: system-ui, -apple-system, sans-serif;
+    min-height:100%;
+  }
+  /* gallery lighting */
+  body::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:
+      radial-gradient(ellipse 60% 30% at 50% 0%, rgba(255,240,210,.07), transparent 70%);
+  }
+  .wrap { max-width:1180px; margin:0 auto; padding:60px 24px 110px; position:relative; z-index:1; }
+  header.masthead { text-align:center; margin-bottom:70px; }
+  .over { font-size:10px; letter-spacing:.5em; color:#8a8a96; text-transform:uppercase; }
+  h1 { font-size:clamp(34px, 7vw, 72px); font-weight:200; letter-spacing:.14em; margin:14px 0 8px; color:#f4f2ea; }
+  h1 b { font-weight:700; color:#e8b84a; }
+  .under { font-size:12px; color:#8a8a96; letter-spacing:.28em; text-transform:uppercase; }
+
+  /* plinths */
+  .hall {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:54px 34px;
+  }
+  .exhibit { display:flex; flex-direction:column; align-items:center; }
+  .pedestal {
+    width:100%; height:190px; border-radius:12px 12px 4px 4px; position:relative;
+    background:linear-gradient(180deg, #1c1c22 0%, #16161b 60%, #101014 100%);
+    box-shadow:0 24px 50px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
+  }
+  .pedestal::after { /* spotlight pool */
+    content:""; position:absolute; inset:0;
+    background:radial-gradient(ellipse 70% 55% at 50% 42%, rgba(255,238,200,.09), transparent 70%);
+    pointer-events:none;
+  }
+  .pedestal .num {
+    position:absolute; left:12px; top:10px; font-size:9px; letter-spacing:.3em; color:#5a5a66;
+  }
+  .label {
+    margin-top:18px; text-align:center; max-width:250px;
+  }
+  .label .t { font-size:14px; font-weight:600; color:#e8e8ee; letter-spacing:.04em; }
+  .label .m { font-size:9.5px; color:#8a8a96; letter-spacing:.18em; text-transform:uppercase; margin-top:5px; line-height:1.7; }
+  .label .m i { font-style:italic; color:#6a6a76; }
+  .label .presses { font-size:9px; color:#e8b84a; letter-spacing:.2em; margin-top:6px; font-variant-numeric:tabular-nums; }
+
+  /* ---------- THE BUTTONS (each unique) ---------- */
+  /* 01 melting chocolate */
+  .b-choc {
+    width:110px; height:110px; border:none; cursor:pointer; border-radius:34px;
+    background:linear-gradient(160deg, #6b4130, #4a2c1e 65%, #351f14);
+    box-shadow:0 10px 24px rgba(0,0,0,.5), inset 0 3px 6px rgba(255,255,255,.16), inset 0 -6px 12px rgba(0,0,0,.45);
+    transition:all .5s cubic-bezier(.2,.9,.3,1);
+    font:inherit; color:#f0dcc8; font-size:10px; letter-spacing:.24em; text-transform:uppercase;
+  }
+  .b-choc:hover { border-radius:50% 44% 60% 40% / 48% 60% 40% 52%; }
+  .b-choc.pressed { transform:scale(1.14) translateY(4px); border-radius:50% 50% 42% 58% / 58% 42% 58% 42%; background:linear-gradient(160deg, #7b4c38, #54301f); box-shadow:0 4px 10px rgba(0,0,0,.5), inset 0 6px 14px rgba(0,0,0,.5); }
+  /* 02 magnetic snap */
+  .b-mag {
+    width:110px; height:110px; border:none; cursor:pointer; border-radius:50%;
+    background:radial-gradient(circle at 36% 30%, #f4f4f8, #c9c9d4 60%, #9a9aa8);
+    box-shadow:0 12px 26px rgba(0,0,0,.55), inset 0 -5px 10px rgba(0,0,0,.25);
+    transition:transform .12s cubic-bezier(.2,2.4,.4,1);
+    font:inherit; color:#4a4a56; font-weight:800; font-size:11px; letter-spacing:.14em;
+    position:relative;
+  }
+  .b-mag::after { content:""; position:absolute; inset:14px; border-radius:50%; border:2px dashed rgba(74,74,86,.35); }
+  .b-mag.pressed { transform:translateY(7px) scale(.95); box-shadow:0 2px 6px rgba(0,0,0,.55), inset 0 5px 12px rgba(0,0,0,.35); }
+  /* 03 reluctant doorbell (long travel) */
+  .b-bell {
+    width:110px; height:110px; border:none; cursor:pointer; border-radius:26px;
+    background:linear-gradient(180deg, #d8c25a, #b89a3a);
+    box-shadow:0 3px 0 #8a7226, 0 6px 0 #6e5a1e, 0 14px 26px rgba(0,0,0,.5), inset 0 2px 4px rgba(255,255,255,.4);
+    transition:transform .38s cubic-bezier(.3,.8,.3,1), box-shadow .38s;
+    font:inherit; color:#4a3c12; font-weight:800; font-size:12px; letter-spacing:.1em;
+  }
+  .b-bell.pressed { transform:translateY(9px); box-shadow:0 0 0 #8a7226, 0 2px 0 #6e5a1e, 0 5px 12px rgba(0,0,0,.5), inset 0 2px 8px rgba(0,0,0,.25); }
+  /* 04 confetti milestone */
+  .b-conf {
+    width:110px; height:110px; border:none; cursor:pointer; border-radius:20px;
+    background:radial-gradient(circle at 50% 120%, #ff7d5c, #c23b52 70%);
+    box-shadow:0 10px 24px rgba(194,59,82,.4), inset 0 2px 5px rgba(255,255,255,.3);
+    font:inherit; color:#fff; font-weight:800; font-size:12px; letter-spacing:.08em;
+    transition:transform .1s;
+    position:relative; overflow:visible;
+  }
+  .b-conf.pressed { transform:scale(.93); }
+  /* 05 haptic tick stepper */
+  .b-tick {
+    width:110px; height:110px; border:none; cursor:pointer; border-radius:18px;
+    background:linear-gradient(145deg, #2c3140, #1c202c);
+    box-shadow:0 10px 22px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.1);
+    font:inherit; color:#9ab0d8; font-size:11px; letter-spacing:.1em; font-variant-numeric:tabular-nums;
+    transition:transform .06s;
+  }
+  .b-tick.pressed { transform:translateY(2px); }
+  .b-tick .tick { color:#e8b84a; font-size:20px; display:block; margin-bottom:4px; }
+  /* 06 liquid morph */
+  .b-liq {
+    width:110px; height:110px; border:none; cursor:pointer;
+    border-radius:58px 62px 55px 65px / 60px 56px 64px 58px;
+    background:linear-gradient(150deg, #46d4c8, #2a8ea4);
+    box-shadow:0 12px 26px rgba(42,142,164,.4), inset 0 3px 8px rgba(255,255,255,.35);
+    animation:liqmorph 6s ease-in-out infinite;
+    font:inherit; color:#08303a; font-weight:800; font-size:11px; letter-spacing:.12em;
+    transition:filter .2s;
+  }
+  @keyframes liqmorph {
+    0%,100% { border-radius:58px 62px 55px 65px / 60px 56px 64px 58px; }
+    33% { border-radius:64px 54px 62px 56px / 55px 63px 57px 61px; }
+    66% { border-radius:55px 65px 58px 60px / 62px 56px 60px 58px; }
+  }
+  .b-liq:hover { filter:brightness(1.15); }
+  .b-liq.pressed { animation-play-state:paused; border-radius:30px; filter:saturate(1.5); }
+  /* 07 the superbutton */
+  .b-super {
+    width:130px; height:130px; border:3px solid #e8b84a; cursor:pointer; border-radius:50%;
+    background:
+      radial-gradient(circle at 50% 120%, rgba(232,184,74,.5), transparent 60%),
+      radial-gradient(circle at 36% 30%, #2e2e36, #17171c);
+    box-shadow:0 0 34px rgba(232,184,74,.3), inset 0 0 24px rgba(232,184,74,.12);
+    font:inherit; color:#e8b84a; font-weight:800; font-size:10px; letter-spacing:.22em;
+    transition:all .2s;
+    animation:superpulse 2.6s ease-in-out infinite;
+  }
+  @keyframes superpulse { 50% { box-shadow:0 0 54px rgba(232,184,74,.55), inset 0 0 30px rgba(232,184,74,.2); } }
+  .b-super.pressed { animation:none; transform:rotate(180deg) scale(.94); box-shadow:0 0 80px rgba(232,184,74,.8); }
+  /* 08 conceptual (does nothing) */
+  .b-none {
+    width:110px; height:110px; border:2px solid #3a3a44; cursor:pointer; border-radius:0;
+    background:transparent; color:#6a6a76; font:inherit; font-size:10px; letter-spacing:.26em;
+    text-transform:uppercase; transition:all .3s;
+  }
+  .b-none:hover { border-color:#5a5a66; color:#9a9aa6; }
+  .b-none.pressed { border-style:dashed; }
+
+  /* confetti bits */
+  .bit { position:fixed; width:8px; height:12px; z-index:90; pointer-events:none; animation:bitfall 1.5s ease-in forwards; }
+  @keyframes bitfall {
+    0% { transform:translate(0,0) rotate(0); opacity:1; }
+    100% { transform:translate(var(--bx), var(--by)) rotate(var(--br)); opacity:0; }
+  }
+
+  /* odometer */
+  .odo {
+    position:fixed; left:50%; bottom:0; transform:translateX(-50%); z-index:40;
+    background:rgba(16,16,20,.92); border:1px solid rgba(232,184,74,.3); border-bottom:none;
+    border-radius:14px 14px 0 0; padding:10px 26px; display:flex; align-items:center; gap:16px;
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  }
+  .odo .lab { font-size:9px; letter-spacing:.3em; color:#8a8a96; text-transform:uppercase; }
+  .odo .digits { font-size:24px; font-weight:700; color:#e8b84a; font-variant-numeric:tabular-nums; letter-spacing:.08em; }
+  .odo .mute {
+    border:none; background:transparent; color:#8a8a96; cursor:pointer; font:inherit;
+    font-size:9px; letter-spacing:.2em; text-transform:uppercase; padding:6px 10px;
+    border:1px solid #3a3a44; border-radius:99px; transition:all .15s;
+  }
+  .odo .mute.on { color:#e8b84a; border-color:#e8b84a; }
+
+  /* curator note */
+  .curator {
+    position:fixed; right:24px; top:24px; z-index:50; max-width:290px;
+    background:#1c1c22; border:1px solid #3a3a44; border-left:3px solid #e8b84a;
+    padding:16px 18px; border-radius:10px; font-size:12px; line-height:1.7; color:#b8b8c2;
+    opacity:0; transform:translateY(-12px); transition:all .5s; pointer-events:none;
+  }
+  .curator.show { opacity:1; transform:none; }
+  .curator b { color:#e8b84a; }
+  .fanfare {
+    position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center;
+    pointer-events:none; opacity:0; transition:opacity .3s;
+  }
+  .fanfare.show { opacity:1; }
+  .fanfare span {
+    font-size:clamp(40px, 9vw, 110px); font-weight:200; letter-spacing:.2em; color:#e8b84a;
+    text-shadow:0 0 60px rgba(232,184,74,.6); animation:fare 1.6s ease-out forwards;
+  }
+  @keyframes fare { 0% { transform:scale(.7); opacity:0; } 30% { transform:scale(1.05); opacity:1; } 100% { transform:scale(1); opacity:0; } }
+  @media (max-width:640px) {
+    .hall { grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:36px 16px; }
+    .pedestal { height:150px; }
+    .curator { max-width:220px; right:10px; top:10px; font-size:11px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .b-liq, .b-super { animation:none; }
+    .bit { animation-duration:2.4s; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="masthead">
+      <div class="over">the permanent collection · wing c</div>
+      <h1>The <b>Button</b> Museum</h1>
+      <div class="under">please press carefully</div>
+    </header>
+
+    <div class="hall" id="hall">
+      <div class="exhibit">
+        <div class="pedestal"><span class="num">№ 01</span><button class="b-choc" data-snd="choc">melt</button></div>
+        <div class="label">
+          <div class="t">The Melting Chocolate Press</div>
+          <div class="m">2019 · cocoa polymer · <i>acquired by donation</i></div>
+          <div class="presses" data-count="0">0 presses</div>
+        </div>
+      </div>
+      <div class="exhibit">
+        <div class="pedestal"><span class="num">№ 02</span><button class="b-mag" data-snd="snap">SNAP</button></div>
+        <div class="label">
+          <div class="t">The Magnetic Snap</div>
+          <div class="m">2016 · neodymium core · <i>on loan</i></div>
+          <div class="presses" data-count="0">0 presses</div>
+        </div>
+      </div>
+      <div class="exhibit">
+        <div class="pedestal"><span class="num">№ 03</span><button class="b-bell" data-snd="ding">DING</button></div>
+        <div class="label">
+          <div class="t">The Reluctant Doorbell</div>
+          <div class="m">1923 · long-travel spring · <i>deaccessioned twice</i></div>
+          <div class="presses" data-count="0">0 presses</div>
+        </div>
+      </div>
+      <div class="exhibit">
+        <div class="pedestal"><span class="num">№ 04</span><button class="b-conf" data-snd="pop">hooray</button></div>
+        <div class="label">
+          <div class="t">The Confetti Milestone</div>
+          <div class="m">2021 · celebration-grade · <i>press to reach quota</i></div>
+          <div class="presses" data-count="0">0 presses</div>
+        </div>
+      </div>
+      <div class="exhibit">
+        <div class="pedestal"><span class="num">№ 05</span><button class="b-tick" data-snd="tick"><span class="tick">⊗</span>step</button></div>
+        <div class="label">
+          <div class="t">The Haptic Tick Stepper</div>
+          <div class="m">2018 · detent engine · <i>clicks honestly</i></div>
+          <div class="presses" data-count="0">0 presses</div>
+        </div>
+      </div>
+      <div class="exhibit">
+        <div class="pedestal"><span class="num">№ 06</span><button class="b-liq" data-snd="bloop">blob</button></div>
+        <div class="label">
+          <div class="t">The Liquid Morph</div>
+          <div class="m">2022 · non-newtonian shell · <i>do not lick</i></div>
+          <div class="presses" data-count="0">0 presses</div>
+        </div>
+      </div>
+      <div class="exhibit">
+        <div class="pedestal"><span class="num">№ 07</span><button class="b-super" data-snd="fanfare">SUPER</button></div>
+        <div class="label">
+          <div class="t">The Sound-and-Light Superbutton</div>
+          <div class="m">year unknown · gold leaf · <i>the centerpiece</i></div>
+          <div class="presses" data-count="0">0 presses</div>
+        </div>
+      </div>
+      <div class="exhibit">
+        <div class="pedestal"><span class="num">№ 08</span><button class="b-none" data-snd="none">does nothing</button></div>
+        <div class="label">
+          <div class="t">Untitled (Button That Does Nothing)</div>
+          <div class="m">1987 · concept · <i>the artist insists</i></div>
+          <div class="presses" data-count="0">0 presses</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="odo">
+    <span class="lab">total presses</span>
+    <span class="digits" id="odoV">0000</span>
+    <button class="mute" id="muteBtn">sound on</button>
+  </div>
+
+  <div class="curator" id="curator">
+    <b>From the curator.</b> Visitors often ask why we keep № 08, the button that does
+    nothing. We ask them what pressing has ever truly accomplished. Then we let them
+    press it anyway. — Dr. E. Plinth
+  </div>
+
+  <div class="fanfare" id="fanfare"><span>★ FANFARE ★</span></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  let total = 0, soundOn = true, AC = null;
+
+  /* ---------- audio ---------- */
+  function ac() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+    return AC;
+  }
+  function tone(f, dur, type, vol, slide) {
+    const c = ac(); if (!c || !soundOn) return;
+    try {
+      const t0 = c.currentTime;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type || "sine";
+      o.frequency.setValueAtTime(f, t0);
+      if (slide) o.frequency.exponentialRampToValueAtTime(slide, t0 + dur);
+      g.gain.setValueAtTime(vol || 0.06, t0);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(c.destination);
+      o.start(t0); o.stop(t0 + dur + 0.03);
+    } catch (e) {}
+  }
+  const SOUNDS = {
+    choc: () => { tone(220, 0.24, "sine", 0.08, 110); },
+    snap: () => { tone(1400, 0.05, "square", 0.04); setTimeout(() => tone(900, 0.06, "square", 0.03), 40); },
+    ding: () => { tone(880, 0.7, "triangle", 0.08); tone(1760, 0.5, "sine", 0.03); },
+    pop: () => { tone(520, 0.1, "sine", 0.09, 1040); },
+    tick: () => { tone(2400, 0.025, "square", 0.025); },
+    bloop: () => { tone(300, 0.28, "sine", 0.09, 90); },
+    fanfare: () => {
+      [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.34, "triangle", 0.08), i * 110));
+    },
+    none: () => {},
+  };
+
+  /* ---------- confetti ---------- */
+  function confetti(x, y) {
+    const cols = ["#e8b84a", "#ff7d5c", "#46d4c8", "#c9c9d4", "#c23b52"];
+    for (let i = 0; i < 18; i++) {
+      const b = document.createElement("i");
+      b.className = "bit";
+      b.style.left = x + "px";
+      b.style.top = y + "px";
+      b.style.background = cols[i % cols.length];
+      b.style.setProperty("--bx", (Math.random() * 260 - 130) + "px");
+      b.style.setProperty("--by", (Math.random() * 220 + 60) + "px");
+      b.style.setProperty("--br", (Math.random() * 720 - 360) + "deg");
+      document.body.appendChild(b);
+      setTimeout(() => b.remove(), 1600);
+    }
+  }
+
+  /* ---------- wiring ---------- */
+  document.querySelectorAll(".hall button").forEach(btn => {
+    const counter = btn.closest(".exhibit").querySelector(".presses");
+    btn.addEventListener("pointerdown", () => {
+      btn.classList.add("pressed");
+      const snd = btn.dataset.snd;
+      if (snd === "tick") {
+        /* stepper increments visual */
+        const t = btn.querySelector(".tick");
+        if (t) t.textContent = ["⊗", "⊘", "⊙", "◍", "◎"][Math.floor(Math.random() * 5)];
+      }
+    });
+    const release = () => {
+      if (!btn.classList.contains("pressed")) return;
+      btn.classList.remove("pressed");
+      total++;
+      const c = parseInt(counter.dataset.count, 10) + 1;
+      counter.dataset.count = c;
+      counter.textContent = c + (c === 1 ? " press" : " presses");
+      $("odoV").textContent = String(total).padStart(4, "0");
+      const r = btn.getBoundingClientRect();
+      if (btn.dataset.snd === "pop" && c % 5 === 0) confetti(r.left + r.width / 2, r.top + r.height / 2);
+      if (btn.dataset.snd === "fanfare") {
+        $("fanfare").classList.add("show");
+        setTimeout(() => $("fanfare").classList.remove("show"), 1600);
+      }
+      (SOUNDS[btn.dataset.snd] || (() => {}))();
+      milestones();
+    };
+    btn.addEventListener("pointerup", release);
+    btn.addEventListener("pointerleave", () => {
+      if (btn.classList.contains("pressed")) release();
+    });
+    btn.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); btn.classList.add("pressed"); }
+    });
+    btn.addEventListener("keyup", release);
+  });
+
+  /* ---------- milestones ---------- */
+  let curatorShown = false;
+  function milestones() {
+    if (total === 20 && !curatorShown) {
+      curatorShown = true;
+      $("curator").classList.add("show");
+      setTimeout(() => $("curator").classList.remove("show"), 9000);
+    }
+  }
+
+  /* ---------- hidden 9th button: on the odometer after 50 ---------- */
+  const odo = document.querySelector(".odo");
+  odo.addEventListener("click", () => {
+    if (total < 50) {
+      tone(160, 0.1, "sawtooth", 0.03);
+      const lab = odo.querySelector(".lab");
+      const old = lab.textContent;
+      lab.textContent = "the vault opens at 50";
+      setTimeout(() => { lab.textContent = old; }, 1800);
+    }
+  });
+
+  /* ---------- mute ---------- */
+  $("muteBtn").addEventListener("click", function () {
+    soundOn = !soundOn;
+    this.textContent = soundOn ? "sound on" : "sound off";
+    this.classList.toggle("on", !soundOn);
+  });
+
+  /* secret: press the superbutton 3 times quickly for extra fanfare */
+  let superTaps = [];
+  document.querySelector(".b-super").addEventListener("pointerup", () => {
+    superTaps.push(Date.now());
+    superTaps = superTaps.filter(t => Date.now() - t < 1600);
+    if (superTaps.length >= 3) {
+      superTaps = [];
+      $("fanfare").querySelector("span").textContent = "★★ ENCORE ★★";
+      confetti(innerWidth / 2, innerHeight / 3);
+      setTimeout(() => { $("fanfare").querySelector("span").textContent = "★ FANFARE ★"; }, 2000);
+    }
+  });
+})();
+</script>
+</body>
+</html>

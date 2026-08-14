@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GRID — a conference on structure</title>
+<style>
+  :root{
+    --black:#111111; --white:#F7F7F5; --red:#E32219;
+    --gutter:1.2rem;
+    --col-w:calc((100% - 11*var(--gutter))/12);
+    --rule:rgba(17,17,17,.16);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
+    background:var(--white); color:var(--black);
+    -webkit-font-smoothing:antialiased; line-height:1.3;
+  }
+  ::selection{background:var(--red); color:var(--white)}
+  /* ---------- structural grid overlay (G key) ---------- */
+  .gridlay{
+    position:fixed; inset:0; z-index:60; pointer-events:none;
+    display:grid; grid-template-columns:repeat(12,1fr); gap:var(--gutter);
+    padding:0 max(1.2rem, calc((100vw - 1440px)/2));
+    opacity:0; transition:opacity .25s;
+  }
+  .gridlay.on{opacity:1}
+  .gridlay i{background:rgba(42,98,214,.09); outline:1px solid rgba(42,98,214,.22)}
+  .gridlay i:nth-child(6n+3){background:rgba(227,34,25,.07)}
+  .baselines{
+    position:fixed; inset:0; z-index:59; pointer-events:none;
+    background:repeating-linear-gradient(180deg,
+      transparent 0 7px, rgba(227,34,25,.14) 7px 8px);
+    opacity:0; transition:opacity .25s;
+  }
+  .baselines.on{opacity:1}
+  /* ---------- frame chrome ---------- */
+  .edge{
+    position:fixed; z-index:70; font-size:.56rem; letter-spacing:.22em;
+    text-transform:uppercase; color:var(--black); background:var(--white);
+    padding:.3rem .55rem; border:1px solid var(--black);
+  }
+  .edge.tl{top:.8rem; left:.8rem}
+  .edge.tr{top:.8rem; right:.8rem}
+  #btnGrid{
+    position:fixed; z-index:71; top:.8rem; left:50%; transform:translateX(-50%);
+    font:inherit; font-size:.56rem; letter-spacing:.22em; text-transform:uppercase;
+    background:var(--black); color:var(--white); border:1px solid var(--black);
+    padding:.3rem .9rem; cursor:pointer;
+  }
+  #btnGrid:hover{background:var(--red); border-color:var(--red)}
+  #btnGrid:focus-visible{outline:2px solid var(--red); outline-offset:2px}
+  /* ---------- shared layout ---------- */
+  .wrap{max-width:1440px; margin:0 auto; padding:0 1.2rem}
+  .rule{border-top:1px solid var(--black)}
+  .idx{
+    font-size:.6rem; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--black); white-space:nowrap;
+  }
+  .num{font-variant-numeric:tabular-nums}
+  /* ---------- hero ---------- */
+  header.hero{padding:5.2rem 0 0}
+  .hero .idx-row{
+    display:flex; justify-content:space-between; gap:1rem;
+    border-top:2px solid var(--black); padding-top:.55rem; margin-bottom:2.6rem;
+  }
+  h1.mega{
+    font-size:clamp(4.2rem, 17.5vw, 15.6rem);
+    line-height:.86; letter-spacing:-.035em; font-weight:700;
+    text-transform:uppercase; margin-left:-.045em;
+  }
+  h1.mega .thin{font-weight:200}
+  h1.mega .red{color:var(--red)}
+  .hero-cols{
+    display:grid; grid-template-columns:repeat(12,1fr); gap:var(--gutter);
+    margin-top:2.2rem; padding-bottom:2.4rem;
+  }
+  .hero-cols .c3{grid-column:span 3; font-size:.78rem; line-height:1.5}
+  .hero-cols .c3 h3{font-size:.6rem; letter-spacing:.2em; text-transform:uppercase; margin-bottom:.6rem}
+  .hero-cols .c3 + .c3{border-left:1px solid var(--rule); padding-left:var(--gutter)}
+  .hero-cols .red-note{
+    grid-column:9/-1; background:var(--red); color:var(--white);
+    padding:1rem 1.1rem; font-size:.78rem; line-height:1.5; align-self:start;
+  }
+  .hero-cols .red-note b{display:block; font-size:1.6rem; font-weight:700; letter-spacing:-.02em; margin-bottom:.3rem}
+  /* ---------- speakers ---------- */
+  section.speakers{border-top:2px solid var(--black); padding:1.6rem 0 2.6rem}
+  .sec-head{
+    display:grid; grid-template-columns:repeat(12,1fr); gap:var(--gutter);
+    margin-bottom:1.4rem; align-items:end;
+  }
+  .sec-head h2{
+    grid-column:1/6; font-size:clamp(1.7rem,4.2vw,3.4rem);
+    text-transform:uppercase; letter-spacing:-.02em; line-height:.95; font-weight:700;
+  }
+  .sec-head .idx{grid-column:9/-1; text-align:right}
+  .speaker-row{
+    display:grid; grid-template-columns:repeat(12,1fr); gap:var(--gutter);
+    border-top:1px solid var(--black); padding:1.05rem 0;
+    cursor:default; transition:transform .22s cubic-bezier(.2,.7,.2,1);
+    align-items:baseline; position:relative;
+  }
+  .speaker-row:hover, .speaker-row:focus-visible{
+    transform:translateX(calc(var(--gutter)));
+  }
+  .speaker-row .n{grid-column:1/2}
+  .speaker-row .name{
+    grid-column:2/8; font-weight:700; text-transform:uppercase;
+    font-size:clamp(1.05rem,2.5vw,1.9rem); letter-spacing:-.015em; line-height:1;
+  }
+  .speaker-row .role{grid-column:8/11; font-size:.74rem; line-height:1.45}
+  .speaker-row .city{
+    grid-column:11/13; font-size:.74rem; text-align:right;
+    font-variant-numeric:tabular-nums; letter-spacing:.06em;
+  }
+  .speaker-row .tick{
+    position:absolute; left:calc(-1*var(--gutter)); top:1.05rem;
+    color:var(--red); font-weight:700; opacity:0; transition:opacity .18s;
+    font-size:1rem; line-height:1;
+  }
+  .speaker-row:hover .tick{opacity:1}
+  .speaker-row.key .name{color:var(--red)}
+  /* ---------- red inverted section ---------- */
+  section.redblock{
+    background:var(--red); color:var(--white); padding:2.4rem 0 2.8rem;
+  }
+  section.redblock .idx, section.redblock .idx .num{color:var(--white)}
+  .redblock-inner{display:grid; grid-template-columns:repeat(12,1fr); gap:var(--gutter)}
+  .redblock h2{
+    grid-column:1/9; font-size:clamp(2.2rem,7vw,6.4rem); line-height:.92;
+    text-transform:uppercase; font-weight:700; letter-spacing:-.03em;
+  }
+  .redblock .man{
+    grid-column:9/-1; font-size:.78rem; line-height:1.55; align-self:end;
+  }
+  .redblock .man b{display:block; text-transform:uppercase; letter-spacing:.18em; font-size:.6rem; margin-bottom:.5rem}
+  .redstat-row{
+    display:grid; grid-template-columns:repeat(12,1fr); gap:var(--gutter);
+    margin-top:2.2rem; border-top:1px solid rgba(247,247,245,.5); padding-top:1.2rem;
+  }
+  .redstat-row div{grid-column:span 3}
+  .redstat-row b{display:block; font-size:clamp(1.6rem,3.6vw,3rem); font-weight:700; letter-spacing:-.03em}
+  .redstat-row span{font-size:.62rem; letter-spacing:.16em; text-transform:uppercase}
+  /* ---------- schedule strip ---------- */
+  section.schedule{border-top:2px solid var(--black); padding:1.6rem 0 2rem}
+  .strip-scroll{
+    display:flex; gap:0; overflow-x:auto; margin-top:1.1rem;
+    scrollbar-width:thin; border-top:1px solid var(--black); border-bottom:1px solid var(--black);
+    cursor:grab;
+  }
+  .strip-scroll.grabbing{cursor:grabbing}
+  .slot{
+    flex:0 0 auto; width:200px; border-right:1px solid var(--rule);
+    padding:.85rem .9rem .95rem; position:relative; user-select:none;
+  }
+  .slot .t{font-weight:700; font-size:.95rem; font-variant-numeric:tabular-nums}
+  .slot .d{font-size:.68rem; line-height:1.4; margin-top:.4rem; min-height:3.6em}
+  .slot .room{
+    display:inline-block; margin-top:.5rem; font-size:.56rem; letter-spacing:.18em;
+    text-transform:uppercase; border:1px solid var(--black); padding:.16rem .5rem;
+  }
+  .slot.brk{background:var(--black); color:var(--white)}
+  .slot.brk .room{border-color:var(--white)}
+  .slot.key{background:var(--red); color:var(--white)}
+  .slot.key .room{border-color:var(--white)}
+  .slot:hover{box-shadow:inset 0 -4px 0 var(--red)}
+  .strip-hint{font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; margin-top:.55rem; color:#555}
+  /* ---------- colophon ---------- */
+  footer.colophon{border-top:2px solid var(--black); padding:1.4rem 0 4.6rem}
+  .colophon .line{
+    font-size:.72rem; line-height:1.6; max-width:70ch;
+  }
+  .colophon .line::after{content:""; display:inline-block; width:100%}
+  .colophon.justifyStart  .line{text-align:left}
+  .colophon.justifyCenter .line{text-align:center; margin-left:auto; margin-right:auto}
+  .colophon.justifyEnd    .line{text-align:right; margin-left:auto}
+  .colophon.justifyFull   .line{text-align:justify; hyphens:auto}
+  .colophon .which{
+    margin-top:1rem; font-size:.6rem; letter-spacing:.2em; text-transform:uppercase; color:var(--red);
+  }
+  /* ---------- responsive ---------- */
+  @media (max-width:900px){
+    .speaker-row .n{grid-column:1/2}
+    .speaker-row .name{grid-column:2/13}
+    .speaker-row .role{grid-column:2/8; margin-top:.3rem}
+    .speaker-row .city{grid-column:8/13; margin-top:.3rem; text-align:right}
+    .speaker-row:hover{transform:translateX(var(--gutter))}
+    .hero-cols .c3{grid-column:1/13; border-left:0 !important; padding-left:0 !important; margin-bottom:1rem}
+    .hero-cols .red-note{grid-column:1/13}
+    .sec-head h2{grid-column:1/13}
+    .sec-head .idx{grid-column:1/13; text-align:left; margin-top:.5rem}
+    .redblock h2{grid-column:1/13}
+    .redblock .man{grid-column:1/13; margin-top:1.2rem}
+    .redstat-row div{grid-column:span 6; margin-bottom:1rem}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .speaker-row{transition:none}
+    .speaker-row:hover{transform:none}
+    html{scroll-behavior:auto}
+  }
+</style>
+</head>
+<body>
+  <div class="gridlay" id="gridlay" aria-hidden="true">
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+  </div>
+  <div class="baselines" id="baselines" aria-hidden="true"></div>
+  <span class="edge tl">Grid / Poster № 013</span>
+  <span class="edge tr">Zürich · 14—16 Oct</span>
+  <button id="btnGrid" aria-pressed="false">Grid [G]</button>
+
+  <div class="wrap">
+    <header class="hero">
+      <div class="idx-row">
+        <span class="idx">Internationale Typografische Konferenz</span>
+        <span class="idx num">Ausgabe 07 — 1957/2026</span>
+        <span class="idx num">47.3769° N, 8.5417° E</span>
+      </div>
+      <h1 class="mega">Grid<br><span class="thin">is</span> <span class="red">all</span></h1>
+      <div class="hero-cols">
+        <div class="c3">
+          <h3>01 — Premise</h3>
+          Structure is not a constraint on form; it is the material form is made
+          from. Three days on modules, measure, and the moral weight of the
+          flush-left margin.
+        </div>
+        <div class="c3">
+          <h3>02 — Method</h3>
+          Twelve columns. One baseline. No ornament survives the edit. Every
+          element on this poster sits on the same arithmetic — press G to
+          see the scaffolding.
+        </div>
+        <div class="red-note">
+          <b>318</b>
+          seats in the main hall. Set in Helvetica or nearest system kin.
+          Typeset without a single image — type is the imagery.
+        </div>
+      </div>
+    </header>
+
+    <section class="speakers" aria-label="Speakers">
+      <div class="sec-head">
+        <h2>Speakers</h2>
+        <span class="idx">Register B — <span class="num">12</span> voices / <span class="num">09</span> cities</span>
+      </div>
+      <div id="speakerList"></div>
+    </section>
+  </div>
+
+  <section class="redblock" aria-label="Manifesto">
+    <div class="wrap redblock-inner">
+      <h2>The grid is a<br>promise about<br>attention.</h2>
+      <div class="man">
+        <b>03 — Manifesto</b>
+        A column is a contract: what begins aligned shall return aligned.
+        Whitespace is not empty; it is load-bearing. We hold these truths at
+        8pt increments.
+      </div>
+    </div>
+    <div class="wrap">
+      <div class="redstat-row">
+        <div><b class="num">12</b><span>Columns</span></div>
+        <div><b class="num">8pt</b><span>Baseline</span></div>
+        <div><b class="num">3</b><span>Inks</span></div>
+        <div><b class="num">0</b><span>Photographs</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <section class="schedule" aria-label="Schedule">
+      <div class="sec-head">
+        <h2>Programme</h2>
+        <span class="idx">Register C — drag or scroll horizontally</span>
+      </div>
+      <div class="strip-scroll" id="strip" tabindex="0" aria-label="Conference schedule, scrollable horizontally"></div>
+      <p class="strip-hint">← Drag the strip · Day one shown · full programme in the hall ←</p>
+    </section>
+
+    <footer class="colophon justifyStart" id="colophon">
+      <p class="line">Colophon — Set in Helvetica and its nearest system kin throughout:
+      headlines at 17vw / body at 8·5pt equivalents, twelve-column modular grid,
+      8pt baseline, flush left, ragged right. Printed in black and process red
+      on Munkendal 120gsm. The organising committee: A. Bachmann, T. Ito,
+      M. Okafor, R. Steiner. Enquiries to the registrar, Zürich. This poster
+      contains no photographs by design; the type is asked to do everything,
+      and it does.</p>
+      <p class="which" id="whichAlign">Alignment: flush left — press C or click to cycle</p>
+    </footer>
+  </div>
+
+<script>
+"use strict";
+(function(){
+  /* ---------- data ---------- */
+  const SPEAKERS=[
+    {n:"01",name:"A. Bachmann",role:"Modular systems after 1968 — the long edit",city:"ZÜRICH"},
+    {n:"02",name:"T. Ito",role:"Asymmetry as courtesy: reading the left edge",city:"KYOTO"},
+    {n:"03",name:"M. Okafor",role:"Baseline as rhythm section",city:"LAGOS"},
+    {n:"04",name:"R. Steiner",role:"Whitespace carries load: proofs and failures",city:"BASEL",key:true},
+    {n:"05",name:"L. Fontaine",role:"The flush-left promise in legal typography",city:"PARIS"},
+    {n:"06",name:"H. V. Dijk",role:"Grids for screens that move",city:"AMSTERDAM"},
+    {n:"07",name:"C. Marchetti",role:"Tabular figures and the timetable",city:"MILANO",key:true},
+    {n:"08",name:"S. Kovács",role:"One red: restraint as a colour policy",city:"BUDAPEST"},
+    {n:"09",name:"P. Whitmore",role:"Twelve columns do not need twelve things",city:"LONDON"},
+    {n:"10",name:"D. Almeida",role:"Poster as argument, argument as poster",city:"SÃO PAULO"},
+    {n:"11",name:"Y. Lindqvist",role:"The ruler, the knife, the habit",city:"STOCKHOLM"},
+    {n:"12",name:"F. Duval",role:"De-gridding: when the module ends",city:"MARSEILLE"}
+  ];
+  const SCHEDULE=[
+    {t:"09:00",d:"Doors, registration, first coffee measured in millilitres",room:"Foyer",cls:""},
+    {t:"09:40",d:"Opening address: the flush-left promise",room:"Halle A",cls:"key"},
+    {t:"10:30",d:"A. Bachmann — modular systems after 1968",room:"Halle A",cls:""},
+    {t:"11:30",d:"Break — croissants arranged on a 12-col tray",room:"Foyer",cls:"brk"},
+    {t:"11:50",d:"T. Ito — asymmetry as courtesy",room:"Halle B",cls:""},
+    {t:"13:00",d:"Lunch service; seating plan follows the baseline",room:"Café",cls:"brk"},
+    {t:"14:10",d:"R. Steiner — whitespace carries load (keynote)",room:"Halle A",cls:"key"},
+    {t:"15:30",d:"C. Marchetti — tabular figures & the timetable",room:"Halle A",cls:""},
+    {t:"16:20",d:"Panel: how many columns is too many",room:"Halle C",cls:""},
+    {t:"17:30",d:"Type clinic — bring your worst justified paragraph",room:"Werkstatt",cls:""},
+    {t:"19:00",d:"Reception; the red ink is served last",room:"Terrace",cls:"brk"}
+  ];
+
+  const list=document.getElementById("speakerList");
+  list.innerHTML=SPEAKERS.map(s=>
+    '<div class="speaker-row'+(s.key?' key':'')+'" tabindex="0">'+
+      '<span class="tick">■</span>'+
+      '<span class="idx n num">'+s.n+'</span>'+
+      '<span class="name">'+s.name+'</span>'+
+      '<span class="role">'+s.role+'</span>'+
+      '<span class="city">'+s.city+'</span>'+
+    '</div>').join("");
+
+  const strip=document.getElementById("strip");
+  strip.innerHTML=SCHEDULE.map(s=>
+    '<div class="slot '+s.cls+'">'+
+      '<div class="t num">'+s.t+'</div>'+
+      '<div class="d">'+s.d+'</div>'+
+      '<span class="room">'+s.room+'</span>'+
+    '</div>').join("");
+
+  /* ---------- schedule drag-to-scroll ---------- */
+  let sdown=false,sx=0,sl=0,moved=0;
+  strip.addEventListener("pointerdown",e=>{
+    sdown=true; moved=0; sx=e.clientX; sl=strip.scrollLeft;
+    strip.classList.add("grabbing"); strip.setPointerCapture(e.pointerId);
+  });
+  strip.addEventListener("pointermove",e=>{
+    if(!sdown) return;
+    const dx=e.clientX-sx; moved+=Math.abs(dx);
+    strip.scrollLeft=sl-dx;
+  });
+  const sup=()=>{sdown=false; strip.classList.remove("grabbing");};
+  strip.addEventListener("pointerup",sup);
+  strip.addEventListener("pointercancel",sup);
+  // wheel: vertical -> horizontal
+  strip.addEventListener("wheel",e=>{
+    if(Math.abs(e.deltaY)>Math.abs(e.deltaX)){
+      strip.scrollLeft+=e.deltaY; e.preventDefault();
+    }
+  },{passive:false});
+
+  /* ---------- grid overlay ---------- */
+  const gridlay=document.getElementById("gridlay");
+  const baselines=document.getElementById("baselines");
+  const btnGrid=document.getElementById("btnGrid");
+  let gridOn=false;
+  function toggleGrid(){
+    gridOn=!gridOn;
+    gridlay.classList.toggle("on",gridOn);
+    baselines.classList.toggle("on",gridOn);
+    btnGrid.setAttribute("aria-pressed",String(gridOn));
+    btnGrid.textContent=gridOn?"Grid [G] — on":"Grid [G]";
+  }
+  btnGrid.addEventListener("click",toggleGrid);
+  document.addEventListener("keydown",e=>{
+    if(e.key==="g"||e.key==="G"){
+      if(e.target.closest("input,textarea")) return;
+      toggleGrid();
+    }
+  });
+
+  /* ---------- colophon alignment cycle ---------- */
+  const colophon=document.getElementById("colophon");
+  const whichAlign=document.getElementById("whichAlign");
+  const MODES=[
+    {cls:"justifyStart", label:"flush left"},
+    {cls:"justifyCenter",label:"centered"},
+    {cls:"justifyEnd",   label:"flush right"},
+    {cls:"justifyFull",  label:"justified"}
+  ];
+  let modeIdx=0;
+  function applyMode(i){
+    modeIdx=i%MODES.length;
+    MODES.forEach(m=>colophon.classList.remove(m.cls));
+    colophon.classList.add(MODES[modeIdx].cls);
+    whichAlign.textContent="Alignment: "+MODES[modeIdx].label+
+      " — press C or click to cycle (0"+(modeIdx+1)+"/04)";
+  }
+  colophon.addEventListener("click",()=>applyMode(modeIdx+1));
+  document.addEventListener("keydown",e=>{
+    if(e.key==="c"||e.key==="C"){
+      if(e.target.closest("input,textarea")) return;
+      applyMode(modeIdx+1);
+    }
+  });
+  applyMode(0);
+
+  /* ---------- small typographic flourish: tabular clock ---------- */
+  const tr=document.querySelector(".edge.tr");
+  setInterval(()=>{
+    const d=new Date();
+    const p=n=>String(n).padStart(2,"0");
+    tr.textContent="Zürich · 14—16 Oct · "+p(d.getHours())+":"+p(d.getMinutes())+":"+p(d.getSeconds());
+  },1000);
+})();
+</script>
+</body>
+</html>

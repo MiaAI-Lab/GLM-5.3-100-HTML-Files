@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HERBARIUM — folio XII</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:#262017; color:#3d3428;
+    overflow:hidden;
+  }
+  /* room */
+  body::before {
+    content:""; position:fixed; inset:0;
+    background:radial-gradient(ellipse at 50% 20%, rgba(200,170,120,.14), transparent 55%);
+    pointer-events:none;
+  }
+  .tablescene {
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  /* album */
+  .album {
+    position:relative; width:min(980px, 96vw); height:min(680px, 92vh);
+    background:linear-gradient(150deg, #3a2f22, #2c2318);
+    border-radius:8px;
+    box-shadow:0 40px 90px rgba(0,0,0,.7), inset 0 0 0 1px rgba(220,190,140,.14);
+    display:flex; overflow:hidden;
+  }
+  .spine { width:36px; background:repeating-linear-gradient(180deg, #46392a 0 26px, #3a2f22 26px 52px);
+    border-right:2px solid rgba(0,0,0,.4); }
+  .page-area { flex:1; position:relative; perspective:1600px; }
+  .page {
+    position:absolute; inset:0; padding:34px 38px;
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(190,160,110,.12), transparent 50%),
+      linear-gradient(160deg, #efe6d0, #e6dbc0);
+    box-shadow:inset 0 0 60px rgba(120,90,50,.25);
+    transform-origin:left center;
+  }
+  .page.turning { animation:turnpage .9s cubic-bezier(.5,.05,.3,1) forwards; }
+  @keyframes turnpage {
+    0% { transform:rotateY(0); z-index:5; }
+    50% { z-index:6; }
+    100% { transform:rotateY(-104deg); z-index:6; }
+  }
+  /* foxing spots */
+  .fox { position:absolute; border-radius:50%; pointer-events:none;
+    background:radial-gradient(circle, rgba(150,110,60,.28), rgba(150,110,60,0) 70%); }
+
+  header.plate-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; }
+  .folio { font-size:11px; letter-spacing:.34em; color:#8a7a5e; text-transform:uppercase; font-family:system-ui, sans-serif; }
+  .plate-no { font-size:11px; color:#a08c6a; font-style:italic; }
+
+  /* specimen */
+  .specimen { position:relative; height:56%; display:flex; align-items:center; justify-content:center; }
+  .specimen svg { max-height:100%; max-width:88%; }
+  .tape {
+    position:absolute; width:86px; height:22px; background:rgba(230,215,180,.65);
+    box-shadow:0 1px 3px rgba(0,0,0,.2); border-left:1px dashed rgba(140,120,90,.4); border-right:1px dashed rgba(140,120,90,.4);
+  }
+
+  /* label */
+  .label-card {
+    position:absolute; right:34px; bottom:30px; width:230px; padding:14px 16px;
+    background:#f6efdd; border:1px solid rgba(140,120,90,.35);
+    font-size:12.5px; line-height:1.7; box-shadow:2px 3px 8px rgba(80,60,30,.25);
+    transform:rotate(-1.2deg);
+  }
+  .label-card .latin { font-style:italic; font-size:14.5px; color:#4a3c28; }
+  .label-card .common { font-family:system-ui, sans-serif; font-size:10px; letter-spacing:.1em; color:#8a7a5e; margin:3px 0 6px; }
+  .label-card .collector { font-size:11px; color:#6a5c44; }
+  .label-card .hand { font-family:"Segoe Script", "Brush Script MT", cursive; color:#5a4a34; }
+
+  /* loupe */
+  .loupe {
+    position:fixed; width:150px; height:150px; border-radius:50%; z-index:60; pointer-events:none;
+    border:7px solid #4a3a26; box-shadow:0 18px 40px rgba(0,0,0,.5), inset 0 0 20px rgba(120,90,50,.3);
+    overflow:hidden; opacity:0; transition:opacity .25s;
+    background:#efe6d0;
+  }
+  .loupe.show { opacity:1; }
+  .loupe .mag { position:absolute; width:200%; height:200%; transform-origin:0 0; }
+
+  /* filmstrip drawers */
+  .drawers {
+    position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:40;
+    display:flex; gap:10px; padding:10px 14px; border-radius:14px;
+    background:rgba(30,24,16,.85); border:1px solid rgba(220,190,140,.2);
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  }
+  .drawers button {
+    width:54px; height:70px; border-radius:6px; border:none; cursor:pointer; overflow:hidden;
+    background:#e6dbc0; position:relative; transition:transform .16s;
+    box-shadow:0 3px 8px rgba(0,0,0,.4);
+  }
+  .drawers button:hover { transform:translateY(-4px); }
+  .drawers button.on { outline:3px solid #d4a537; outline-offset:2px; }
+  .drawers button svg { width:100%; height:100%; }
+  .drawers .lab { position:absolute; bottom:2px; left:0; right:0; font-size:7px; text-align:center;
+    font-family:system-ui, sans-serif; color:#6a5c44; background:rgba(246,239,221,.8); }
+
+  .tools { position:fixed; top:16px; right:18px; z-index:40; display:flex; gap:8px; }
+  .tools button {
+    background:rgba(30,24,16,.85); color:#d4c5a0; border:1px solid rgba(220,190,140,.3);
+    font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.2em; text-transform:uppercase;
+    padding:9px 14px; border-radius:99px; cursor:pointer; transition:all .15s;
+  }
+  .tools button:hover { background:rgba(220,190,140,.2); }
+  .tools button.on { background:#8a6d3a; color:#f6efdd; border-color:#8a6d3a; }
+
+  @media (max-width:700px) {
+    .label-card { width:180px; right:16px; }
+    .page { padding:22px; }
+    .drawers button { width:44px; height:58px; }
+  }
+</style>
+</head>
+<body>
+  <div class="tablescene">
+    <div class="album">
+      <div class="spine"></div>
+      <div class="page-area">
+        <div class="page" id="page">
+          <!-- foxing spots -->
+          <div class="fox" style="width:70px;height:60px;left:6%;top:10%"></div>
+          <div class="fox" style="width:40px;height:44px;left:80%;top:70%"></div>
+          <div class="fox" style="width:52px;height:40px;left:40%;top:6%"></div>
+
+          <header class="plate-head">
+            <span class="folio">herbarium · folio xii</span>
+            <span class="plate-no" id="plateNo">plate 1 of 5</span>
+          </header>
+
+          <div class="specimen" id="specimen"></div>
+
+          <div class="tape" style="left:12%; bottom:31%; transform:rotate(-8deg)"></div>
+          <div class="tape" style="right:30%; top:16%; transform:rotate(5deg)"></div>
+
+          <div class="label-card" id="labelCard">
+            <div class="latin" id="lLatin">Digitalis purpurea</div>
+            <div class="common" id="lCommon">common foxglove</div>
+            <div class="collector">
+              coll. <span class="hand">E. Voss</span><br>
+              <span id="lLocus">loco: shady bank, mill road</span><br>
+              <span id="lDate">die: 14 jun 1897</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tools">
+    <button id="loupeBtn" class="on">loupe</button>
+    <button id="pressBtn">press your own</button>
+  </div>
+
+  <div class="drawers" id="drawers"></div>
+
+  <div class="loupe" id="loupe"><div class="mag" id="loupeMag"></div></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const NS = "http://www.w3.org/2000/svg";
+
+  /* ---------- specimens ---------- */
+  const SPECIMENS = [
+    { latin: "Digitalis purpurea", common: "common foxglove", locus: "shady bank, mill road", date: "14 jun 1897",
+      stem: "M60 420 C 64 320, 52 240, 66 140", leaves: [[58,330,-1],[64,270,1]], flowers: "bells",
+      note: "poisonous; the village doctor grew it anyway" },
+    { latin: "Pteridium aquilinum", common: "bracken fern", locus: "heath margin, north ridge", date: "2 aug 1896",
+      stem: "M60 420 C 66 340, 50 260, 72 150", leaves: [], flowers: "fronds",
+      note: "pressed badly; the fronds overlapped and argued" },
+    { latin: "Papaver rhoeas", common: "common poppy", locus: "edge of the wheat", date: "29 jun 1898",
+      stem: "M60 420 C 58 330, 66 250, 60 160", leaves: [[62,300,1]], flowers: "poppy",
+      note: "petals faded from scarlet to ghost-pink within the year" },
+    { latin: "Equisetum arvense", common: "field horsetail", locus: "ditch by the railway", date: "11 may 1895",
+      stem: "M60 420 L 62 150", leaves: [], flowers: "whorls",
+      note: "a plant older than the dinosaurs, pressed between two train timetables" },
+    { latin: "Viola odorata", common: "sweet violet", locus: "orchard hedge, south side", date: "20 mar 1897",
+      stem: "M60 420 C 66 360, 54 300, 68 240", leaves: [[64,360,-1],[58,310,1]], flowers: "violet",
+      note: "scent gone, of course. the label remembers it was sweet." },
+  ];
+
+  function specimenSVG(sp) {
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 120 440");
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    const INK = "#5c5240", OLIVE = "#6e7a52", RUST = "#8a6a42";
+    /* stem */
+    const stem = document.createElementNS(NS, "path");
+    stem.setAttribute("d", sp.stem);
+    stem.setAttribute("fill", "none");
+    stem.setAttribute("stroke", INK);
+    stem.setAttribute("stroke-width", "2.4");
+    svg.appendChild(stem);
+    /* leaves */
+    sp.leaves.forEach(([x, y, dir]) => {
+      const lf = document.createElementNS(NS, "path");
+      lf.setAttribute("d", "M" + x + " " + y + " q " + (26 * dir) + " -8 " + (34 * dir) + " -22 q " + (-26 * dir) + " 4 " + (-34 * dir) + " 22 z");
+      lf.setAttribute("fill", OLIVE);
+      lf.setAttribute("opacity", "0.85");
+      svg.appendChild(lf);
+      /* veins */
+      const v = document.createElementNS(NS, "path");
+      v.setAttribute("d", "M" + x + " " + y + " l " + (26 * dir) + " -14");
+      v.setAttribute("stroke", "#4a5438");
+      v.setAttribute("stroke-width", "0.8");
+      v.setAttribute("fill", "none");
+      svg.appendChild(v);
+    });
+    /* flower heads */
+    if (sp.flowers === "bells") {
+      for (let i = 0; i < 5; i++) {
+        const y = 150 - i * 18;
+        const bell = document.createElementNS(NS, "path");
+        bell.setAttribute("d", "M66 " + y + " q 10 2 8 12 q -8 6 -16 0 q -2 -10 8 -12 z");
+        bell.setAttribute("fill", "#b48ab4");
+        svg.appendChild(bell);
+        const ped = document.createElementNS(NS, "path");
+        ped.setAttribute("d", "M66 " + (y + 2) + " l -8 " + (12 + i));
+        ped.setAttribute("stroke", INK); ped.setAttribute("stroke-width", "1.2"); ped.setAttribute("fill", "none");
+        svg.appendChild(ped);
+      }
+    } else if (sp.flowers === "fronds") {
+      for (let i = 0; i < 6; i++) {
+        const y = 160 + i * 34;
+        const dir = i % 2 ? 1 : -1;
+        const fr = document.createElementNS(NS, "path");
+        fr.setAttribute("d", "M64 " + y + " q " + (30 * dir) + " -18 " + (46 * dir) + " 4");
+        fr.setAttribute("stroke", OLIVE); fr.setAttribute("stroke-width", "2"); fr.setAttribute("fill", "none");
+        svg.appendChild(fr);
+        for (let k = 1; k < 5; k++) {
+          const p = document.createElementNS(NS, "path");
+          p.setAttribute("d", "M" + (64 + 9 * k * dir) + " " + (y - k * 3.4) + " l " + (7 * dir) + " 6");
+          p.setAttribute("stroke", "#5c6a48"); p.setAttribute("stroke-width", "1"); p.setAttribute("fill", "none");
+          svg.appendChild(p);
+        }
+      }
+    } else if (sp.flowers === "poppy") {
+      const head = document.createElementNS(NS, "circle");
+      head.setAttribute("cx", "60"); head.setAttribute("cy", "140"); head.setAttribute("r", "17");
+      head.setAttribute("fill", "#c98a92");
+      svg.appendChild(head);
+      const center = document.createElementNS(NS, "circle");
+      center.setAttribute("cx", "60"); center.setAttribute("cy", "140"); head.setAttribute("r", "17");
+      center.setAttribute("r", "5"); center.setAttribute("fill", "#4a3c30");
+      svg.appendChild(center);
+    } else if (sp.flowers === "whorls") {
+      for (let i = 0; i < 8; i++) {
+        const y = 170 + i * 30;
+        const wh = document.createElementNS(NS, "path");
+        wh.setAttribute("d", "M62 " + y + " m0 0 l -16 4 m16 -4 l 16 4 m-16 -4 l -13 -7 m13 7 l 13 -7");
+        wh.setAttribute("stroke", "#6a7a58"); wh.setAttribute("stroke-width", "1.4"); wh.setAttribute("fill", "none");
+        svg.appendChild(wh);
+      }
+      const cone = document.createElementNS(NS, "path");
+      cone.setAttribute("d", "M62 150 l -5 14 l 10 0 z");
+      cone.setAttribute("fill", RUST);
+      svg.appendChild(cone);
+    } else if (sp.flowers === "violet") {
+      for (let i = 0; i < 3; i++) {
+        const fx = 66 + i * 8, fy = 210 - i * 22;
+        for (let k = 0; k < 5; k++) {
+          const a = (6.283 / 5) * k;
+          const pet = document.createElementNS(NS, "ellipse");
+          pet.setAttribute("cx", fx + Math.cos(a) * 7); pet.setAttribute("cy", fy + Math.sin(a) * 7);
+          pet.setAttribute("rx", "5.5"); pet.setAttribute("ry", "3.4");
+          pet.setAttribute("fill", "#8a6ab4");
+          pet.setAttribute("transform", "rotate(" + (a * 180 / 3.1416) + " " + (fx + Math.cos(a) * 7) + " " + (fy + Math.sin(a) * 7) + ")");
+          svg.appendChild(pet);
+        }
+        const c = document.createElementNS(NS, "circle");
+        c.setAttribute("cx", fx); c.setAttribute("cy", fy); c.setAttribute("r", "2.4"); c.setAttribute("fill", "#e8d44a");
+        svg.appendChild(c);
+      }
+    }
+    /* root */
+    const root = document.createElementNS(NS, "path");
+    root.setAttribute("d", "M60 420 q -8 12 -4 18 M60 420 q 8 12 5 19 M60 420 l 0 16");
+    root.setAttribute("stroke", "#8a7a5e"); root.setAttribute("stroke-width", "1.4"); root.setAttribute("fill", "none");
+    svg.appendChild(root);
+    return svg;
+  }
+
+  /* ---------- drawers ---------- */
+  const drawersEl = $("drawers");
+  SPECIMENS.forEach((sp, i) => {
+    const b = document.createElement("button");
+    const mini = specimenSVG(sp);
+    mini.setAttribute("viewBox", "0 0 120 440");
+    b.appendChild(mini);
+    const lab = document.createElement("span");
+    lab.className = "lab";
+    lab.textContent = sp.common.split(" ").pop().slice(0, 8);
+    b.appendChild(lab);
+    b.addEventListener("click", () => openPlate(i));
+    drawersEl.appendChild(b);
+  });
+
+  let current = 0;
+  function openPlate(i) {
+    current = i;
+    const sp = SPECIMENS[i];
+    const page = $("page");
+    page.classList.remove("turning");
+    void page.offsetWidth;
+    page.classList.add("turning");
+    setTimeout(() => {
+      const specBox = $("specimen");
+      specBox.innerHTML = "";
+      specBox.appendChild(specimenSVG(sp));
+      $("lLatin").textContent = sp.latin;
+      $("lCommon").textContent = sp.common + " — " + sp.note;
+      $("lLocus").textContent = "loco: " + sp.locus;
+      $("lDate").textContent = "die: " + sp.date;
+      $("plateNo").textContent = "plate " + (i + 1) + " of " + SPECIMENS.length;
+      document.querySelectorAll(".drawers button").forEach((b, k) => b.classList.toggle("on", k === i));
+    }, 430);
+  }
+  openPlate(0);
+  document.querySelector(".drawers button").classList.add("on");
+
+  /* ---------- loupe ---------- */
+  const loupe = $("loupe"), mag = $("loupeMag");
+  let loupeOn = true;
+  $("loupeBtn").addEventListener("click", function () { loupeOn = !loupeOn; this.classList.toggle("on", loupeOn); });
+  addEventListener("pointermove", (e) => {
+    if (!loupeOn) { loupe.classList.remove("show"); return; }
+    const page = $("page").getBoundingClientRect();
+    if (e.clientX < page.left || e.clientX > page.right || e.clientY < page.top || e.clientY > page.bottom) {
+      loupe.classList.remove("show");
+      return;
+    }
+    /* clone the specimen svg scaled up */
+    mag.innerHTML = "";
+    const clone = $("specimen").querySelector("svg");
+    if (clone) {
+      const c2 = clone.cloneNode(true);
+      c2.setAttribute("width", "100%"); c2.setAttribute("height", "100%");
+      mag.appendChild(c2);
+    }
+    mag.style.transform = "scale(2) translate(" + (-(e.clientX - page.left - 75) / 2 - 40) + "px," + (-(e.clientY - page.top - 75) / 2 - 40) + "px)";
+    loupe.style.left = (e.clientX - 75) + "px";
+    loupe.style.top = (e.clientY - 75) + "px";
+    loupe.classList.add("show");
+  });
+
+  /* ---------- press your own (simple composer) ---------- */
+  let pressing = false;
+  $("pressBtn").addEventListener("click", function () {
+    pressing = !pressing;
+    this.classList.toggle("on", pressing);
+    this.textContent = pressing ? "click the page to place" : "press your own";
+    toast(pressing ? "press mode: click to place cuttings" : "press mode off");
+  });
+  $("page").addEventListener("click", (e) => {
+    if (!pressing) return;
+    const r = $("page").getBoundingClientRect();
+    const sp = SPECIMENS[Math.floor(Math.random() * SPECIMENS.length)];
+    const frag = specimenSVG(sp);
+    frag.style.cssText = "position:absolute;height:" + (70 + Math.random() * 90) + "px;left:" + (e.clientX - r.left - 30) + "px;top:" + (e.clientY - r.top - 60) + "px;opacity:.85;transform:rotate(" + ((Math.random() - 0.5) * 40) + "deg);pointer-events:none;";
+    $("page").appendChild(frag);
+  });
+
+  /* ---------- toast ---------- */
+  let toastEl = null;
+  function toast(m) {
+    if (!toastEl) {
+      toastEl = document.createElement("div");
+      toastEl.style.cssText = "position:fixed;top:16px;left:50%;transform:translate(-50%,-80px);background:#3a2f22;color:#e8dcc0;padding:9px 18px;border-radius:99px;font-family:system-ui,sans-serif;font-size:10.5px;letter-spacing:.14em;transition:transform .35s;z-index:80;";
+      document.body.appendChild(toastEl);
+    }
+    toastEl.textContent = m;
+    toastEl.style.transform = "translate(-50%,0)";
+    clearTimeout(toastEl._t);
+    toastEl._t = setTimeout(() => { toastEl.style.transform = "translate(-50%,-80px)"; }, 1900);
+  }
+})();
+</script>
+</body>
+</html>

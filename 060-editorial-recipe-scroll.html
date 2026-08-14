@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SALT &amp; EMBER — braised short ribs</title>
+<style>
+:root{
+  --char:#1c1712; --char2:#26201a; --cream:#f2e8d8; --cream2:#e6d9c3;
+  --ember:#d9622b; --ember2:#f0a35e; --sage:#8ba888; --inkmut:#a8988a;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
+  background:var(--char);color:var(--cream);
+  overflow-x:hidden;
+}
+body.printmode{overflow:visible}
+/* masthead */
+.masthead{
+  min-height:92vh;display:flex;flex-direction:column;justify-content:flex-end;
+  padding:0 clamp(18px,7vw,110px) 8vh;position:relative;
+  background:
+    radial-gradient(70% 55% at 78% 20%,rgba(217,98,43,.16),transparent 70%),
+    radial-gradient(50% 40% at 15% 85%,rgba(139,168,136,.08),transparent 70%);
+}
+.masthead .k{color:var(--ember);letter-spacing:.42em;font-size:.66rem}
+h1{
+  font-size:clamp(3rem,13vw,10rem);line-height:.88;letter-spacing:.01em;
+  font-weight:800;margin:.8rem 0 1rem;
+}
+h1 .amp{color:var(--ember);font-weight:400;font-size:.7em;vertical-align:.06em}
+.dek{max-width:44ch;color:var(--inkmut);font-size:.86rem;line-height:1.8}
+.dek em{color:var(--cream2);font-style:italic}
+/* progress ring */
+#ringWrap{
+  position:fixed;top:clamp(12px,3vh,30px);right:clamp(12px,3vw,34px);z-index:9;
+  width:74px;height:74px;display:flex;align-items:center;justify-content:center;
+  background:rgba(28,23,18,.72);border:1px solid rgba(242,232,216,.14);
+  border-radius:50%;backdrop-filter:blur(6px);
+  transition:transform .5s ease;
+}
+body.printmode #ringWrap{display:none}
+#ring{width:74px;height:74px;transform:rotate(-90deg)}
+#ringPct{position:absolute;font-size:.56rem;letter-spacing:.14em;color:var(--cream2)}
+/* servings stepper */
+.servings{
+  margin-top:2.4rem;display:flex;align-items:center;gap:1.1rem;
+}
+.servings .lbl{font-size:.6rem;letter-spacing:.3em;color:var(--inkmut)}
+.stepper{display:flex;border:1px solid rgba(242,232,216,.28)}
+.stepper button{
+  width:44px;height:44px;background:none;border:none;color:var(--cream);
+  font-size:1.2rem;cursor:pointer;transition:background .2s;
+}
+.stepper button:hover{background:rgba(242,232,216,.1)}
+#servesN{
+  width:64px;display:flex;align-items:center;justify-content:center;
+  font-size:1.3rem;font-weight:700;font-variant-numeric:tabular-nums;
+  border-left:1px solid rgba(242,232,216,.28);
+  border-right:1px solid rgba(242,232,216,.28);
+}
+/* ingredients ledger */
+.ledger{margin-top:2.6rem;max-width:560px;border-top:1px solid rgba(242,232,216,.2)}
+.ledger table{width:100%;border-collapse:collapse;font-size:.8rem}
+.ledger td{padding:.6rem .2rem;border-bottom:1px dashed rgba(242,232,216,.16)}
+.ledger td:first-child{color:var(--cream2)}
+.ledger td.q{color:var(--ember2);text-align:right;font-variant-numeric:tabular-nums;
+  font-weight:700;min-width:6ch}
+.ledger td.u{color:var(--inkmut);text-align:right;min-width:5ch}
+/* chapters */
+.chapter{
+  min-height:100vh;display:grid;
+  grid-template-columns:1fr minmax(260px,420px);
+  gap:clamp(20px,5vw,70px);align-items:center;
+  padding:12vh clamp(18px,7vw,110px);
+  border-top:1px solid rgba(242,232,216,.1);
+  position:relative;
+}
+.chapter:nth-child(even){grid-template-columns:minmax(260px,420px) 1fr;}
+.chapter:nth-child(even) .plate{order:2}
+.stepnum{
+  position:absolute;top:9vh;left:clamp(18px,7vw,110px);
+  font-size:.62rem;letter-spacing:.4em;color:var(--ember);
+}
+.stepbody h2{
+  font-size:clamp(1.8rem,4.4vw,3.2rem);font-weight:800;line-height:1.02;
+  margin-bottom:1.2rem;letter-spacing:.01em;
+}
+.stepbody .time{color:var(--sage);font-size:.68rem;letter-spacing:.26em;margin-bottom:1.4rem}
+.stepbody p{
+  color:var(--inkmut);font-size:.84rem;line-height:1.9;max-width:52ch;
+}
+.stepbody p b{color:var(--cream2);font-weight:700}
+/* margin note */
+.marginnote{
+  margin:1.6rem 0 0;padding-left:1rem;
+  border-left:2px solid var(--sage);
+  font-style:italic;color:var(--sage);font-size:.74rem;line-height:1.8;
+  max-width:40ch;
+}
+/* plate art */
+.plate{position:relative;aspect-ratio:1/1;max-width:440px;width:100%;
+  justify-self:center}
+.plate .disc{
+  position:absolute;border-radius:50%;
+}
+.plate .rimshadow{
+  inset:0;
+  background:radial-gradient(circle at 38% 32%,
+    var(--c1) 0%, var(--c2) 46%, var(--c3) 74%, var(--c4) 100%);
+  box-shadow:0 30px 60px rgba(0,0,0,.55), inset 0 -14px 34px rgba(0,0,0,.4),
+    inset 0 10px 22px rgba(255,255,255,.06);
+}
+.plate .inner{inset:9%;
+  background:radial-gradient(circle at 40% 34%,var(--c2),var(--c3) 72%,var(--c4));
+  box-shadow:inset 0 8px 26px rgba(0,0,0,.35);
+}
+.food{position:absolute;border-radius:50%;filter:blur(1px)}
+.garnish{position:absolute;border-radius:50%;filter:blur(.5px)}
+/* steam svg */
+.steam{position:absolute;left:20%;right:20%;top:-34%;height:60%;
+  pointer-events:none;overflow:visible}
+.steam path{
+  fill:none;stroke:rgba(242,232,216,.34);stroke-width:2.4;stroke-linecap:round;
+  stroke-dasharray:180;stroke-dashoffset:180;
+  transition:stroke-dashoffset 2.4s ease;
+}
+.chapter.seen .steam path{stroke-dashoffset:0}
+.chapter:nth-child(even).seen .steam path{transition-delay:.4s}
+/* timer callout */
+.timer{
+  display:inline-flex;align-items:center;gap:.9rem;margin-top:1.8rem;
+  border:1px solid rgba(217,98,43,.5);background:rgba(217,98,43,.08);
+  padding:.7rem 1rem;cursor:pointer;user-select:none;transition:background .2s;
+}
+.timer:hover{background:rgba(217,98,43,.16)}
+.timer .tlabel{font-size:.58rem;letter-spacing:.26em;color:var(--ember2)}
+.timer .tval{font-size:1.5rem;font-weight:800;font-variant-numeric:tabular-nums;
+  color:var(--cream)}
+.timer.running{border-color:var(--ember2);box-shadow:0 0 18px rgba(240,163,94,.28)}
+.timer.done{border-color:var(--sage);background:rgba(139,168,136,.12)}
+/* reveal animation */
+.rv{opacity:0;transform:translateY(26px);
+  transition:opacity .9s ease,transform .9s cubic-bezier(.2,.7,.2,1)}
+.chapter.seen .rv{opacity:1;transform:none}
+.chapter.seen .rv:nth-child(2){transition-delay:.12s}
+.chapter.seen .rv:nth-child(3){transition-delay:.24s}
+.chapter.seen .rv:nth-child(4){transition-delay:.36s}
+/* footer */
+.plateout{
+  min-height:70vh;border-top:1px solid rgba(242,232,216,.1);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:1.4rem;text-align:center;padding:10vh 18px;
+  background:radial-gradient(60% 60% at 50% 30%,rgba(217,98,43,.12),transparent 70%);
+}
+.plateout h2{font-size:clamp(1.8rem,5vw,3rem);font-weight:800}
+.plateout p{color:var(--inkmut);font-size:.8rem;max-width:46ch;line-height:1.9}
+.tools{display:flex;gap:.8rem;flex-wrap:wrap;justify-content:center}
+.btn{
+  border:1px solid rgba(242,232,216,.3);background:none;color:var(--cream);
+  font:inherit;font-size:.62rem;letter-spacing:.26em;padding:.8rem 1.4rem;
+  cursor:pointer;text-transform:uppercase;transition:all .25s;
+}
+.btn:hover{background:rgba(242,232,216,.1)}
+.btn[aria-pressed="true"]{background:var(--cream);color:var(--char)}
+/* print mode */
+body.printmode .masthead{min-height:auto;padding-top:5vh}
+body.printmode .chapter{min-height:auto;display:block;padding:5vh 6vw}
+body.printmode .plate,body.printmode #ringWrap,body.printmode .steam,
+body.printmode .tools,body.printmode .rv{
+  display:none;opacity:1;transform:none;
+}
+body.printmode .stepbody p,body.printmode .ledger{max-width:none}
+@media (max-width:820px){
+  .chapter,.chapter:nth-child(even){grid-template-columns:1fr}
+  .chapter:nth-child(even) .plate{order:0}
+  .plate{max-width:min(340px,80vw)}
+  .ledger{max-width:none}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .rv{transition:none;opacity:1;transform:none}
+  .steam path{transition:none;stroke-dashoffset:0}
+  #ringWrap{transition:none}
+}
+</style>
+</head>
+<body>
+
+<div id="ringWrap" aria-hidden="true">
+  <svg id="ring" viewBox="0 0 74 74">
+    <circle cx="37" cy="37" r="30" fill="none" stroke="rgba(242,232,216,.14)" stroke-width="4"/>
+    <circle id="ringArc" cx="37" cy="37" r="30" fill="none" stroke="#d9622b"
+      stroke-width="4" stroke-linecap="round" stroke-dasharray="188.5"
+      stroke-dashoffset="188.5"/>
+    <g id="ringTicks"></g>
+  </svg>
+  <span id="ringPct">0%</span>
+</div>
+
+<header class="masthead">
+  <div>
+    <span class="k">RECIPE Nº 014 · BRAISE</span>
+    <h1>SALT<br><span class="amp">&amp;</span> EMBER</h1>
+    <p class="dek">Short ribs braised in wine and time — <em>five movements,
+    one pot, three hours of patience.</em> Serve when the spoon stands
+    alone.</p>
+
+    <div class="servings">
+      <span class="lbl">SERVINGS</span>
+      <div class="stepper">
+        <button id="servDown" aria-label="fewer servings">−</button>
+        <span id="servesN">4</span>
+        <button id="servUp" aria-label="more servings">+</button>
+      </div>
+      <span class="lbl" id="servesHint"> scaling live</span>
+    </div>
+
+    <div class="ledger">
+      <table aria-label="ingredients">
+        <tbody id="ingBody"></tbody>
+      </table>
+    </div>
+  </div>
+</header>
+
+<main id="chapters"></main>
+
+<footer class="plateout">
+  <span class="k" style="color:var(--ember);letter-spacing:.42em;font-size:.66rem">
+    SERVICE</span>
+  <h2>Plate wide. Spoon high.</h2>
+  <p>Lay the rib bone-up over wet polenta, sauce pooled around, gremolata
+  scattered like confetti. Eat immediately, with bread, with people you like.</p>
+  <div class="tools">
+    <button class="btn" id="printBtn">Print view</button>
+    <button class="btn" id="muteBtn" aria-pressed="false">Chime: off</button>
+  </div>
+</footer>
+
+<script>
+"use strict";
+/* ============ SALT & EMBER — editorial recipe ============ */
+var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- data model ---------- */
+var STEPS = [
+  {num:"I", name:"MISE EN PLACE", time:"25 MIN", secs:1500,
+   copy:"<b>Everything in reach before the flame.</b> Pat the ribs bone-dry — moisture is the enemy of the crust. Cut vegetables to a coarse, honest mirepoix; they will melt and vanish. Open the wine and let it breathe; you'll want a glass for the cook.",
+   note:"The cooler the meat when it hits the pan, the better the sear. Salt it yesterday if you can.",
+   plate:"mise",
+   heat:"LOW"},
+  {num:"II", name:"SEAR", time:"12 MIN", secs:720,
+   copy:"<b>Color is flavor; there are no shortcuts.</b> A heavy pot, a thin film of oil, and patience. Sear each face of the ribs until mahogany — not brown, <b>mahogany</b> — then rest them on a tray while the vegetables take the stage.",
+   note:"If the fond looks like it's burning, add a splash of wine to scrape it up — that's the sauce's first floor.",
+   plate:"sear",
+   heat:"HIGH"},
+  {num:"III", name:"BRAISE", time:"3 HRS", secs:10800,
+   copy:"<b>Deglace, submerge, and let time do the work.</b> Return the ribs to the pot with wine, stock, and aromatics. Bring barely to a murmur — <b>never a boil</b> — lid ajar, into a low oven. Three hours. Check once, then trust.",
+   note:"A braise that bubbles hard shreds; a braise that whispers glistens. Keep it at a shiver.",
+   plate:"braise",
+   heat:"LOW"},
+  {num:"IV", name:"REST", time:"30 MIN", secs:1800,
+   copy:"<b>The pause that finishes the dish.</b> Lift the ribs gently from the liquid and let them rest, tented. Skim the fat, then reduce the braising liquid until it coats a spoon and shines like lacquer. Taste for salt at the very end.",
+   note:"Overnight is even better: fat lifts off in a cold sheet, and the flavors finish their argument.",
+   plate:"rest",
+   heat:"OFF"},
+  {num:"V", name:"PLATE", time:"5 MIN", secs:300,
+   copy:"<b>Bone up, sauce pooled, garnish scattered.</b> Wet polenta or mashed potato in a wide, warm bowl. The rib laid on top, sauce nappe'd around — never over — and a fistful of gremolata to cut the richness.",
+   note:"Warm the bowls. Cold porcelain steals heat from food in seconds.",
+   plate:"final",
+   heat:"—" }
+];
+
+var ING = [
+  {q:1.6, u:"kg", n:"beef short ribs, cut across the bone"},
+  {q:18, u:"g", n:"kosher salt"},
+  {q:4,  u:"g", n:"black pepper, cracked"},
+  {q:30, u:"ml", n:"olive oil"},
+  {q:2,  u:"",   n:"onions, roughly chopped"},
+  {q:2,  u:"",   n:"carrots, thick coins"},
+  {q:3,  u:"",   n:"celery stalks"},
+  {q:6,  u:"",   n:"garlic cloves, smashed"},
+  {q:2,  u:"tbsp", n:"tomato paste"},
+  {q:750,u:"ml", n:"dry red wine"},
+  {q:500,u:"ml", n:"beef stock"},
+  {q:2,  u:"",   n:"bay leaves"},
+  {q:3,  u:"",   n:"thyme sprigs"},
+  {q:1,  u:"tbsp", n:"parsley, lemon zest & garlic (gremolata)"}
+];
+var BASE_SERVES = 4;
+var serves = BASE_SERVES;
+
+/* ---------- quantity rendering with morph ---------- */
+function fmtQ(q){
+  if(q>=100) return Math.round(q).toString();
+  if(q>=10) return (Math.round(q*10)/10).toString();
+  return (Math.round(q*100)/100).toString();
+}
+function renderIng(){
+  var body = document.getElementById("ingBody");
+  var rows = [];
+  ING.forEach(function(ing,i){
+    var scaled = ing.q * serves / BASE_SERVES;
+    var existing = body.children[i];
+    if(existing){
+      rows.push({el:existing, from:parseFloat(existing.getAttribute("data-v")||"0"),
+        to:scaled, u:ing.u, i:i});
+    }else{
+      var tr=document.createElement("tr");
+      tr.innerHTML="<td>"+ing.n+"</td><td class='u'>"+ing.u+"</td>"+
+        "<td class='q'>0</td>";
+      tr.setAttribute("data-v","0");
+      body.appendChild(tr);
+      rows.push({el:tr, from:0, to:scaled, u:ing.u, i:i});
+    }
+  });
+  /* animate morph */
+  var t0=performance.now(), dur = REDUCED?1:600;
+  function tick(now){
+    var t=Math.min(1,(now-t0)/dur);
+    var e=1-Math.pow(1-t,3);
+    rows.forEach(function(r){
+      var v=r.from+(r.to-r.from)*e;
+      var cell=r.el.querySelector(".q");
+      cell.textContent=fmtQ(v);
+      r.el.setAttribute("data-v", String(r.to));
+    });
+    if(t<1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+document.getElementById("servUp").addEventListener("click",function(){
+  serves=Math.min(12,serves+1); syncServes();
+});
+document.getElementById("servDown").addEventListener("click",function(){
+  serves=Math.max(1,serves-1); syncServes();
+});
+function syncServes(){
+  document.getElementById("servesN").textContent=serves;
+  renderIng();
+}
+
+/* ---------- plate art definitions ---------- */
+function plateStyle(kind){
+  /* returns palette for plate discs */
+  if(kind==="mise")  return {c1:"#3a3128",c2:"#2c251c",c3:"#241e17",c4:"#1a1511"};
+  if(kind==="sear")  return {c1:"#5a3420",c2:"#3e2515",c3:"#2a1a10",c4:"#1c130c"};
+  if(kind==="braise")return {c1:"#6e3b22",c2:"#4a2a18",c3:"#31200f",c4:"#1f150c"};
+  if(kind==="rest")  return {c1:"#4a3a2c",c2:"#382c20",c3:"#2a2018",c4:"#1c1510"};
+  return {c1:"#7a4626",c2:"#54301a",c3:"#38200f",c4:"#221507"};
+}
+/* food pieces per step, positions on plate in % */
+var FOODS = {
+  mise:[ {x:30,y:34,s:11,c:"#8ba888"},{x:48,y:30,s:8,c:"#a8988a"},
+         {x:63,y:40,s:9,c:"#c07a3a"},{x:36,y:52,s:7,c:"#96795a"},
+         {x:56,y:56,s:10,c:"#7c5c40"},{x:46,y:44,s:6,c:"#d9622b"},
+         {x:70,y:56,s:6,c:"#8ba888"} ],
+  sear:[ {x:38,y:42,s:17,c:"#4a2a16"},{x:60,y:52,s:15,c:"#3e2412"},
+         {x:50,y:66,s:12,c:"#59311a"},{x:66,y:34,s:10,c:"#4e2c15"} ],
+  braise:[ {x:40,y:46,s:19,c:"#5c3218"},{x:61,y:55,s:17,c:"#6e3b20"},
+           {x:50,y:68,s:13,c:"#4a2a14"},{x:57,y:33,s:8,c:"#d9622b"},
+           {x:34,y:64,s:6,c:"#8ba888"} ],
+  rest:[ {x:44,y:48,s:18,c:"#5c3420"},{x:63,y:52,s:14,c:"#4c2b16"},
+         {x:35,y:60,s:8,c:"#8ba888"} ],
+  final:[ {x:42,y:46,s:20,c:"#6e3c1e"},{x:64,y:54,s:15,c:"#5a3018"},
+          {x:52,y:66,s:12,c:"#7a4626"},{x:58,y:34,s:7,c:"#d9622b"},
+          {x:66,y:42,s:5,c:"#8ba888"},{x:36,y:62,s:5,c:"#8ba888"},
+          {x:47,y:58,s:4,c:"#f0a35e"} ]
+};
+/* ---------- build chapters ---------- */
+function buildChapters(){
+  var main=document.getElementById("chapters");
+  STEPS.forEach(function(st,i){
+    var sec=document.createElement("section");
+    sec.className="chapter";
+    sec.id="step"+i;
+    var ps=plateStyle(st.plate);
+    var foods=FOODS[st.plate].map(function(f,j){
+      return "<span class='food' style='left:"+(f.x-f.s/2)+"%;top:"+(f.y-f.s/2)+
+        "%;width:"+f.s+"%;height:"+f.s+"%;background:radial-gradient(circle at 36% 32%,"+
+        f.c+", rgba(0,0,0,0) 72%);box-shadow:0 6px 14px rgba(0,0,0,.5);"+
+        "animation-delay:"+(j*.4)+"s'></span>";
+    }).join("");
+    sec.innerHTML=
+      "<span class='stepnum'>STEP "+st.num+" · HEAT "+st.heat+"</span>"+
+      "<div class='stepbody'>"+
+        "<h2 class='rv'>"+st.name+"</h2>"+
+        "<div class='time rv'>"+st.time+" · TAP TIMER TO RUN</div>"+
+        "<p class='rv'>"+st.copy+"</p>"+
+        "<div class='timer rv' data-step='"+i+"' role='button' tabindex='0'>"+
+          "<span class='tlabel'>TIMER</span>"+
+          "<span class='tval' id='tv"+i+"'>"+fmtTimer(st.secs)+"</span>"+
+        "</div>"+
+        "<div class='marginnote rv'>"+st.note+"</div>"+
+      "</div>"+
+      "<div class='plate'>"+
+        "<svg class='steam' viewBox='0 0 100 90' aria-hidden='true'>"+
+          "<path d='M30 85 C 24 62, 38 54, 31 34 C 26 20, 34 12, 31 2'/>"+
+          "<path d='M50 88 C 43 60, 58 50, 50 30 C 44 14, 55 8, 50 -2'/>"+
+          "<path d='M70 85 C 64 62, 78 52, 69 32 C 64 18, 73 10, 70 0'/>"+
+        "</svg>"+
+        "<div class='disc rimshadow' style='--c1:"+ps.c1+";--c2:"+ps.c2+
+          ";--c3:"+ps.c3+";--c4:"+ps.c4+"'></div>"+
+        "<div class='disc inner' style='--c1:"+ps.c1+";--c2:"+ps.c2+
+          ";--c3:"+ps.c3+";--c4:"+ps.c4+"'></div>"+
+        foods+
+      "</div>";
+    main.appendChild(sec);
+  });
+}
+buildChapters();
+
+/* ---------- ring ticks ---------- */
+(function(){
+  var g=document.getElementById("ringTicks");
+  var n=STEPS.length+1;
+  var html="";
+  for(var i=0;i<n;i++){
+    var ang=-Math.PI/2 + (i/(n-1))*Math.PI*2;
+    var x1=37+Math.cos(ang)*24, y1=37+Math.sin(ang)*24;
+    var x2=37+Math.cos(ang)*27, y2=37+Math.sin(ang)*27;
+    html+="<line x1='"+x1.toFixed(1)+"' y1='"+y1.toFixed(1)+
+      "' x2='"+x2.toFixed(1)+"' y2='"+y2.toFixed(1)+
+      "' stroke='rgba(242,232,216,.5)' stroke-width='1.6'/>";
+  }
+  g.innerHTML=html;
+})();
+
+/* ---------- scroll: reveal + progress ring ---------- */
+var ringArc=document.getElementById("ringArc");
+var ringPct=document.getElementById("ringPct");
+var CIRC=188.5;
+function onScroll(){
+  var doc=Math.max(1,document.documentElement.scrollHeight-window.innerHeight);
+  var p=Math.min(1,Math.max(0,window.scrollY/doc));
+  ringArc.setAttribute("stroke-dashoffset", String(CIRC*(1-p)));
+  ringPct.textContent=Math.round(p*100)+"%";
+}
+window.addEventListener("scroll",onScroll,{passive:true});
+onScroll();
+
+var io = new IntersectionObserver(function(entries){
+  entries.forEach(function(en){
+    if(en.isIntersecting) en.target.classList.add("seen");
+  });
+},{threshold:0.25});
+document.querySelectorAll(".chapter").forEach(function(c){ io.observe(c); });
+
+/* ---------- timers with WebAudio chime ---------- */
+var actx=null, chimeOn=false;
+function ensureAudio(){
+  if(actx) return true;
+  var AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC) return false;
+  actx=new AC();
+  return true;
+}
+function chime(){
+  if(!chimeOn || !ensureAudio()) return;
+  if(actx.state==="suspended") actx.resume();
+  var t=actx.currentTime;
+  [880,1320].forEach(function(f,i){
+    var o=actx.createOscillator(), g=actx.createGain();
+    o.type="sine"; o.frequency.value=f;
+    g.gain.setValueAtTime(0,t+i*.18);
+    g.gain.linearRampToValueAtTime(.12,t+i*.18+.02);
+    g.gain.exponentialRampToValueAtTime(.0001,t+i*.18+1.1);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t+i*.18); o.stop(t+i*.18+1.2);
+  });
+}
+function fmtTimer(s){
+  var h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
+  if(h>0) return h+":"+String(m).padStart(2,"0")+":00";
+  return m+":"+String(sec).padStart(2,"0");
+}
+document.querySelectorAll(".timer").forEach(function(t){
+  var step=STEPS[+t.getAttribute("data-step")];
+  var tv=document.getElementById("tv"+t.getAttribute("data-step"));
+  var total=step.secs, left=total, iv=null;
+  function paint(){
+    tv.textContent=fmtTimer(left);
+  }
+  function stop(done){
+    clearInterval(iv); iv=null;
+    t.classList.remove("running");
+    if(done){ t.classList.add("done"); chime(); }
+  }
+  function run(){
+    if(iv){ stop(false); left=total; paint(); t.classList.remove("done"); return; }
+    t.classList.remove("done");
+    t.classList.add("running");
+    var stepMs=Math.max(1, Math.round(total*1000/60));
+    var target=Date.now()+left*1000;
+    iv=setInterval(function(){
+      left=Math.max(0,Math.round((target-Date.now())/1000));
+      paint();
+      if(left<=0) stop(true);
+    },250);
+    paint();
+  }
+  t.addEventListener("click",run);
+  t.addEventListener("keydown",function(e){
+    if(e.key==="Enter"||e.key===" "){ e.preventDefault(); run(); }
+  });
+});
+
+/* ---------- print view ---------- */
+var printBtn=document.getElementById("printBtn");
+printBtn.addEventListener("click",function(){
+  var on=document.body.classList.toggle("printmode");
+  printBtn.textContent=on?"Scroll view":"Print view";
+  printBtn.setAttribute("aria-pressed",on?"true":"false");
+  window.scrollTo({top:0,behavior:"auto"});
+});
+
+/* ---------- mute / chime toggle ---------- */
+var muteBtn=document.getElementById("muteBtn");
+muteBtn.addEventListener("click",function(){
+  chimeOn=!chimeOn;
+  muteBtn.setAttribute("aria-pressed",chimeOn?"true":"false");
+  muteBtn.textContent="Chime: "+(chimeOn?"on":"off");
+});
+
+/* ---------- boot ---------- */
+renderIng();
+</script>
+</body>
+</html>

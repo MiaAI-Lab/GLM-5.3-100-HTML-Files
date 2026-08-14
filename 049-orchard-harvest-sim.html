@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ORCHARD — a seasons toy</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background:#e9e3d3; touch-action:none; user-select:none; -webkit-user-select:none;
+  }
+  #stage { position:fixed; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; }
+
+  /* ---------- paper texture ---------- */
+  body::after {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:30; opacity:.4;
+    background-image:
+      radial-gradient(rgba(120,105,80,.08) 1px, transparent 1.5px),
+      radial-gradient(rgba(120,105,80,.06) 1px, transparent 1.5px);
+    background-size:6px 6px, 9px 9px;
+  }
+
+  /* ---------- control ring ---------- */
+  .ring {
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:20;
+    display:flex; align-items:center; gap:14px;
+    background:rgba(250,246,236,.86); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    border:1px solid rgba(120,100,70,.25); border-radius:999px; padding:10px 18px;
+    box-shadow:0 14px 40px rgba(90,75,50,.25);
+  }
+  .seasonwheel { position:relative; width:56px; height:56px; flex-shrink:0; cursor:grab; }
+  .seasonwheel:active { cursor:grabbing; }
+  .seasonwheel svg { width:100%; height:100%; transition:transform .2s; }
+  .ring .info { display:flex; flex-direction:column; gap:2px; min-width:86px; }
+  .ring .info b { font-size:15px; color:#5a4a32; letter-spacing:.06em; }
+  .ring .info span { font-size:9px; letter-spacing:.22em; color:#a08c6a; text-transform:uppercase; }
+  .btns { display:flex; gap:8px; }
+  .btns button {
+    border:1px solid rgba(120,100,70,.35); background:transparent; color:#6a5a40; border-radius:999px;
+    font:inherit; font-size:10px; letter-spacing:.16em; text-transform:uppercase; padding:8px 14px; cursor:pointer;
+    transition:all .18s;
+  }
+  .btns button:hover { background:#6a5a40; color:#faf6ec; }
+  .btns button.on { background:#6a5a40; color:#faf6ec; }
+  .basket {
+    position:fixed; right:26px; bottom:26px; z-index:20; text-align:center;
+    background:rgba(250,246,236,.86); border:1px solid rgba(120,100,70,.25); border-radius:16px;
+    padding:12px 18px; box-shadow:0 14px 40px rgba(90,75,50,.25);
+  }
+  .basket .cnt { font-size:24px; color:#b0552f; font-weight:700; }
+  .basket .lbl { font-size:8.5px; letter-spacing:.24em; color:#a08c6a; text-transform:uppercase; }
+
+  .title { position:fixed; left:28px; top:24px; z-index:20; }
+  .title h1 { font-family:Georgia, serif; font-weight:400; font-size:30px; color:#5a4a32; letter-spacing:.08em; }
+  .title p { font-size:10px; letter-spacing:.26em; color:#a08c6a; text-transform:uppercase; margin-top:4px; }
+
+  @media (max-width:640px) {
+    .ring { bottom:14px; padding:8px 12px; gap:10px; }
+    .ring .info { min-width:70px; }
+    .basket { right:14px; bottom:96px; padding:8px 12px; }
+    .title h1 { font-size:22px; }
+  }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="bg"></canvas>
+    <canvas id="fg"></canvas>
+  </div>
+
+  <div class="title">
+    <h1>Orchard</h1>
+    <p>a small tree · four seasons · one basket</p>
+  </div>
+
+  <div class="ring">
+    <div class="seasonwheel" id="wheel" title="drag to turn the year"></div>
+    <div class="info">
+      <b id="seasonName">Spring</b>
+      <span id="dateLabel">week 14 · april</span>
+    </div>
+    <div class="btns">
+      <button id="playBtn">▶ play</button>
+      <button id="windBtn">wind</button>
+    </div>
+  </div>
+
+  <div class="basket">
+    <div class="cnt" id="fruitCnt">0</div>
+    <div class="lbl">picked</div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const bg = document.getElementById("bg"), fg = document.getElementById("fg");
+  const bx = bg.getContext("2d"), fx = fg.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let season = 0.28; /* 0..1 around the year; start late spring */
+  let playing = false, windBoost = 0, lastT = performance.now();
+  let fruits = [], petals = [], bees = [], ripples = [], rain = [];
+  let basket = 0;
+  let cloudSeed = Math.random();
+
+  /* ---------- geometry ---------- */
+  function treeAnchor() { return { x: W * 0.5, y: H * 0.78 }; }
+  const branches = [];
+  function buildTree() {
+    branches.length = 0;
+    const a = treeAnchor();
+    const trunk = { x0: a.x, y0: a.y, x1: a.x - 6, y1: a.y - H * 0.16, w: 16 };
+    branches.push(trunk);
+    let level = [trunk];
+    for (let d = 0; d < 4; d++) {
+      const next = [];
+      level.forEach(b => {
+        const n = 2 + Math.floor(Math.random() * 2);
+        for (let k = 0; k < n; k++) {
+          const ang = Math.atan2(b.y1 - b.y0, b.x1 - b.x0) + (Math.random() - 0.5) * 1.5;
+          const len = (Math.hypot(b.x1 - b.x0, b.y1 - b.y0)) * (0.55 + Math.random() * 0.2);
+          const nb = {
+            x0: b.x1, y0: b.y1,
+            x1: b.x1 + Math.cos(ang) * len, y1: b.y1 + Math.sin(ang) * len,
+            w: b.w * 0.62,
+          };
+          branches.push(nb); next.push(nb);
+        }
+      });
+      level = next;
+    }
+  }
+  function canopyClusters() {
+    /* the leafy blobs at outer branch tips */
+    const tips = branches.filter(b => b.w < 3.2);
+    return tips.map(b => ({ x: b.x1, y: b.y1, r: 22 + b.w * 8, sway: Math.random() * 6.28 }));
+  }
+
+  /* ---------- season helpers ---------- */
+  const SEASONS = [["Winter","winter"],["Spring","spring"],["Summer","summer"],["Autumn","autumn"]];
+  function seasonInfo() {
+    const idx = Math.floor(((season % 1) + 1) % 1 * 4) % 4;
+    return { idx, name: SEASONS[idx][0] };
+  }
+  function seasonMix() {
+    /* returns {bud, blossom, leaf, fruit, bare} weights 0..1 */
+    const p = ((season % 1) + 1) % 1;
+    const bell = (c, w) => Math.max(0, 1 - Math.abs(p - c) / w);
+    return {
+      p,
+      snow: bell(0.02, 0.10) + bell(0.98, 0.10),
+      blossom: bell(0.22, 0.10),
+      bud: bell(0.12, 0.08),
+      leaf: Math.max(bell(0.45, 0.30), bell(0.6, 0.35)),
+      fruit: bell(0.62, 0.14),
+      autumn: bell(0.82, 0.14),
+      bare: bell(0.95, 0.12) + bell(0.05, 0.12),
+    };
+  }
+  function skyColors(m) {
+    if (m.snow > 0.4) return ["#dfe4ea", "#c8cfd8"];
+    if (m.blossom > 0.3) return ["#f2e4e0", "#e5d9d2"];
+    if (m.autumn > 0.3) return ["#f0e0c8", "#e3cdb0"];
+    if (m.fruit > 0.4) return ["#eef0dc", "#dfe3c8"];
+    return ["#e9ecda", "#d8dec6"];
+  }
+
+  /* ---------- background painting (soft watercolor) ---------- */
+  function paintBG(m) {
+    const grd = bx.createLinearGradient(0, 0, 0, H);
+    const [c0, c1] = skyColors(m);
+    grd.addColorStop(0, c0); grd.addColorStop(1, c1);
+    bx.fillStyle = grd;
+    bx.fillRect(0, 0, W, H);
+    /* sun halo */
+    const sx = W * 0.78, sy = H * 0.2;
+    const halo = bx.createRadialGradient(sx, sy, 8, sx, sy, W * 0.3);
+    halo.addColorStop(0, "rgba(255,240,200,.75)");
+    halo.addColorStop(1, "rgba(255,240,200,0)");
+    bx.fillStyle = halo;
+    bx.fillRect(0, 0, W, H);
+    /* soft hills */
+    hill(bx, H * 0.68, H * 0.1, "rgba(150,170,140,.35)", 0.7);
+    hill(bx, H * 0.78, H * 0.08, "rgba(120,150,115,.4)", 1.3);
+    /* ground wash */
+    const gw = bx.createLinearGradient(0, H * 0.72, 0, H);
+    gw.addColorStop(0, "rgba(110,140,105,.5)");
+    gw.addColorStop(1, "rgba(90,120,88,.65)");
+    bx.fillStyle = gw;
+    bx.fillRect(0, H * 0.72, W, H * 0.28);
+    /* hand-wobble ground line */
+    bx.strokeStyle = "rgba(90,80,60,.5)"; bx.lineWidth = 2;
+    bx.beginPath();
+    for (let x = 0; x <= W; x += 14) {
+      const y = H * 0.78 + Math.sin(x * 0.02 + 3) * 3 + Math.sin(x * 0.11) * 1.5;
+      x ? bx.lineTo(x, y) : bx.moveTo(x, y);
+    }
+    bx.stroke();
+    /* winter snow caps on ground */
+    if (m.snow > 0.15) {
+      bx.fillStyle = "rgba(245,248,252," + Math.min(0.85, m.snow) + ")";
+      bx.beginPath();
+      bx.moveTo(0, H * 0.79);
+      for (let x = 0; x <= W; x += 20) bx.lineTo(x, H * 0.79 - 4 - Math.sin(x * 0.03) * 5);
+      bx.lineTo(W, H); bx.lineTo(0, H);
+      bx.fill();
+    }
+  }
+  function hill(ctx, baseY, amp, color, freq) {
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.moveTo(0, H);
+    for (let x = 0; x <= W; x += 18) {
+      const y = baseY + Math.sin(x * 0.004 * freq + cloudSeed * 9) * amp;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(W, H); ctx.fill();
+  }
+
+  /* ---------- foreground painting ---------- */
+  let clusters = [];
+  function paintFG(m, t, dt) {
+    fx.clearRect(0, 0, W, H);
+    const wind = 0.6 + windBoost * 5;
+    /* trunk + branches */
+    branches.forEach((b, i) => {
+      const sway = Math.sin(t / 900 + i) * wind * (1 - b.w / 18) * 2.2;
+      fx.strokeStyle = "#6a5a44";
+      fx.lineWidth = Math.max(1.4, b.w);
+      fx.lineCap = "round";
+      fx.beginPath();
+      fx.moveTo(b.x0, b.y0);
+      fx.quadraticCurveTo((b.x0 + b.x1) / 2 + sway * 0.5, (b.y0 + b.y1) / 2, b.x1 + sway, b.y1);
+      fx.stroke();
+    });
+    /* canopy blobs */
+    const swayBase = Math.sin(t / 700) * wind * 2;
+    clusters.forEach((c, i) => {
+      const sx = c.x + Math.sin(t / 800 + c.sway) * wind * 3;
+      /* decide colors by season */
+      let col = null, alpha = 0.8;
+      if (m.blossom > 0.25 && (i % 3 !== 0)) col = "rgba(244,194,214," + m.blossom + ")";
+      if (m.leaf > 0.15) col = "rgba(126,166,110," + m.leaf * 0.9 + ")";
+      if (m.autumn > 0.15) col = "rgba(214,138,74," + m.autumn + ")";
+      if (m.bud > 0.2 && !col) col = "rgba(160,180,120," + m.bud * 0.7 + ")";
+      if (m.snow > 0.3) col = null;
+      if (col) blob(sx, c.y, c.r * (0.7 + 0.3 * (m.leaf || m.autumn || m.blossom)), col);
+      /* snow caps */
+      if (m.snow > 0.2) {
+        blob(sx, c.y - c.r * 0.3, c.r * 0.55, "rgba(248,250,254," + m.snow * 0.9 + ")");
+      }
+    });
+    /* fruit */
+    if (m.fruit > 0.3) {
+      clusters.forEach((c, i) => {
+        if (i % 2 !== 0) return;
+        const sx = c.x + Math.sin(t / 800 + c.sway) * wind * 3;
+        const r = 7 * m.fruit;
+        fx.fillStyle = "#c05a30";
+        fx.beginPath(); fx.arc(sx + 8, c.y + 10, r, 0, 6.283); fx.fill();
+        fx.fillStyle = "rgba(255,255,255,.35)";
+        fx.beginPath(); fx.arc(sx + 6, c.y + 8, r * 0.35, 0, 6.283); fx.fill();
+      });
+    }
+  }
+  function blob(x, y, r, color) {
+    /* watercolor blob: few overlapping translucent circles */
+    fx.fillStyle = color;
+    for (let k = 0; k < 3; k++) {
+      fx.beginPath();
+      fx.arc(x + (k - 1) * r * 0.22, y + (k % 2) * r * 0.18, r * (0.85 - k * 0.12), 0, 6.283);
+      fx.fill();
+    }
+  }
+
+  /* ---------- particles: petals, leaves, bees, rain ---------- */
+  function spawnParticles(m, dt) {
+    const wind = windBoost;
+    if (m.blossom > 0.35 && Math.random() < 0.12 + wind * 0.4) {
+      const c = clusters[Math.floor(Math.random() * clusters.length)];
+      petals.push({ type: "petal", x: c.x, y: c.y, vx: (Math.random() - 0.2) * 1.4, vy: 0.4 + Math.random() * 0.8, ph: Math.random() * 6.28, life: 1 });
+    }
+    if (m.autumn > 0.35 && Math.random() < 0.1 + wind * 0.5) {
+      const c = clusters[Math.floor(Math.random() * clusters.length)];
+      petals.push({ type: "leaf", x: c.x, y: c.y, vx: (Math.random() - 0.3) * 1.6, vy: 0.5 + Math.random() * 0.7, ph: Math.random() * 6.28, life: 1 });
+    }
+    if (m.snow > 0.3 && Math.random() < 0.3) {
+      petals.push({ type: "snow", x: Math.random() * W, y: -8, vx: (Math.random() - 0.5) * 0.8 + wind * 2, vy: 0.6 + Math.random() * 0.9, ph: Math.random() * 6.28, life: 1 });
+    }
+    /* summer bees */
+    const m2 = seasonMix();
+    if (m2.leaf > 0.5 && bees.length < 5 && Math.random() < 0.01) {
+      bees.push({ x: Math.random() * W, y: H * 0.3 + Math.random() * H * 0.25, ph: Math.random() * 6.28, t: 0 });
+    }
+  }
+  function stepParticles(dt, t) {
+    const wind = windBoost;
+    petals = petals.filter(p => p.life > 0 && p.y < H + 20);
+    petals.forEach(p => {
+      p.ph += 0.08;
+      p.x += p.vx + Math.sin(p.ph) * 1.2 + wind * 3;
+      p.y += p.vy;
+      if (p.y > H * 0.8) p.life -= 0.05;
+    });
+    bees = bees.filter(b => b.t < 900);
+    bees.forEach(b => {
+      b.t++; b.ph += 0.03;
+      b.x += Math.sin(b.ph * 1.3) * 2.2;
+      b.y += Math.cos(b.ph) * 1.4;
+    });
+    windBoost = Math.max(0, windBoost - 0.006);
+  }
+  function drawParticles(t) {
+    petals.forEach(p => {
+      fx.save();
+      fx.translate(p.x, p.y);
+      fx.rotate(Math.sin(p.ph) * 0.8);
+      if (p.type === "petal") {
+        fx.fillStyle = "rgba(246,200,218,.9)";
+        fx.beginPath(); fx.ellipse(0, 0, 5, 3.2, 0, 0, 6.283); fx.fill();
+      } else if (p.type === "leaf") {
+        fx.fillStyle = "rgba(206,124,58,.9)";
+        fx.beginPath(); fx.ellipse(0, 0, 6, 3.4, 0.5, 0, 6.283); fx.fill();
+      } else {
+        fx.fillStyle = "rgba(250,252,255,.95)";
+        fx.beginPath(); fx.arc(0, 0, 2.6, 0, 6.283); fx.fill();
+      }
+      fx.restore();
+    });
+    bees.forEach(b => {
+      fx.save(); fx.translate(b.x, b.y);
+      fx.fillStyle = "#e0a83a";
+      fx.beginPath(); fx.ellipse(0, 0, 5, 3.4, Math.sin(b.ph * 8) * 0.4, 0, 6.283); fx.fill();
+      fx.fillStyle = "rgba(255,255,255,.75)";
+      fx.beginPath(); fx.ellipse(0, 0, 1.4, 4.4, 0.3, 0, 6.283); fx.fill();
+      fx.restore();
+    });
+  }
+
+  /* ---------- picking fruit ---------- */
+  fg.canvas.parentElement.addEventListener("pointerdown", (e) => {
+    const m = seasonMix();
+    if (m.fruit < 0.3) return;
+    const x = e.clientX, y = e.clientY;
+    for (const c of clusters) {
+      if (Math.hypot(c.x - x, c.y - y) < c.r * 1.4) {
+        basket++;
+        document.getElementById("fruitCnt").textContent = basket;
+        /* plink */
+        plink();
+        /* pop animation: quick ring */
+        ripples.push({ x: c.x + 8, y: c.y + 10, r: 4, a: 1 });
+        return;
+      }
+    }
+  });
+  let AC = null;
+  function plink() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      const o = AC.createOscillator(), g = AC.createGain();
+      o.type = "triangle";
+      o.frequency.setValueAtTime(720, AC.currentTime);
+      o.frequency.exponentialRampToValueAtTime(980, AC.currentTime + 0.09);
+      g.gain.setValueAtTime(0.08, AC.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.22);
+      o.connect(g); g.connect(AC.destination);
+      o.start(); o.stop(AC.currentTime + 0.24);
+    } catch (e) {}
+  }
+
+  /* ---------- season wheel ---------- */
+  const wheel = document.getElementById("wheel");
+  const NS = "http://www.w3.org/2000/svg";
+  const wsvg = document.createElementNS(NS, "svg");
+  wsvg.setAttribute("viewBox", "0 0 100 100");
+  wsvg.innerHTML =
+    '<circle cx="50" cy="50" r="46" fill="none" stroke="#c9bda4" stroke-width="2"/>' +
+    '<path d="M50 4 A46 46 0 0 1 96 50 L50 50 Z" fill="rgba(140,170,120,.5)"/>' +
+    '<path d="M96 50 A46 46 0 0 1 50 96 L50 50 Z" fill="rgba(226,180,90,.55)"/>' +
+    '<path d="M50 96 A46 46 0 0 1 4 50 L50 50 Z" fill="rgba(220,228,240,.6)"/>' +
+    '<path d="M4 50 A46 46 0 0 1 50 4 L50 50 Z" fill="rgba(244,194,214,.6)"/>' +
+    '<circle cx="50" cy="50" r="7" fill="#faf6ec" stroke="#6a5a40" stroke-width="1.6"/>';
+  wheel.appendChild(wsvg);
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function wheelRender() {
+    wsvg.style.transform = "rotate(" + (season * 360 + 90) + "deg)";
+    const p = ((season % 1) + 1) % 1;
+    const month = MONTHS[Math.floor(p * 12) % 12];
+    const sIdx = Math.floor(p * 4) % 4;
+    document.getElementById("seasonName").textContent = SEASONS[sIdx][0];
+    document.getElementById("dateLabel").textContent = month + " · week " + String(Math.floor(p * 52) + 1).padStart(2, "0");
+  }
+  let wheelDrag = false, wheelStartA = 0, startSeason = 0;
+  function angleOf(e) {
+    const r = wheel.getBoundingClientRect();
+    return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2));
+  }
+  wheel.addEventListener("pointerdown", (e) => {
+    wheelDrag = true; wheelStartA = angleOf(e); startSeason = season;
+    wheel.setPointerCapture && wheel.setPointerCapture(e.pointerId);
+  });
+  wheel.addEventListener("pointermove", (e) => {
+    if (!wheelDrag) return;
+    let da = angleOf(e) - wheelStartA;
+    if (da > Math.PI) da -= Math.PI * 2;
+    if (da < -Math.PI) da += Math.PI * 2;
+    season = startSeason + da / (Math.PI * 2);
+    wheelRender();
+  });
+  wheel.addEventListener("pointerup", () => { wheelDrag = false; });
+
+  /* ---------- buttons ---------- */
+  document.getElementById("playBtn").addEventListener("click", function () {
+    playing = !playing;
+    this.textContent = playing ? "❙❙ pause" : "▶ play";
+    this.classList.toggle("on", playing);
+  });
+  document.getElementById("windBtn").addEventListener("click", () => { windBoost = 1; });
+
+  /* ---------- resize & loop ---------- */
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    [bg, fg].forEach(c => { c.width = W * DPR; c.height = H * DPR; });
+    bx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    fx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    buildTree();
+    clusters = canopyClusters();
+    paintBG(seasonMix());
+  }
+  window.addEventListener("resize", resize);
+  resize(); wheelRender();
+
+  let acc = 0;
+  function loop(t) {
+    const dt = Math.min(50, t - lastT); lastT = t;
+    if (!document.hidden) {
+      if (playing && !wheelDrag) {
+        season += dt / 1000 / 26; /* full year in ~26s */
+        wheelRender();
+      }
+      acc += dt;
+      if (acc > 260) { paintBG(seasonMix()); acc = 0; }
+      const m = seasonMix();
+      spawnParticles(m, dt);
+      stepParticles(dt, t);
+      paintFG(m, t, dt);
+      drawParticles(t);
+      ripples = ripples.filter(r => r.a > 0);
+      ripples.forEach(r => {
+        r.r += 1.6; r.a -= 0.04;
+        fx.strokeStyle = "rgba(192,90,48," + Math.max(0, r.a) + ")";
+        fx.lineWidth = 2;
+        fx.beginPath(); fx.arc(r.x, r.y, r.r, 0, 6.283); fx.stroke();
+      });
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

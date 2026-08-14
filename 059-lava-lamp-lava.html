@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAGMA — a lava lamp instrument</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:#0e0a10; display:flex; align-items:center; justify-content:center;
+    color:#d8c9d8; gap:40px; padding:20px; flex-wrap:wrap; user-select:none; -webkit-user-select:none;
+  }
+  /* room tint follows lamp hue */
+  #roomGlow { position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:radial-gradient(ellipse 60% 70% at 50% 55%, var(--glow, rgba(255,100,60,.14)), transparent 70%);
+    transition:background 1.2s; }
+  .lamp { position:relative; z-index:2; }
+  .vessel {
+    position:relative; width:150px; height:min(420px, 66vh);
+    border-radius:26px 26px 44px 44px / 18px 18px 40px 40px;
+    background:linear-gradient(100deg, rgba(255,255,255,.1), rgba(255,255,255,.02) 30%, rgba(0,0,0,.18) 85%);
+    box-shadow:
+      inset 0 0 30px rgba(0,0,0,.55),
+      inset 3px 0 8px rgba(255,255,255,.12),
+      0 30px 70px rgba(0,0,0,.7);
+    overflow:hidden;
+  }
+  .vessel::before { /* glass highlight streak */
+    content:""; position:absolute; left:14%; top:4%; bottom:8%; width:12px; border-radius:99px;
+    background:linear-gradient(180deg, rgba(255,255,255,.32), rgba(255,255,255,.06) 60%, transparent);
+    z-index:6;
+  }
+  .vessel .base {
+    position:absolute; left:-8px; right:-8px; bottom:-6px; height:54px;
+    background:linear-gradient(180deg, #3a2c34, #241a20);
+    border-radius:16px 16px 40px 40px;
+    box-shadow:inset 0 2px 0 rgba(255,255,255,.08);
+    z-index:7;
+  }
+  .vessel .base::before { /* heater coil glow */
+    content:""; position:absolute; left:20%; right:20%; top:-4px; height:9px; border-radius:99px;
+    background:radial-gradient(ellipse, var(--hot, #ff6a2e), transparent 75%);
+    filter:blur(2px); animation:heatpulse 3.4s ease-in-out infinite alternate;
+  }
+  @keyframes heatpulse { to { opacity:.55; } }
+  .vessel .cap {
+    position:absolute; left:-8px; right:-8px; top:-8px; height:40px;
+    background:linear-gradient(180deg, #3a2c34, #241a20);
+    border-radius:40px 40px 16px 16px; z-index:7;
+  }
+  #wax { position:absolute; inset:0; z-index:3; }
+  .shadowpool { position:absolute; left:0; right:0; bottom:0; height:70%;
+    background:linear-gradient(180deg, transparent, rgba(0,0,0,.4)); z-index:5; pointer-events:none; }
+
+  /* control shelf */
+  .shelf {
+    width:250px; display:flex; flex-direction:column; gap:20px; z-index:2;
+  }
+  h1 { font-size:19px; font-weight:400; letter-spacing:.5em; text-transform:uppercase; color:#e8d8e8; }
+  .sub { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.3em; color:#8a7a8a; text-transform:uppercase; }
+  .grp label { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.24em; text-transform:uppercase; color:#8a7a8a; display:flex; justify-content:space-between; margin-bottom:8px; }
+  .grp label output { color:#e8d8e8; }
+  input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:3px; background:#3a2c34; border-radius:99px; outline:none; cursor:pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:15px; height:15px; border-radius:50%; background:var(--hot, #ff6a2e); box-shadow:0 0 10px var(--hot, #ff6a2e); }
+  .waxes { display:flex; gap:8px; }
+  .waxes button {
+    flex:1; height:38px; border-radius:10px; border:2px solid transparent; cursor:pointer;
+    transition:all .15s; box-shadow:inset 0 0 8px rgba(0,0,0,.35);
+  }
+  .waxes button.on { border-color:#e8d8e8; transform:translateY(-2px); }
+  .btns { display:flex; gap:8px; }
+  .btns button {
+    flex:1; background:rgba(232,216,232,.06); color:#d8c9d8; border:1px solid rgba(232,216,232,.28);
+    font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.16em; text-transform:uppercase;
+    padding:10px 8px; border-radius:10px; cursor:pointer; transition:all .15s;
+  }
+  .btns button:hover { background:rgba(232,216,232,.16); }
+  .btns button.on { background:#6a3a5a; border-color:#8a5a7a; color:#ffe8f8; }
+  .note { font-size:10.5px; font-style:italic; color:#8a7a8a; line-height:1.7; }
+  @media (max-width:640px) {
+    body { flex-direction:column; gap:20px; }
+    .vessel { height:44vh; width:120px; }
+    .shelf { width:min(320px, 92vw); }
+  }
+  @media (prefers-reduced-motion: reduce) { .vessel .base::before { animation:none; } }
+</style>
+</head>
+<body>
+  <div id="roomGlow"></div>
+
+  <div class="lamp">
+    <div class="vessel">
+      <div class="cap"></div>
+      <canvas id="wax"></canvas>
+      <div class="shadowpool"></div>
+      <div class="base"></div>
+    </div>
+  </div>
+
+  <div class="shelf">
+    <div>
+      <h1>Magma</h1>
+      <div class="sub" style="margin-top:6px;">a convection instrument · 1968</div>
+    </div>
+    <div class="grp">
+      <label>heat <output id="oHeat">62%</output></label>
+      <input type="range" id="rHeat" min="10" max="100" value="62">
+    </div>
+    <div class="grp">
+      <label>wax</label>
+      <div class="waxes" id="waxes">
+        <button data-c="sunset" class="on" style="background:linear-gradient(180deg,#ff8a4a,#c22a1e)" title="classic sunset"></button>
+        <button data-c="lime" style="background:linear-gradient(180deg,#b8e84a,#4a8a1e)" title="toxic lime"></button>
+        <button data-c="ocean" style="background:linear-gradient(180deg,#4ac9e8,#1e4a8a)" title="deep ocean"></button>
+        <button data-c="nebula" style="background:linear-gradient(180deg,#c94ae8,#4a1e8a)" title="nebula"></button>
+      </div>
+    </div>
+    <div class="btns">
+      <button id="ambientBtn">ambient tone</button>
+      <button id="tapBtn">tap glass</button>
+    </div>
+    <p class="note">Wax warms at the coil, rises, cools at the glass, and falls forever. Tap the vessel to break the cycle; the room takes the color of the wax.</p>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById($id(id));
+  function $id(id) { return id; }
+  const cv = $("wax"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let heat = 0.62;
+  const PALETTES = {
+    sunset: { wax: ["#ff8a4a", "#e85a2e", "#c22a1e"], glow: "rgba(255,100,60,.16)", hot: "#ff6a2e" },
+    lime: { wax: ["#b8e84a", "#8ac92e", "#4a8a1e"], glow: "rgba(150,220,80,.13)", hot: "#9ae83a" },
+    ocean: { wax: ["#4ac9e8", "#2e8ac9", "#1e4a8a"], glow: "rgba(70,160,220,.14)", hot: "#3aa8e8" },
+    nebula: { wax: ["#c94ae8", "#8a2ec9", "#4a1e8a"], glow: "rgba(180,80,230,.14)", hot: "#b44ae8" },
+  };
+  let pal = PALETTES.sunset;
+
+  /* metaballs */
+  let blobs = [];
+  function seedBlobs() {
+    blobs = [];
+    for (let i = 0; i < 5; i++) {
+      blobs.push({
+        x: W / 2 + (Math.random() - 0.5) * W * 0.3,
+        y: H * (0.3 + Math.random() * 0.6),
+        vy: -(0.2 + Math.random() * 0.4),
+        r: 22 + Math.random() * 18,
+        phase: Math.random() * 6.28,
+      });
+    }
+  }
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    const r = cv.getBoundingClientRect();
+    W = r.width; H = r.height;
+    cv.width = W * DPR; cv.height = H * DPR;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (!blobs.length) seedBlobs();
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  /* ---------- physics ---------- */
+  function step() {
+    const convection = heat;
+    blobs.forEach(b => {
+      /* hot at bottom → rise; cool at top → fall */
+      const nearBottom = b.y > H * 0.75;
+      const nearTop = b.y < H * 0.2;
+      if (nearBottom) b.heatK = Math.min(1, (b.heatK || 0.5) + 0.02 * convection * 2);
+      if (nearTop) b.heatK = Math.max(0, (b.heatK || 0.5) - 0.012 * (1.4 - convection));
+      b.heatK = b.heatK === undefined ? 0.5 : b.heatK;
+      const targetVy = -(0.15 + b.heatK * 1.1 * convection);
+      b.vy += (targetVy - b.vy) * 0.02;
+      b.y += b.vy;
+      /* wobble */
+      b.x = W / 2 + Math.sin(b.phase += 0.004 * (1 + convection)) * W * 0.22;
+      /* bottom bounce */
+      if (b.y > H - 60 - b.r) { b.y = H - 60 - b.r; b.heatK += 0.05; }
+      if (b.y < b.r + 14) { b.y = b.r + 14; b.heatK -= 0.1; }
+    });
+    /* merge/split imitation: radius breathing */
+    blobs.forEach(b => { b.r += Math.sin(b.phase * 2) * 0.04; });
+  }
+
+  /* ---------- render ---------- */
+  function render(t) {
+    g.clearRect(0, 0, W, H);
+    /* draw blobs additively with glow */
+    g.globalCompositeOperation = "source-over";
+    blobs.forEach((b, i) => {
+      const col = pal.wax[i % 3];
+      const grd = g.createRadialGradient(b.x, b.y, b.r * 0.2, b.x, b.y, b.r * 1.7);
+      grd.addColorStop(0, col);
+      grd.addColorStop(0.55, col + "cc");
+      grd.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = grd;
+      g.beginPath();
+      g.arc(b.x, b.y, b.r * 1.7, 0, 6.283);
+      g.fill();
+    });
+    /* metaball connection blobs */
+    g.globalCompositeOperation = "source-over";
+    for (let i = 0; i < blobs.length; i++) {
+      for (let k = i + 1; k < blobs.length; k++) {
+        const a = blobs[i], b2 = blobs[k];
+        const d = Math.hypot(a.x - b2.x, a.y - b2.y);
+        if (d < (a.r + b2.r) * 1.5) {
+          const mx = (a.x + b2.x) / 2, my = (a.y + b2.y) / 2;
+          const rr = (a.r + b2.r) * 0.55 - d * 0.2;
+          if (rr > 4) {
+            const col = pal.wax[0];
+            const grd = g.createRadialGradient(mx, my, 1, mx, my, rr);
+            grd.addColorStop(0, col + "aa");
+            grd.addColorStop(1, "rgba(0,0,0,0)");
+            g.fillStyle = grd;
+            g.beginPath(); g.arc(mx, my, rr, 0, 6.283); g.fill();
+          }
+        }
+      }
+    }
+    /* rising micro-bubbles when hot */
+    if (heat > 0.5 && Math.random() < heat * 0.3) {
+      /* small droplets detach */
+    }
+  }
+
+  /* shimmer at coil */
+  function drawCoilGlow() {
+    const cg = g.createRadialGradient(W / 2, H - 46, 4, W / 2, H - 46, W * 0.8);
+    cg.addColorStop(0, pal.hot + "66");
+    cg.addColorStop(1, "transparent");
+    g.fillStyle = cg;
+    g.fillRect(0, H - 90, W, 90);
+  }
+
+  function loop(t) {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+    step();
+    render(t);
+    drawCoilGlow();
+  }
+  requestAnimationFrame(loop);
+
+  /* ---------- controls ---------- */
+  $("rHeat").addEventListener("input", (e) => {
+    heat = parseInt(e.target.value, 10) / 100;
+    $("oHeat").textContent = Math.round(heat * 100) + "%";
+    document.documentElement.style.setProperty("--hot", pal.hot);
+  });
+  document.documentElement.style.setProperty("--hot", pal.hot);
+  document.documentElement.style.setProperty("--glow", pal.glow);
+
+  $("waxes").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    $("waxes").querySelectorAll("button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    pal = PALETTES[b.dataset.c];
+    document.documentElement.style.setProperty("--glow", pal.glow);
+    document.documentElement.style.setProperty("--hot", pal.hot);
+    if (drone) setDrone();
+  }));
+
+  /* ---------- tap glass: scatter blobs ---------- */
+  let tapVel = [];
+  $("tapBtn").addEventListener("click", () => {
+    blobs.forEach(b => {
+      b.vy += (Math.random() - 0.5) * 4;
+      b.x += (Math.random() - 0.5) * 26;
+    });
+    tickSound(300, 0.05, "sine");
+  });
+  cv.addEventListener("pointerdown", () => $("tapBtn").click());
+
+  /* ---------- ambient drone ---------- */
+  let AC = null, drone = false, droneNodes = [];
+  function ensureAC() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+    return AC;
+  }
+  function setDrone() {
+    const c = ensureAC(); if (!c) return;
+    droneNodes.forEach(n => { try { n.stop ? n.stop() : n.disconnect(); } catch (e) {} });
+    droneNodes = [];
+    const base = 70 + heat * 60;
+    [1, 1.5, 2.02].forEach((m, i) => {
+      const o = c.createOscillator(), g2 = c.createGain(), f = c.createBiquadFilter();
+      o.type = "sawtooth"; o.frequency.value = base * m;
+      f.type = "lowpass"; f.frequency.value = 240;
+      g2.gain.value = 0.012 / (i + 1);
+      o.connect(f); f.connect(g2); g2.connect(c.destination);
+      o.start();
+      droneNodes.push(o, g2);
+    });
+  }
+  $("ambientBtn").addEventListener("click", function () {
+    drone = !drone;
+    this.classList.toggle("on", drone);
+    if (drone) setDrone();
+    else droneNodes.forEach(n => { try { n.stop ? n.stop() : n.disconnect(); } catch (e) {} }), droneNodes = [];
+  });
+  function tickSound(freq, vol, type) {
+    const c = ensureAC(); if (!c) return;
+    try {
+      const t0 = c.currentTime;
+      const o = c.createOscillator(), g2 = c.createGain();
+      o.type = type || "sine"; o.frequency.value = freq;
+      g2.gain.setValueAtTime(vol, t0);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
+      o.connect(g2); g2.connect(c.destination);
+      o.start(t0); o.stop(t0 + 0.32);
+    } catch (e) {}
+  }
+})();
+</script>
+</body>
+</html>

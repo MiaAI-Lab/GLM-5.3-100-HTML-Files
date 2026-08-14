@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WARMING STRIPES — 1880→2025</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:#0d1117; color:#d8dee9; overflow-x:hidden;
+  }
+  .kicker {
+    font-family:system-ui, sans-serif; font-size:10px; letter-spacing:.4em; text-transform:uppercase;
+    color:#7a8699;
+  }
+  /* ---------- hero stripes ---------- */
+  .hero { min-height:92vh; display:flex; flex-direction:column; justify-content:center; padding:8vh 7vw; position:relative; }
+  .hero h1 { font-size:clamp(34px, 6.4vw, 74px); font-weight:400; line-height:1.08; max-width:16ch; margin:18px 0 26px; }
+  .hero h1 em { font-style:normal; color:#ff8a5c; }
+  .hero p.lede { font-size:clamp(15px, 1.8vw, 19px); line-height:1.8; color:#9aa7bb; max-width:56ch; font-family:system-ui, sans-serif; font-weight:300; }
+  .scrollcue { position:absolute; bottom:26px; left:50%; transform:translateX(-50%); font-family:system-ui, sans-serif;
+    font-size:9px; letter-spacing:.4em; color:#5a6577; text-transform:uppercase; animation:cue 2.4s ease-in-out infinite; }
+  @keyframes cue { 50% { transform:translate(-50%,8px); opacity:.5; } }
+
+  /* the stripes field */
+  .field { position:relative; }
+  .stripes { display:flex; width:100%; height:34vh; min-height:220px; }
+  .stripes i { flex:1; position:relative; transition:transform .18s cubic-bezier(.2,.9,.3,1); }
+  .stripes i:hover { transform:scaleY(1.1); z-index:2; }
+  .years { display:flex; width:100%; font-family:system-ui, sans-serif; font-size:9.5px; color:#7a8699; padding:8px 0 0; letter-spacing:.08em; }
+  .years span { flex:1; text-align:left; }
+  .axis { display:flex; justify-content:space-between; font-family:system-ui, sans-serif; font-size:9px; color:#5a6577; padding:6px 0; letter-spacing:.2em; text-transform:uppercase; }
+
+  /* magnifier */
+  .lens {
+    position:fixed; z-index:70; width:210px; border-radius:14px; overflow:hidden; pointer-events:none;
+    background:#0d1117; border:1px solid #3a4556; opacity:0; transition:opacity .2s;
+    box-shadow:0 24px 60px rgba(0,0,0,.7);
+  }
+  .lens.show { opacity:1; }
+  .lens .top { padding:10px 14px 8px; font-family:system-ui, sans-serif; }
+  .lens .yr { font-size:22px; font-weight:300; color:#e8eef7; }
+  .lens .an { font-size:11px; margin-top:2px; }
+  .lens .bar { height:8px; border-radius:99px; background:#1c2430; margin:8px 14px; overflow:hidden; }
+  .lens .bar i { display:block; height:100%; background:linear-gradient(90deg,#5aa9d6,#ff8a5c); }
+  .lens .spark { width:100%; height:44px; display:block; }
+
+  /* ---------- chapters ---------- */
+  .chapter { padding:16vh 7vw; max-width:920px; }
+  .chapter .kicker { margin-bottom:20px; }
+  .chapter h2 { font-size:clamp(26px, 4vw, 44px); font-weight:400; line-height:1.2; margin-bottom:26px; }
+  .chapter p { font-family:system-ui, sans-serif; font-weight:300; font-size:16px; line-height:1.9; color:#9aa7bb; margin-bottom:1.4em; }
+  .chapter p b { color:#d8dee9; font-weight:500; }
+  .chips { display:flex; gap:10px; flex-wrap:wrap; margin-top:28px; }
+  .chips span { font-family:system-ui, sans-serif; font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+    padding:8px 16px; border-radius:99px; border:1px solid #3a4556; color:#9aa7bb; }
+  .chips span.hot { border-color:#8a4530; color:#ff8a5c; }
+
+  /* bars mode section */
+  .barmode { padding:12vh 7vw 16vh; }
+  .barmode .kicker { margin-bottom:18px; }
+  .canvaswrap { position:relative; border:1px solid #1c2430; border-radius:12px; overflow:hidden; }
+  #barsC { width:100%; height:46vh; display:block; }
+  .playrow { display:flex; align-items:center; gap:16px; margin-top:18px; flex-wrap:wrap; }
+  .playrow button {
+    background:#1c2430; color:#d8dee9; border:1px solid #3a4556; font-family:system-ui, sans-serif;
+    font-size:10px; letter-spacing:.22em; text-transform:uppercase; padding:11px 22px; border-radius:99px; cursor:pointer;
+    transition:all .15s;
+  }
+  .playrow button:hover { background:#2a3648; }
+  .playrow button.on { background:#ff8a5c; color:#14100c; border-color:#ff8a5c; }
+  .footnote { font-family:system-ui, sans-serif; font-size:11px; color:#5a6577; line-height:1.8; max-width:64ch; margin-top:24px; }
+
+  /* story dots */
+  .dots { position:fixed; right:22px; top:50%; transform:translateY(-50%); z-index:40; display:flex; flex-direction:column; gap:10px; }
+  .dots button { width:8px; height:8px; border-radius:50%; border:1px solid #5a6577; background:transparent; cursor:pointer; padding:0; }
+  .dots button.on { background:#ff8a5c; border-color:#ff8a5c; }
+
+  @media (max-width:640px) {
+    .stripes { height:22vh; }
+    .lens { width:170px; }
+    .dots { right:10px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .scrollcue { animation:none; }
+    html { scroll-behavior:auto; }
+  }
+</style>
+</head>
+<body>
+  <section class="hero" id="top">
+    <div class="kicker">a field of color · one degree at a time</div>
+    <h1>146 years, <em>one stripe</em> per year.</h1>
+    <p class="lede">Each stripe below is a year of the planet's temperature, 1880 to 2025 —
+    blue cooler than the twentieth-century average, red warmer. No axes, no gridlines, no mercy
+    from the pattern. Scroll to read it.</p>
+    <div class="scrollcue">read the stripes ↓</div>
+  </section>
+
+  <section class="field" id="field">
+    <div class="stripes" id="stripes"></div>
+    <div class="axis"><span>1880</span><span>colder ← → hotter</span><span>2025</span></div>
+  </section>
+
+  <section class="chapter" id="c1">
+    <div class="kicker">how to read</div>
+    <h2>The picture needs no numbers. That was the point.</h2>
+    <p>Stripes like these were designed to be readable at a glance — on a page, a mural,
+    a scarf. Each column is a single year's average temperature anomaly, colored by how far
+    it sat from the 1951–1980 baseline. <b>The palette does the arguing.</b></p>
+    <p>Run your cursor across the field below to inspect any year: the anomaly, and a small
+    trace of that decade's drift. Notice how the blues thin out after 1980 like a language
+    losing its speakers.</p>
+    <div class="chips">
+      <span>1880s · mostly blue</span>
+      <span>1940s · a plateau</span>
+      <span class="hot">1980s → the turn</span>
+      <span class="hot">2015+ · record reds</span>
+    </div>
+  </section>
+
+  <section class="barmode" id="c2">
+    <div class="kicker">the same data, standing up</div>
+    <div class="canvaswrap"><canvas id="barsC"></canvas></div>
+    <div class="playrow">
+      <button id="playBtn">▶ animate anomalies</button>
+      <button id="storyBtn">▶ story mode</button>
+      <span style="font-family:system-ui,sans-serif;font-size:10px;color:#5a6577;letter-spacing:.14em;">ANOMALY (°C VS 1951–80)</span>
+    </div>
+    <p class="footnote">Data note: this page uses an <b>illustrative synthetic dataset</b> shaped like the real
+    instrumental record — it is art about the shape of a measurement, not the measurement itself.
+    For the real stripes, visit the national met services; for the real anxiety, look outside.</p>
+  </section>
+
+  <div class="lens" id="lens">
+    <div class="top">
+      <div class="yr" id="lensYr">1969</div>
+      <div class="an" id="lensAn">−0.05°C vs baseline</div>
+    </div>
+    <div class="bar"><i id="lensBar" style="width:50%"></i></div>
+    <canvas class="spark" id="lensSpark" width="210" height="44"></canvas>
+  </div>
+
+  <div class="dots" id="dots"></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------- synthetic record: shaped like the real one ---------- */
+  const YEARS = [];
+  (function gen() {
+    let v = -0.18 + Math.random() * 0.1;
+    for (let y = 1880; y <= 2025; y++) {
+      /* long slow wobble + volcanic dips + accelerating forcing */
+      let base = -0.25;
+      if (y >= 1910) base += Math.min(0.22, (y - 1910) * 0.004);
+      if (y >= 1945) base += 0.05 * Math.sin((y - 1945) * 0.5);
+      if (y >= 1975) base += Math.pow((y - 1975) / 50, 1.7) * 1.15;
+      /* notable dips: krakatoa 1883, pinatubo 1991-93 */
+      let dip = 0;
+      if (y >= 1883 && y <= 1885) dip = -0.22;
+      if (y >= 1991 && y <= 1993) dip = -0.2;
+      v = base + dip + (Math.random() - 0.5) * 0.16 + (v - base) * 0.35;
+      YEARS.push({ y, v });
+    }
+  })();
+
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  function anomalyColor(v) {
+    /* map -0.6..+1.3 to blue→white→red ramp */
+    const t = clamp((v + 0.6) / 1.9, 0, 1);
+    let r, g, b;
+    if (t < 0.5) {
+      const k = t / 0.5;
+      r = 8 + (240 - 8) * k; g = 48 + (240 - 48) * k; b = 107 + (240 - 107) * k;
+    } else {
+      const k = (t - 0.5) / 0.5;
+      r = 240 + (155 - 240) * k; g = 240 - (155 - 240) * k; b = 240 * (1 - k) + 60 * k;
+    }
+    return "rgb(" + (r | 0) + "," + (g | 0) + "," + (b | 0) + ")";
+  }
+
+  /* ---------- build stripes ---------- */
+  const stripesEl = $("stripes");
+  YEARS.forEach((d, i) => {
+    const s = document.createElement("i");
+    s.style.background = anomalyColor(d.v);
+    s.dataset.i = i;
+    stripesEl.appendChild(s);
+  });
+  /* reveal animation */
+  const io = new IntersectionObserver((ents) => {
+    ents.forEach(en => {
+      if (en.isIntersecting) {
+        [...stripesEl.children].forEach((el, i) => {
+          el.style.opacity = "0";
+          setTimeout(() => {
+            el.style.transition = "opacity .5s";
+            el.style.opacity = "1";
+          }, i * 8);
+        });
+        io.disconnect();
+      }
+    });
+  }, { threshold: 0.3 });
+  io.observe($("field"));
+
+  /* ---------- lens ---------- */
+  const lens = $("lens");
+  const spark = $("lensSpark").getContext("2d");
+  stripesEl.addEventListener("pointermove", (e) => {
+    const r = stripesEl.getBoundingClientRect();
+    const i = clamp(Math.floor(((e.clientX - r.left) / r.width) * YEARS.length), 0, YEARS.length - 1);
+    const d = YEARS[i];
+    $("lensYr").textContent = d.y;
+    $("lensAn").textContent = (d.v >= 0 ? "+" : "−") + Math.abs(d.v).toFixed(2) + "°C vs baseline";
+    $("lensAn").style.color = anomalyColor(d.v);
+    $("lensBar").style.width = clamp(50 + d.v * 38, 3, 100) + "%";
+    /* decade sparkline */
+    spark.clearRect(0, 0, 210, 44);
+    spark.strokeStyle = "rgba(216,222,233,.6)";
+    spark.lineWidth = 1.4;
+    spark.beginPath();
+    for (let k = Math.max(0, i - 9); k <= Math.min(YEARS.length - 1, i + 1); k++) {
+      const x = ((k - (i - 9)) / 10) * 210;
+      const y = 38 - ((YEARS[k].v + 0.6) / 1.9) * 34;
+      k === Math.max(0, i - 9) ? spark.moveTo(x, y) : spark.lineTo(x, y);
+    }
+    spark.stroke();
+    lens.classList.add("show");
+    lens.style.left = clamp(e.clientX - 105, 8, innerWidth - 226) + "px";
+    lens.style.top = (e.clientY - 130) + "px";
+  });
+  stripesEl.addEventListener("pointerleave", () => lens.classList.remove("show"));
+
+  /* ---------- bars canvas ---------- */
+  const barsC = $("barsC");
+  const bc = barsC.getContext("2d");
+  let barsT = 1, playing = false, storyMode = false;
+  function drawBars() {
+    const w = barsC.width = barsC.clientWidth * 2;
+    const h = barsC.height = barsC.clientHeight * 2;
+    bc.clearRect(0, 0, w, h);
+    /* baseline */
+    const zero = h * 0.62;
+    bc.strokeStyle = "rgba(154,167,187,.3)";
+    bc.setLineDash([4, 6]);
+    bc.beginPath(); bc.moveTo(0, zero); bc.lineTo(w, zero); bc.stroke();
+    bc.setLineDash([]);
+    bc.fillStyle = "rgba(122,134,153,.8)";
+    bc.font = "18px system-ui, sans-serif";
+    bc.fillText("0", 8, zero - 8);
+    const bw = w / YEARS.length;
+    const n = Math.floor(YEARS.length * barsT);
+    for (let i = 0; i < n; i++) {
+      const d = YEARS[i];
+      const bh = Math.abs(d.v) * (h * 0.36);
+      const x = i * bw;
+      bc.fillStyle = anomalyColor(d.v);
+      if (d.v >= 0) bc.fillRect(x, zero - bh, Math.max(1, bw - 1), bh);
+      else bc.fillRect(x, zero, Math.max(1, bw - 1), bh);
+    }
+  }
+  drawBars();
+  addEventListener("resize", drawBars);
+
+  $("playBtn").addEventListener("click", function () {
+    playing = !playing;
+    this.classList.toggle("on", playing);
+    this.textContent = playing ? "❙❙ pause" : "▶ animate anomalies";
+    if (playing) {
+      barsT = 0;
+      const step = () => {
+        if (!playing) return;
+        barsT = Math.min(1, barsT + 0.008);
+        drawBars();
+        if (barsT < 1) requestAnimationFrame(step);
+        else { playing = false; this.classList.remove("on"); this.textContent = "▶ animate anomalies"; }
+      };
+      requestAnimationFrame(step);
+    }
+  });
+
+  /* story mode: auto-scroll through milestones */
+  const MILESTONES = [
+    { y: 1883, note: "Krakatoa erupts — the stripes dip blue for three years." },
+    { y: 1944, note: "A warm spike during the war years; the plateau follows." },
+    { y: 1977, note: "The turn. After this year the cool blues become rare." },
+    { y: 1998, note: "A super-el niño year — the first stripe to hit deep red." },
+    { y: 2016, note: "The hottest year on the record to that point." },
+    { y: 2024, note: "The record falls again. The stripe is nearly crimson." },
+  ];
+  $("storyBtn").addEventListener("click", function () {
+    if (storyMode) return;
+    storyMode = true;
+    this.classList.add("on");
+    /* scroll to field and walk milestones */
+    $("field").scrollIntoView({ behavior: "smooth" });
+    let i = 0;
+    const walk = () => {
+      if (i >= MILESTONES.length) {
+        storyMode = false;
+        this.classList.remove("on");
+        lens.classList.remove("show");
+        return;
+      }
+      const m = MILESTONES[i++];
+      const idx = YEARS.findIndex(d => d.y === m.y);
+      const stripe = stripesEl.children[idx];
+      if (stripe) {
+        const r = stripe.getBoundingClientRect();
+        lens.classList.add("show");
+        $("lensYr").textContent = m.y;
+        $("lensAn").textContent = m.note;
+        $("lensAn").style.color = "#e8eef7";
+        lens.style.left = clamp(r.left - 80, 8, innerWidth - 226) + "px";
+        lens.style.top = clamp(r.top - 150, 60, innerHeight - 200) + "px";
+      }
+      setTimeout(walk, 2600);
+    };
+    setTimeout(walk, 900);
+  });
+
+  /* ---------- dots ---------- */
+  const dots = $("dots");
+  ["top", "c1", "c2"].forEach(id => {
+    const b = document.createElement("button");
+    b.setAttribute("aria-label", id);
+    b.addEventListener("click", () => $(id).scrollIntoView({ behavior: "smooth" }));
+    dots.appendChild(b);
+  });
+  addEventListener("scroll", () => {
+    const pos = scrollY + innerHeight * 0.4;
+    const secs = ["top", "c1", "c2"];
+    secs.forEach((id, i) => {
+      const el = $(id);
+      const on = pos >= el.offsetTop && (i === secs.length - 1 || pos < $(secs[i + 1]).offsetTop);
+      dots.children[i].classList.toggle("on", on);
+    });
+  }, { passive: true });
+})();
+</script>
+</body>
+</html>

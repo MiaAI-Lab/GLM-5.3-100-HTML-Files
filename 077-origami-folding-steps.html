@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FOLD — one thousand cranes</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow-x:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:#d8cbb0; color:#4a3a28; min-height:100vh;
+  }
+  body::after { /* paper grain */
+    content:""; position:fixed; inset:0; pointer-events:none; opacity:.4; z-index:50;
+    background-image:radial-gradient(rgba(120,100,70,.08) 1px, transparent 1.4px);
+    background-size:6px 6px;
+  }
+  .wrap { max-width:860px; margin:0 auto; padding:50px 22px 90px; }
+
+  header { text-align:center; margin-bottom:44px; }
+  header h1 { font-size:clamp(28px, 5vw, 48px); font-weight:400; letter-spacing:.4em; color:#5a4a32; }
+  header p { font-family:system-ui, sans-serif; font-size:10px; letter-spacing:.34em; color:#9a8760; text-transform:uppercase; margin-top:10px; }
+
+  /* the folding stage */
+  .stage {
+    position:relative; width:min(420px, 88vw); aspect-ratio:1; margin:0 auto 30px;
+    perspective:900px;
+  }
+  .kami {
+    position:absolute; inset:0; transform-style:preserve-3d; transform:rotateX(18deg) rotateZ(-4deg);
+    filter:drop-shadow(10px 14px 18px rgba(90,70,40,.3));
+  }
+  .kami svg { width:100%; height:100%; overflow:visible; }
+
+  /* step readout */
+  .stepbar { display:flex; align-items:center; justify-content:center; gap:18px; margin-bottom:26px; flex-wrap:wrap; }
+  .stepbar .stepno { font-size:13px; letter-spacing:.2em; color:#7a6a4a; }
+  .stepbar .stepno b { font-size:26px; color:#c9552e; }
+  .foldbtns { display:flex; gap:12px; }
+  .foldbtns button {
+    background:#5a4a32; color:#f4ecd8; border:none; font-family:system-ui, sans-serif;
+    font-size:10px; letter-spacing:.22em; text-transform:uppercase; padding:12px 24px; border-radius:99px;
+    cursor:pointer; transition:all .15s;
+  }
+  .foldbtns button:hover { background:#7a6342; }
+  .foldbtns button.ghost { background:transparent; color:#5a4a32; border:1px solid #5a4a32; }
+  .progress { width:min(360px, 80vw); height:3px; background:rgba(90,74,50,.2); margin:0 auto 40px; border-radius:99px; }
+  .progress i { display:block; height:100%; background:#c9552e; border-radius:99px; transition:width .4s; }
+
+  .instructions { text-align:center; font-style:italic; font-size:14.5px; color:#7a6a4a; line-height:1.8; max-width:52ch; margin:0 auto; }
+
+  /* senbazuru line */
+  .senbazuru {
+    position:fixed; right:0; top:0; bottom:0; width:120px; pointer-events:none; z-index:5;
+  }
+  .senbazuru .crane { position:absolute; right:26px; font-size:22px; opacity:0; animation:hang 5s ease-in-out infinite alternate; }
+  @keyframes hang {
+    from { transform:rotate(-4deg) translateY(0); }
+    to { transform:rotate(4deg) translateY(6px); }
+  }
+  @media (max-width:700px) { .senbazuru { display:none; } }
+  @media (prefers-reduced-motion: reduce) { .senbazuru .crane { animation:none; } }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Fold</h1>
+      <p>the classic crane · one sheet · no cuts</p>
+    </header>
+
+    <div class="stage">
+      <div class="kami">
+        <svg id="paper" viewBox="0 0 400 400" aria-hidden="true">
+          <g id="sheet"></g>
+        </svg>
+      </div>
+    </div>
+
+    <div class="stepbar">
+      <span class="stepno">step <b id="stepV">0</b>/8</span>
+      <div class="foldbtns">
+        <button class="ghost" id="backBtn">◀ unfold</button>
+        <button id="foldBtn">fold ▶</button>
+        <button class="ghost" id="autoBtn">auto</button>
+      </div>
+    </div>
+    <div class="progress"><i id="progFill" style="width:0%"></i></div>
+    <p class="instructions" id="instrV">a square of kami paper. begin with the valley fold — corner to corner, crease softly.</p>
+  </div>
+
+  <div class="senbazuru" id="senbazuru"></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById($id(id));
+  function $id(id) { return id; }
+  const NS = "http://www.w3.org/2000/svg";
+  const sheet = document.getElementById("sheet");
+  let step = 0;
+  let cranes = 0;
+
+  /* ---------- 8 fold states (square → crane silhouette) ---------- */
+  /* each state: list of polygons with shade; animated by dash draw + fade */
+  const STATES = [
+    { name: "the square", polys: [{ pts: "60,60 340,60 340,340 60,340", f: "#f4ecd8", s: "#c9b892" }], instr: "a square of kami paper. begin with the valley fold — corner to corner, crease softly." },
+    { name: "the triangle", polys: [
+      { pts: "60,60 340,60 200,340", f: "#f0e6cc", s: "#c9b892" },
+      { pts: "60,60 340,60 200,60", f: "rgba(0,0,0,.05)", s: "#b0a07a", dash: "6 6" },
+    ], instr: "folded once. the diagonal crease is your first decision — everything after follows from it." },
+    { name: "the smaller triangle", polys: [
+      { pts: "60,60 340,60 200,200", f: "#ece0c2", s: "#c9b892" },
+      { pts: "60,60 200,200 60,200", f: "rgba(0,0,0,.05)", s: "#b0a07a", dash: "6 6" },
+    ], instr: "again — right angle to right angle. the paper halves like a secret." },
+    { name: "the square base", polys: [
+      { pts: "130,110 270,110 320,240 80,240", f: "#f0e6cc", s: "#c9b892" },
+      { pts: "130,110 200,240 80,240", f: "rgba(0,0,0,.07)", s: "#b0a07a" },
+      { pts: "270,110 200,240 320,240", f: "rgba(0,0,0,.04)", s: "#b0a07a" },
+      { pts: "130,110 270,110 200,175", f: "none", s: "#a09070", dash: "5 5" },
+    ], instr: "the preliminary base: squash-fold the layers flat. four flaps, like an envelope that forgot its letter." },
+    { name: "the bird base", polys: [
+      { pts: "150,90 250,90 290,250 110,250", f: "#ece0c2", s: "#c9b892" },
+      { pts: "150,90 200,250 110,250", f: "rgba(0,0,0,.08)", s: "#b0a07a" },
+      { pts: "250,90 200,250 290,250", f: "rgba(0,0,0,.04)", s: "#b0a07a" },
+      { pts: "200,150 200,90 240,120", f: "#c9552e", s: "#a03e1e" },
+    ], instr: "petal folds raise the spine. the paper now wants to be a bird — it is only waiting for permission." },
+    { name: "the neck", polys: [
+      { pts: "160,140 240,140 330,220 240,260", f: "#ece0c2", s: "#c9b892" },
+      { pts: "160,140 200,260 130,240", f: "rgba(0,0,0,.07)", s: "#b0a07a" },
+      { pts: "240,260 330,220 330,240", f: "#c9552e", s: "#a03e1e" },
+      { pts: "130,240 150,190 160,140", f: "#e0d4b4", s: "#c9b892" },
+    ], instr: "two reverse folds: one pulls the head up, the other the tail. the crane learns its posture." },
+    { name: "the head & wings", polys: [
+      { pts: "150,120 250,120 340,200 220,270", f: "#f0e6cc", s: "#c9b892" },
+      { pts: "340,200 330,168 316,176", f: "#c9552e", s: "#a03e1e" },
+      { pts: "150,120 180,240 110,230", f: "rgba(0,0,0,.06)", s: "#b0a07a" },
+      { pts: "120,270 220,150 320,270", f: "#e8dcc0", s: "#c9b892" },
+    ], instr: "fold down the wings, crease the beak. almost — it is holding its breath." },
+    { name: "the crane", polys: [
+      { pts: "120,260 200,140 280,260", f: "#f4ecd8", s: "#c9b892" },
+      { pts: "200,140 296,168 322,152 300,136", f: "#c9552e", s: "#a03e1e" },
+      { pts: "200,140 104,168 78,152 100,136", f: "#e0d4b4", s: "#b0a07a" },
+      { pts: "120,260 200,300 280,260", f: "#e8dcc0", s: "#c9b892" },
+    ], instr: "the crane. drop it in the palm of your hand — if you folded truly, it will hold a breath of wind." },
+  ];
+
+  function render(animateIn) {
+    sheet.innerHTML = "";
+    const st = STATES[step];
+    st.polys.forEach((p, i) => {
+      const poly = document.createElementNS(NS, "polygon");
+      poly.setAttribute("points", p.pts);
+      poly.setAttribute("fill", p.f);
+      poly.setAttribute("stroke", p.s);
+      poly.setAttribute("stroke-width", "2");
+      if (p.dash) poly.setAttribute("stroke-dasharray", p.dash);
+      if (animateIn) {
+        poly.style.opacity = "0";
+        poly.style.transformOrigin = "200px 200px";
+        poly.style.transition = "opacity .5s " + (i * 0.12) + "s";
+        requestAnimationFrame(() => requestAnimationFrame(() => { poly.style.opacity = "1"; }));
+      }
+      sheet.appendChild(poly);
+    });
+    $("stepV").textContent = step;
+    $("instrV").textContent = st.instr;
+    $("progFill").style.width = (step / 8 * 100) + "%";
+  }
+
+  $("#foldBtn").addEventListener("click", () => {
+    if (step < 8) { step++; render(true); if (step === 8) craneDone(); }
+  });
+  $("#backBtn").addEventListener("click", () => { if (step > 0) { step--; render(false); } });
+  let autoT = null;
+  $("#autoBtn").addEventListener("click", function () {
+    if (autoT) { clearInterval(autoT); autoT = null; this.textContent = "auto"; return; }
+    this.textContent = "stop";
+    autoT = setInterval(() => {
+      if (step < 8) { step++; render(true); if (step === 8) craneDone(); }
+      else { clearInterval(autoT); autoT = null; this.textContent = "auto"; }
+    }, 1300);
+  });
+
+  /* completed crane → senbazuru */
+  function craneDone() {
+    cranes++;
+    const line = $("#senbazuru");
+    const c = document.createElement("span");
+    c.className = "crane";
+    c.textContent = "🕊";
+    c.style.top = (14 + (cranes - 1) * 9) + "%";
+    c.style.opacity = ".9";
+    c.style.animationDelay = (Math.random() * 2) + "s";
+    line.appendChild(c);
+    if (cranes > 10) line.firstChild.remove();
+  }
+
+  render(false);
+})();
+</script>
+</body>
+</html>

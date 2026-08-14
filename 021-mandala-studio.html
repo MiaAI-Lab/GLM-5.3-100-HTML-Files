@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MANDALA — radial symmetry studio</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    background:#171a2b;
+    background: radial-gradient(ellipse at 50% 42%, #1d2140 0%, #141628 55%, #0d0e1c 100%);
+    font-family: system-ui, -apple-system, sans-serif; color:#c9cdea;
+    display:flex; touch-action:none;
+  }
+  canvas#art { flex:1; display:block; cursor:crosshair; touch-action:none; }
+  /* ---------- side rail ---------- */
+  aside {
+    width:240px; flex-shrink:0; display:flex; flex-direction:column; gap:18px;
+    padding:22px 18px; border-left:1px solid rgba(201,205,234,.14);
+    background:rgba(13,14,28,.72); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    overflow-y:auto; scrollbar-width:thin; z-index:5;
+  }
+  h1 { font-size:15px; font-weight:600; letter-spacing:.42em; color:#eef; text-transform:uppercase; }
+  h1 small { display:block; font-size:9px; letter-spacing:.24em; color:#7f84ad; margin-top:5px; font-weight:400; }
+  .grp { display:flex; flex-direction:column; gap:6px; }
+  .grp label { font-size:9px; letter-spacing:.22em; text-transform:uppercase; color:#8f94bd; display:flex; justify-content:space-between; }
+  .grp label output { color:#d8c9ff; }
+  input[type=range] {
+    -webkit-appearance:none; appearance:none; width:100%; height:3px; border-radius:99px;
+    background:linear-gradient(90deg,#7a6cff,#d8c9ff); outline:none; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+    background:#fff; box-shadow:0 0 10px #7a6cff; cursor:grab;
+  }
+  input[type=range]::-moz-range-thumb { width:14px; height:14px; border-radius:50%; background:#fff; border:none; box-shadow:0 0 10px #7a6cff; }
+  .btnrow { display:flex; gap:8px; flex-wrap:wrap; }
+  button.act {
+    flex:1; min-width:60px; background:rgba(122,108,255,.12); color:#cfc7ff;
+    border:1px solid rgba(122,108,255,.4); border-radius:9px; padding:9px 6px;
+    font:inherit; font-size:10px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer;
+    transition:all .18s;
+  }
+  button.act:hover { background:rgba(122,108,255,.3); box-shadow:0 0 14px rgba(122,108,255,.4); color:#fff; }
+  button.act:active { transform:translateY(1px) scale(.98); }
+  button.act.warm { border-color:rgba(255,170,220,.45); background:rgba(255,170,220,.1); color:#ffd7ee; }
+  button.act.warm:hover { background:rgba(255,170,220,.24); box-shadow:0 0 14px rgba(255,170,220,.4); }
+  .hint { font-size:9.5px; line-height:1.65; color:#7f84ad; letter-spacing:.06em; }
+  .hint b { color:#b9bee6; font-weight:600; }
+  .divider { height:1px; background:rgba(201,205,234,.12); }
+  .status { font-size:9px; letter-spacing:.2em; color:#666b96; text-transform:uppercase; text-align:center; margin-top:auto; padding-top:10px; }
+  /* toast */
+  .toast {
+    position:fixed; left:50%; top:18px; transform:translate(-50%,-70px); z-index:20;
+    background:#252a4d; color:#e9e6ff; border:1px solid rgba(122,108,255,.5);
+    padding:9px 18px; border-radius:999px; font-size:11px; letter-spacing:.1em;
+    transition:transform .35s cubic-bezier(.2,1.4,.4,1);
+  }
+  .toast.show { transform:translate(-50%,0); }
+  @media (max-width:700px) {
+    body { flex-direction:column; }
+    aside { width:100%; border-left:none; border-top:1px solid rgba(201,205,234,.14);
+      flex-direction:row; flex-wrap:wrap; gap:12px; order:2; max-height:44vh; }
+    .grp { flex:1; min-width:120px; }
+    canvas#art { order:1; }
+    h1 { width:100%; } .divider,.status,.hint { display:none; }
+    .btnrow { width:100%; }
+  }
+</style>
+</head>
+<body>
+  <canvas id="art"></canvas>
+  <aside>
+    <h1>Mandala<small>radial symmetry studio</small></h1>
+    <div class="grp">
+      <label>Symmetry <output id="oSym">8</output></label>
+      <input type="range" id="rSym" min="2" max="32" step="1" value="8">
+    </div>
+    <div class="grp">
+      <label>Brush weight <output id="oW">3.0</output></label>
+      <input type="range" id="rW" min="0.5" max="14" step="0.5" value="3">
+    </div>
+    <div class="grp">
+      <label>Glow <output id="oG">10</output></label>
+      <input type="range" id="rG" min="0" max="26" step="1" value="10">
+    </div>
+    <div class="grp">
+      <label>Hue drift <output id="oH">1.4</output></label>
+      <input type="range" id="rH" min="0" max="6" step="0.2" value="1.4">
+    </div>
+    <div class="divider"></div>
+    <div class="btnrow">
+      <button class="act" id="bUndo">undo</button>
+      <button class="act" id="bClear">clear</button>
+    </div>
+    <div class="btnrow">
+      <button class="act warm" id="bInspire">inspire me</button>
+      <button class="act" id="bSave">save png</button>
+    </div>
+    <div class="divider"></div>
+    <p class="hint">
+      <b>Draw anywhere</b> — every stroke mirrors around the center.
+      Faster strokes run thinner; finishing a stroke blooms along every axis.
+      Keys: <b>Z</b> undo · <b>C</b> clear · <b>I</b> inspire.
+    </p>
+    <div class="status" id="status">strokes 0 · axes 8</div>
+  </aside>
+  <div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  "use strict";
+  const cv = document.getElementById("art");
+  const ctx = cv.getContext("2d");
+  let W = 0, H = 0, CX = 0, CY = 0, DPR = 1;
+
+  function resize() {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    const r = cv.getBoundingClientRect();
+    /* preserve existing drawing through resize */
+    let snap = null;
+    if (cv.width > 0) {
+      try { snap = document.createElement("canvas"); snap.width = cv.width; snap.height = cv.height;
+        snap.getContext("2d").drawImage(cv, 0, 0); } catch (e) { snap = null; }
+    }
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    paintBase();
+    if (snap) {
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(snap, 0, 0, cv.width, cv.height); ctx.restore();
+    }
+    CX = W / 2; CY = H / 2;
+  }
+  function paintBase() {
+    /* deep charcoal-indigo wash + faint center guide */
+    const g = ctx.createRadialGradient(W / 2, H * .45, 10, W / 2, H * .45, Math.max(W, H) * .75);
+    g.addColorStop(0, "#202449");
+    g.addColorStop(1, "#0e0f20");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  /* ---------- params ---------- */
+  const el = (id) => document.getElementById(id);
+  const params = { sym: 8, w: 3, glow: 10, hueDrift: 1.4 };
+  function bind(id, key, out, fmt) {
+    const r = el(id);
+    const upd = () => {
+      params[key] = parseFloat(r.value);
+      el(out).textContent = fmt ? fmt(params[key]) : params[key];
+      status();
+    };
+    r.addEventListener("input", upd); upd();
+  }
+  function status() {
+    el("status").textContent = "strokes " + strokes + " · axes " + params.sym;
+  }
+  bind("rSym", "sym", "oSym");
+  bind("rW", "w", "oW", (v) => v.toFixed(1));
+  bind("rG", "glow", "oG");
+  bind("rH", "hueDrift", "oH", (v) => v.toFixed(1));
+
+  /* ---------- drawing core ---------- */
+  let hue = 285, strokes = 0;
+  const history = []; /* snapshots for undo (ImageData is heavy; use canvas snaps) */
+  let drawing = false, last = null, lastT = 0;
+
+  function snap() {
+    try {
+      const s = document.createElement("canvas");
+      s.width = cv.width; s.height = cv.height;
+      s.getContext("2d").drawImage(cv, 0, 0);
+      history.push(s);
+      if (history.length > 14) history.shift();
+    } catch (e) {}
+  }
+  function seg(x0, y0, x1, y1, width, alpha) {
+    const n = params.sym;
+    const a0 = Math.atan2(y0 - CY, x0 - CX), r0 = Math.hypot(x0 - CX, y0 - CY);
+    const a1 = Math.atan2(y1 - CY, x1 - CX), r1 = Math.hypot(x1 - CX, y1 - CY);
+    const col = "hsla(" + hue + ", 88%, 68%, " + alpha + ")";
+    ctx.lineCap = "round";
+    ctx.strokeStyle = col;
+    ctx.shadowColor = "hsla(" + hue + ", 90%, 65%, .9)";
+    ctx.shadowBlur = params.glow;
+    ctx.lineWidth = width;
+    for (let k = 0; k < n; k++) {
+      const rot = (Math.PI * 2 / n) * k;
+      ctx.beginPath();
+      ctx.moveTo(CX + Math.cos(a0 + rot) * r0, CY + Math.sin(a0 + rot) * r0);
+      ctx.lineTo(CX + Math.cos(a1 + rot) * r1, CY + Math.sin(a1 + rot) * r1);
+      ctx.stroke();
+      /* mirror for even richness */
+      ctx.beginPath();
+      ctx.moveTo(CX + Math.cos(-a0 + rot) * r0, CY + Math.sin(-a0 + rot) * r0);
+      ctx.lineTo(CX + Math.cos(-a1 + rot) * r1, CY + Math.sin(-a1 + rot) * r1);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+  }
+  function bloom() {
+    /* pulse ring along all axes at stroke end */
+    const r = Math.min(W, H) * 0.42;
+    const n = params.sym;
+    let t = 0;
+    const start = performance.now();
+    function step(now) {
+      t = Math.min(1, (now - start) / 600);
+      const rr = r * t;
+      ctx.save();
+      ctx.globalAlpha = (1 - t) * 0.35;
+      ctx.strokeStyle = "hsla(" + hue + ", 90%, 72%, 1)";
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = "hsla(" + hue + ", 90%, 70%, .8)";
+      ctx.shadowBlur = 12;
+      for (let k = 0; k < n; k++) {
+        const a = (Math.PI * 2 / n) * k;
+        ctx.beginPath();
+        ctx.moveTo(CX, CY);
+        ctx.lineTo(CX + Math.cos(a) * rr, CY + Math.sin(a) * rr);
+        ctx.stroke();
+      }
+      ctx.restore();
+      if (t < 1 && !document.hidden) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  /* ---------- pointer input ---------- */
+  function pos(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  cv.addEventListener("pointerdown", (e) => {
+    snap();
+    drawing = true; last = pos(e); lastT = performance.now();
+    cv.setPointerCapture && cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (!drawing) return;
+    const p = pos(e);
+    const now = performance.now();
+    const dt = Math.max(8, now - lastT);
+    const dist = Math.hypot(p.x - last.x, p.y - last.y);
+    const speed = dist / dt; /* px per ms */
+    const width = Math.max(0.6, params.w * (1.25 - Math.min(1, speed * 0.9)));
+    seg(last.x, last.y, p.x, p.y, width, 0.85);
+    hue = (hue + params.hueDrift * Math.max(0.6, dist * 0.12)) % 360;
+    last = p; lastT = now;
+  });
+  function endStroke() {
+    if (!drawing) return;
+    drawing = false;
+    strokes++;
+    status();
+    bloom();
+  }
+  cv.addEventListener("pointerup", endStroke);
+  cv.addEventListener("pointercancel", endStroke);
+  cv.addEventListener("pointerleave", () => { if (drawing) endStroke(); });
+
+  /* ---------- actions ---------- */
+  el("bUndo").addEventListener("click", undo);
+  el("bClear").addEventListener("click", clearAll);
+  el("bSave").addEventListener("click", savePng);
+  el("bInspire").addEventListener("click", inspire);
+
+  function undo() {
+    const s = history.pop();
+    if (!s) { toastMsg("nothing to undo"); return; }
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(s, 0, 0);
+    ctx.restore();
+    strokes = Math.max(0, strokes - 1); status();
+  }
+  function clearAll() {
+    snap();
+    paintBase();
+    strokes = 0; status();
+    toastMsg("canvas cleared");
+  }
+  function savePng() {
+    try {
+      const a = document.createElement("a");
+      a.download = "mandala-" + Date.now() + ".png";
+      a.href = cv.toDataURL("image/png");
+      a.click();
+      toastMsg("saved ↗");
+    } catch (e) { toastMsg("export blocked by browser"); }
+  }
+
+  /* ---------- inspire: three automatic strokes ---------- */
+  async function inspire() {
+    snap();
+    const cx = CX, cy = CY;
+    for (let s = 0; s < 3; s++) {
+      let a = Math.random() * Math.PI * 2;
+      let r = Math.min(W, H) * (0.08 + Math.random() * 0.2);
+      let x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      const steps = 60 + Math.floor(Math.random() * 60);
+      const spin = (Math.random() * 0.3 + 0.06) * (Math.random() < 0.5 ? -1 : 1);
+      const grow = Math.min(W, H) * (0.0016 + Math.random() * 0.0032);
+      const oldSym = params.sym, oldGlow = params.glow;
+      params.sym = [6, 8, 12, 16][Math.floor(Math.random() * 4)];
+      params.glow = Math.max(params.glow, 12);
+      for (let i = 0; i < steps; i++) {
+        a += spin + Math.sin(i * 0.35 + s) * 0.05;
+        r += grow * Math.sin(i * 0.12 + s * 2.1);
+        const nx = cx + Math.cos(a) * r, ny = cy + Math.sin(a) * r;
+        seg(x, y, nx, ny, params.w * (0.7 + Math.random() * 0.6), 0.8);
+        hue = (hue + params.hueDrift * 2.2) % 360;
+        x = nx; y = ny;
+        if (i % 4 === 0) await new Promise(r2 => setTimeout(r2, 8));
+      }
+      params.sym = oldSym; params.glow = oldGlow;
+      strokes++; status();
+    }
+    bloom();
+    toastMsg("inspired ✓");
+  }
+
+  /* ---------- toast ---------- */
+  let toastTimer = null;
+  function toastMsg(m) {
+    const t = el("toast");
+    t.textContent = m;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 1600);
+  }
+
+  /* ---------- keys ---------- */
+  window.addEventListener("keydown", (e) => {
+    if (e.target && /input|textarea/i.test(e.target.tagName)) return;
+    const k = e.key.toLowerCase();
+    if (k === "z") undo();
+    else if (k === "c") clearAll();
+    else if (k === "i") inspire();
+    else if (k === "s") { e.preventDefault(); savePng(); }
+  });
+
+  window.addEventListener("resize", resize);
+  resize();
+  /* welcome flourish */
+  setTimeout(() => { if (strokes === 0) inspire(); }, 600);
+})();
+</script>
+</body>
+</html>

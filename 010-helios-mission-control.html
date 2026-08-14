@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HELIOS-9 // MISSION CONTROL</title>
+<style>
+  :root{
+    --slate:#0C0F14;
+    --panel:#11151C;
+    --panel2:#141922;
+    --line:rgba(255,179,71,.16);
+    --line-soft:rgba(255,179,71,.08);
+    --amber:#FFB347;
+    --amber-dim:rgba(255,179,71,.55);
+    --amber-faint:rgba(255,179,71,.3);
+    --text:#E8DCC8;
+    --dim:#8A8272;
+    --red:#FF5C5C;
+    --ok:#7DDFA0;
+    --mono:'Courier New',ui-monospace,Menlo,monospace;
+    --sys:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    background:
+      radial-gradient(120vmax 80vmax at 50% -20%, rgba(255,179,71,.05), transparent 60%),
+      var(--slate);
+    color:var(--text);
+    font-family:var(--sys);
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  body::before{ /* scanlines */
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:90;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,.14) 0 1px, transparent 1px 3px);
+    opacity:.5;
+  }
+  ::selection{background:var(--amber);color:#171207}
+
+  .wrap{
+    display:grid;
+    grid-template-columns:216px 1fr;
+    grid-template-rows:auto 1fr;
+    min-height:100vh;
+    gap:0;
+  }
+  @media(max-width:900px){
+    .wrap{grid-template-columns:1fr}
+  }
+
+  /* ————— header strip ————— */
+  header.top{
+    grid-column:1/-1;
+    display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+    padding:14px 20px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(255,179,71,.06), transparent);
+  }
+  header.top .ident{
+    font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.18em;
+    color:var(--amber);
+  }
+  header.top .ident span{color:var(--text)}
+  header.top .sep{width:1px;height:22px;background:var(--line)}
+  header.top .met{
+    font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:.12em;
+  }
+  header.top .met b{color:var(--text)}
+  header.top .status{
+    margin-left:auto;display:flex;align-items:center;gap:10px;
+    font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--ok);
+  }
+  header.top .status .lamp{
+    width:9px;height:9px;border-radius:50%;background:var(--ok);
+    box-shadow:0 0 10px var(--ok);
+    animation:lampBlink 2.6s ease-in-out infinite;
+  }
+  header.top .status.alert{color:var(--red)}
+  header.top .status.alert .lamp{background:var(--red);box-shadow:0 0 12px var(--red);animation-duration:.7s}
+  @keyframes lampBlink{0%,100%{opacity:1}50%{opacity:.45}}
+
+  /* ————— side rail ————— */
+  aside.rail{
+    border-right:1px solid var(--line);
+    padding:18px 14px;
+    display:flex;flex-direction:column;gap:18px;
+    background:rgba(255,179,71,.02);
+  }
+  @media(max-width:900px){
+    aside.rail{border-right:none;border-bottom:1px solid var(--line)}
+  }
+  .rail h2{
+    font-family:var(--mono);font-size:10px;letter-spacing:.3em;text-transform:uppercase;
+    color:var(--dim);margin-bottom:4px;
+  }
+  .rail .mods{display:flex;flex-direction:column;gap:6px}
+  @media(max-width:900px){.rail .mods{flex-direction:row;flex-wrap:wrap}}
+  .mod-toggle{
+    font-family:var(--mono);font-size:11px;letter-spacing:.1em;
+    text-align:left;cursor:pointer;
+    color:var(--dim);
+    background:transparent;border:1px solid var(--line-soft);
+    padding:9px 12px;
+    display:flex;align-items:center;gap:9px;
+    transition:color .25s,border-color .25s,background .25s;
+  }
+  .mod-toggle .sq{
+    width:9px;height:9px;border:1px solid currentColor;flex:none;
+    transition:background .2s;
+  }
+  .mod-toggle[aria-pressed="true"]{color:var(--amber);border-color:var(--line);background:rgba(255,179,71,.05)}
+  .mod-toggle[aria-pressed="true"] .sq{background:var(--amber);box-shadow:0 0 8px var(--amber-faint)}
+  .rail .clockbox{
+    margin-top:auto;
+    border:1px solid var(--line-soft);padding:12px;
+    font-family:var(--mono);
+  }
+  @media(max-width:900px){.rail .clockbox{margin-top:0}}
+  .rail .clockbox .lab{font-size:9px;letter-spacing:.26em;color:var(--dim);text-transform:uppercase}
+  .rail .clockbox .spd{
+    display:flex;align-items:baseline;gap:6px;margin:8px 0;
+    color:var(--amber);font-size:22px;font-weight:700;
+  }
+  .rail .clockbox .spd small{font-size:10px;color:var(--dim);letter-spacing:.2em}
+  .rail input[type=range]{
+    width:100%;accent-color:var(--amber);cursor:pointer;background:transparent;
+  }
+  .spd-stops{display:flex;justify-content:space-between;font-size:9px;color:var(--dim);margin-top:4px;font-family:var(--mono)}
+
+  /* ————— module grid ————— */
+  main.grid{
+    display:grid;
+    grid-template-columns:repeat(12,1fr);
+    gap:12px;
+    padding:14px;
+    align-content:start;
+  }
+  .module{
+    border:1px solid var(--line-soft);
+    background:linear-gradient(180deg,var(--panel2),var(--panel));
+    padding:12px 14px 14px;
+    position:relative;
+    min-width:0;
+    transition:border-color .3s, box-shadow .3s;
+  }
+  .module:hover{border-color:var(--line)}
+  .module::before{ /* corner ticks */
+    content:"";position:absolute;top:-1px;left:-1px;width:10px;height:10px;
+    border-top:2px solid var(--amber-dim);border-left:2px solid var(--amber-dim);
+  }
+  .module::after{
+    content:"";position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;
+    border-bottom:2px solid var(--amber-dim);border-right:2px solid var(--amber-dim);
+  }
+  .module.alerting{
+    animation:alertPulse 1s ease-in-out infinite;
+  }
+  @keyframes alertPulse{
+    0%,100%{border-color:var(--red);box-shadow:0 0 0 rgba(255,92,92,0)}
+    50%{border-color:var(--red);box-shadow:0 0 18px rgba(255,92,92,.35)}
+  }
+  .module.off{display:none}
+  .module h3{
+    font-family:var(--mono);font-size:10px;font-weight:700;
+    letter-spacing:.24em;text-transform:uppercase;
+    color:var(--amber);
+    display:flex;align-items:center;gap:8px;
+    margin-bottom:10px;
+  }
+  .module h3 .tag{
+    margin-left:auto;font-weight:400;font-size:9px;color:var(--dim);letter-spacing:.1em;
+  }
+
+  #m-telemetry{grid-column:span 7}
+  #m-attitude{grid-column:span 5}
+  #m-fuel{grid-column:span 4}
+  #m-log{grid-column:span 5}
+  #m-crew{grid-column:span 3}
+  #m-waterfall{grid-column:span 12}
+  @media(max-width:1100px){
+    #m-telemetry{grid-column:span 12}
+    #m-attitude{grid-column:span 12}
+    #m-fuel{grid-column:span 12}
+    #m-log{grid-column:span 12}
+    #m-crew{grid-column:span 12}
+  }
+
+  /* telemetry chart */
+  .chartbox{position:relative;height:170px}
+  canvas.chart{width:100%;height:100%;display:block}
+  .chart-legend{
+    display:flex;gap:16px;margin-top:8px;
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--dim);
+  }
+  .chart-legend i{display:inline-block;width:14px;height:2px;vertical-align:3px;margin-right:6px}
+
+  /* attitude indicator */
+  .attitude-wrap{display:flex;justify-content:center;padding:4px 0}
+  .attitude{
+    width:min(190px,100%);aspect-ratio:1;border-radius:50%;
+    overflow:hidden;position:relative;
+    border:1px solid var(--line);
+    background:#0A0D11;
+  }
+  .attitude .ball{
+    position:absolute;inset:-20%;
+    background:linear-gradient(180deg,#1E2B3C 0%,#1E2B3C 50%,#3A2A17 50%,#4A3419 100%);
+    transition:transform .35s linear;
+  }
+  .attitude .ball::after{
+    content:"";position:absolute;left:0;right:0;top:50%;height:2px;background:var(--amber);
+    box-shadow:0 0 8px var(--amber-faint);
+  }
+  .attitude .ladder i{
+    position:absolute;left:50%;width:34px;height:1px;background:rgba(232,220,200,.4);
+    transform:translateX(-50%);
+  }
+  .attitude .ladder i:nth-child(1){top:38%}
+  .attitude .ladder i:nth-child(2){top:43%;width:22px}
+  .attitude .ladder i:nth-child(3){top:57%;width:22px}
+  .attitude .ladder i:nth-child(4){top:62%}
+  .attitude .marker{
+    position:absolute;top:50%;left:8%;right:8%;height:0;
+    transform:translateY(-50%);
+  }
+  .attitude .marker::before,.attitude .marker::after{
+    content:"";position:absolute;top:-5px;width:0;height:0;
+    border-top:5px solid transparent;border-bottom:5px solid transparent;
+  }
+  .attitude .marker::before{left:0;border-left:9px solid var(--amber)}
+  .attitude .marker::after{right:0;border-right:9px solid var(--amber)}
+  .attitude .crosshair{
+    position:absolute;top:50%;left:50%;width:12px;height:2px;background:var(--amber);
+    transform:translate(-50%,-50%);
+  }
+  .att-read{
+    text-align:center;font-family:var(--mono);font-size:10.5px;color:var(--dim);
+    margin-top:8px;letter-spacing:.14em;
+  }
+  .att-read b{color:var(--text)}
+
+  /* fuel gauges */
+  .gauges{display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap}
+  .gauge{flex:1;min-width:76px;text-align:center}
+  .gauge svg{width:100%;max-width:110px;display:block;margin:0 auto}
+  .gauge .gv{
+    font-family:var(--mono);font-size:13px;font-weight:700;color:var(--amber);
+    margin-top:2px;
+  }
+  .gauge .gl{
+    font-family:var(--mono);font-size:8.5px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase;
+  }
+
+  /* event log */
+  .log{
+    font-family:var(--mono);font-size:11px;line-height:1.85;
+    height:196px;overflow:hidden;
+    display:flex;flex-direction:column;justify-content:flex-end;
+  }
+  .log .line{
+    display:flex;gap:8px;
+    animation:logIn .3s ease both;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  @keyframes logIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .log .t{color:var(--dim);flex:none}
+  .log .m{color:var(--text);opacity:.85}
+  .log .line.warn .m{color:var(--amber)}
+  .log .line.crit .m{color:var(--red);font-weight:700}
+  .log .line.ok .m{color:var(--ok)}
+  .cursor{
+    display:inline-block;width:7px;height:12px;background:var(--amber);
+    vertical-align:-2px;animation:lampBlink 1s steps(1) infinite;
+  }
+
+  /* crew chips */
+  .crew{display:flex;flex-direction:column;gap:8px}
+  .crewmember{
+    display:flex;align-items:center;gap:9px;
+    border:1px solid var(--line-soft);padding:8px 10px;
+    font-family:var(--mono);font-size:10.5px;
+    transition:border-color .3s;
+  }
+  .crewmember:hover{border-color:var(--line)}
+  .crewmember .pulse{
+    width:8px;height:8px;border-radius:50%;flex:none;
+  }
+  .crewmember .pulse.ok{background:var(--ok);box-shadow:0 0 8px rgba(125,223,160,.7);animation:lampBlink 3s infinite}
+  .crewmember .pulse.ex{background:var(--amber);box-shadow:0 0 8px var(--amber-faint);animation:lampBlink 1.4s infinite}
+  .crewmember .role{margin-left:auto;color:var(--dim);font-size:9px;letter-spacing:.16em}
+  .vitals{font-size:9px;color:var(--dim);letter-spacing:.1em;margin-top:3px}
+
+  /* waterfall */
+  .waterfallbox{height:150px;position:relative;overflow:hidden;border:1px solid var(--line-soft)}
+  canvas.wf{width:100%;height:100%;display:block}
+  .wf-scale{
+    display:flex;justify-content:space-between;
+    font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.14em;margin-top:6px;
+  }
+
+  /* drill button */
+  .drillbar{
+    grid-column:1/-1;
+    display:flex;gap:14px;align-items:center;flex-wrap:wrap;
+    border:1px solid var(--line-soft);
+    padding:12px 16px;
+    background:rgba(255,179,71,.03);
+  }
+  .drillbar .note{
+    font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.16em;
+  }
+  button.drill{
+    font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.28em;
+    text-transform:uppercase;cursor:pointer;
+    color:var(--red);background:transparent;
+    border:1px solid rgba(255,92,92,.5);
+    padding:11px 24px;
+    transition:background .25s,color .25s,box-shadow .25s;
+  }
+  button.drill:hover{background:var(--red);color:#180B0B;box-shadow:0 0 18px rgba(255,92,92,.4)}
+  button.drill:disabled{opacity:.4;cursor:wait}
+
+  /* odometer numbers */
+  .odo{display:inline-flex;gap:1px;font-family:var(--mono)}
+  .odo b{
+    display:inline-block;min-width:.68em;text-align:center;
+    background:rgba(255,179,71,.07);
+    border:1px solid var(--line-soft);
+    padding:2px 1px;
+    font-weight:700;color:var(--amber);
+    transition:transform .28s cubic-bezier(.2,.8,.2,1),opacity .28s;
+  }
+  .odo b.roll{transform:translateY(-8px);opacity:0}
+  .statline{
+    display:flex;gap:22px;flex-wrap:wrap;margin-top:10px;
+    font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.14em;
+  }
+  .statline .k{font-size:8.5px;letter-spacing:.24em;text-transform:uppercase;display:block;margin-bottom:3px}
+
+  footer.railfoot{
+    grid-column:1/-1;
+    padding:10px 20px;border-top:1px solid var(--line);
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;color:var(--dim);
+    display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    text-transform:uppercase;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .log .line{animation:none}
+    .module.alerting,.cursor,header .lamp,.pulse{animation:none}
+    .attitude .ball{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="ident">HELIOS-9 <span>// MISSION CONTROL</span></div>
+    <div class="sep"></div>
+    <div class="met">MET <b id="met">T+ 00:00:00</b></div>
+    <div class="met">SOL <b id="sol">214</b></div>
+    <div class="status" id="topStatus"><span class="lamp"></span><span id="statusText">All systems nominal</span></div>
+  </header>
+
+  <aside class="rail">
+    <div>
+      <h2>Modules</h2>
+      <div class="mods">
+        <button class="mod-toggle" data-mod="m-telemetry" aria-pressed="true"><span class="sq"></span>Telemetry</button>
+        <button class="mod-toggle" data-mod="m-attitude" aria-pressed="true"><span class="sq"></span>Attitude</button>
+        <button class="mod-toggle" data-mod="m-fuel" aria-pressed="true"><span class="sq"></span>Propellant</button>
+        <button class="mod-toggle" data-mod="m-log" aria-pressed="true"><span class="sq"></span>Event Log</button>
+        <button class="mod-toggle" data-mod="m-crew" aria-pressed="true"><span class="sq"></span>Crew</button>
+        <button class="mod-toggle" data-mod="m-waterfall" aria-pressed="true"><span class="sq"></span>Comm Waterfall</button>
+      </div>
+    </div>
+    <div class="clockbox">
+      <div class="lab">Master clock</div>
+      <div class="spd"><span id="spdVal">1.0</span><small>× RATE</small></div>
+      <input type="range" id="speed" min="0" max="5" step="0.5" value="1" aria-label="simulation clock speed">
+      <div class="spd-stops"><span>0.5×</span><span>1×</span><span>2×</span><span>3×</span></div>
+    </div>
+  </aside>
+
+  <main class="grid" id="grid">
+
+    <div class="drillbar">
+      <button class="drill" id="drillBtn">▲ Initiate solar-flare drill</button>
+      <span class="note" id="drillNote">Station-wide coordinated exercise. All modules will pulse; log will carry priority lines.</span>
+    </div>
+
+    <!-- TELEMETRY -->
+    <section class="module" id="m-telemetry">
+      <h3>Power telemetry <span class="tag">CH-A · 4.2 Hz</span></h3>
+      <div class="chartbox"><canvas class="chart" id="chart"></canvas></div>
+      <div class="chart-legend">
+        <span><i style="background:var(--amber)"></i>ARRAY OUTPUT kW</span>
+        <span><i style="background:#7DDFA0"></i>BUS LOAD kW</span>
+        <span><i style="background:#6FA8FF"></i>RAD FLUX µSv/h</span>
+      </div>
+      <div class="statline">
+        <div><span class="k">Output</span><span class="odo" id="odoOut"></span> kW</div>
+        <div><span class="k">Load</span><span class="odo" id="odoLoad"></span> kW</div>
+        <div><span class="k">Flux</span><span class="odo" id="odoFlux"></span> µSv/h</div>
+      </div>
+    </section>
+
+    <!-- ATTITUDE -->
+    <section class="module" id="m-attitude">
+      <h3>Attitude horizon <span class="tag">P/Y/R</span></h3>
+      <div class="attitude-wrap">
+        <div class="attitude">
+          <div class="ball" id="attBall">
+            <div class="ladder"><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="marker"></div>
+          <div class="crosshair"></div>
+        </div>
+      </div>
+      <div class="att-read">pitch <b id="attP">+0.0°</b> · yaw <b id="attY">+0.0°</b> · roll <b id="attR">+0.0°</b></div>
+    </section>
+
+    <!-- FUEL -->
+    <section class="module" id="m-fuel">
+      <h3>Propellant <span class="tag">RADIAL</span></h3>
+      <div class="gauges" id="gauges"></div>
+    </section>
+
+    <!-- LOG -->
+    <section class="module" id="m-log">
+      <h3>Event log <span class="tag">SELF-TYPING</span></h3>
+      <div class="log" id="log"></div>
+    </section>
+
+    <!-- CREW -->
+    <section class="module" id="m-crew">
+      <h3>Crew <span class="tag">5 SOULS</span></h3>
+      <div class="crew" id="crew"></div>
+    </section>
+
+    <!-- WATERFALL -->
+    <section class="module" id="m-waterfall">
+      <h3>Comm-signal waterfall <span class="tag">X-BAND 8.4 GHz</span></h3>
+      <div class="waterfallbox"><canvas class="wf" id="wf"></canvas></div>
+      <div class="wf-scale"><span>−120 dB</span><span>−100</span><span>−80</span><span>−60</span><span>carrier lock</span></div>
+    </section>
+
+    <footer class="railfoot">
+      <span>HELIOS-9 · solar station · fictitious flight dir. console</span>
+      <span id="footClock">—</span>
+    </footer>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ————— master clock ————— */
+  var simSpeed = 1;
+  var speedEl = document.getElementById('speed');
+  var spdVal = document.getElementById('spdVal');
+  speedEl.addEventListener('input', function(){
+    // slider 0..5 in halves maps to 0.5..3.0
+    simSpeed = [0.5,1,1.5,2,2.5,3][parseInt(speedEl.value,10)];
+    spdVal.textContent = simSpeed.toFixed(1);
+    logLine('ok', 'master clock re-timed to ' + simSpeed.toFixed(1) + '×');
+  });
+
+  var metStart = Date.now() - 214 * 86400 * 1000 - 5 * 3600 * 1000; // SOL 214
+  function fmtMET(ms){
+    var s = Math.floor(ms / 1000);
+    var d = Math.floor(s / 86400); s -= d * 86400;
+    var h = Math.floor(s / 3600); s -= h * 3600;
+    var m = Math.floor(s / 60); s -= m * 60;
+    function p(n){ return (n < 10 ? '0' : '') + n; }
+    return p(h) + ':' + p(m) + ':' + p(s);
+  }
+  var lastReal = performance.now();
+  var simElapsed = (Date.now() - metStart);
+  function clockTick(now){
+    var dt = (now - lastReal) * simSpeed;
+    lastReal = now;
+    simElapsed += dt;
+    var met = document.getElementById('met');
+    if (met) met.textContent = 'T+ ' + fmtMET(simElapsed);
+    requestAnimationFrame(clockTick);
+  }
+  requestAnimationFrame(clockTick);
+
+  setInterval(function(){
+    var d = new Date();
+    function p(n){ return (n < 10 ? '0' : '') + n; }
+    document.getElementById('footClock').textContent =
+      'UTC ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds());
+  }, 1000);
+
+  /* ————— event log ————— */
+  var logEl = document.getElementById('log');
+  var logCount = 0;
+  function logLine(kind, msg){
+    if (!logEl) return;
+    logCount++;
+    var d = new Date();
+    function p(n){ return (n < 10 ? '0' : '') + n; }
+    var line = document.createElement('div');
+    line.className = 'line' + (kind ? ' ' + kind : '');
+    line.innerHTML = '<span class="t">' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds()) + '</span><span class="m"></span>';
+    line.querySelector('.m').textContent = msg;
+    logEl.appendChild(line);
+    while (logEl.children.length > 9) logEl.removeChild(logEl.firstChild);
+  }
+
+  var logPool = [
+    [''  , 'array B tracker re-aimed +0.4°'],
+    [''  , 'thermal loop Δ settled at 3.1 K'],
+    [''  , 'ground pass 4472 — uplink 92.4%'],
+    [''  , 'gyro 3 bias drift within limits'],
+    ['warn', 'radiation shelter hatch exercised'],
+    [''  , 'CO₂ scrubber cartridge rotated'],
+    ['ok' , 'water reclaimer at 99.1% recovery'],
+    [''  , 'star tracker lock: VEGA'],
+    [''  , 'micrometeoroid shield sweep clean'],
+    ['warn', 'flare-watch: sunspot group 3664 growth'],
+    [''  , 'battery cell 118 balanced'],
+    ['ok' , 'docking collar pressure nominal']
+  ];
+  function randomLog(){
+    var pick = logPool[Math.floor(Math.random() * logPool.length)];
+    logLine(pick[0], pick[1]);
+    scheduleLog();
+  }
+  var logTimer = null;
+  function scheduleLog(){
+    clearTimeout(logTimer);
+    logTimer = setTimeout(randomLog, (2100 + Math.random() * 3200) / simSpeed);
+  }
+  ['station keeping on sun-line', 'morning checks complete — all greens', 'attitude hand to coarse pointers'].forEach(function(m){ logLine('', m); });
+  scheduleLog();
+
+  /* ————— odometers ————— */
+  function makeOdo(el, digits){
+    var cells = [];
+    for (var i = 0; i < digits; i++){
+      var b = document.createElement('b');
+      b.textContent = '0';
+      el.appendChild(b);
+      cells.push(b);
+    }
+    return {
+      set: function(str){
+        var pad = '';
+        for (var k = 0; k < cells.length - str.length; k++) pad += '0';
+        str = pad + str;
+        for (var i = 0; i < cells.length; i++){
+          if (cells[i].textContent !== str[i]){
+            cells[i].classList.add('roll');
+            (function(cell, ch){
+              setTimeout(function(){ cell.textContent = ch; cell.classList.remove('roll'); }, 130);
+            })(cells[i], str[i]);
+          }
+        }
+      }
+    };
+  }
+  var odoOut  = makeOdo(document.getElementById('odoOut'), 3);
+  var odoLoad = makeOdo(document.getElementById('odoLoad'), 3);
+  var odoFlux = makeOdo(document.getElementById('odoFlux'), 4);
+
+  /* ————— telemetry chart ————— */
+  var chart = document.getElementById('chart');
+  var cctx = chart.getContext('2d');
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var series = [
+    {data: [], color: '#FFB347', min: 0,  max: 120, gen: function(){ return 84 + Math.sin(Date.now()/4200)*10 + (Math.random()-0.5)*7; }},
+    {data: [], color: '#7DDFA0', min: 0,  max: 120, gen: function(){ return 61 + Math.sin(Date.now()/6100+2)*6 + (Math.random()-0.5)*5; }},
+    {data: [], color: '#6FA8FF', min: 0,  max: 400, gen: function(){ return 180 + Math.sin(Date.now()/9000+1)*40 + (Math.random()-0.5)*30; }}
+  ];
+  var MAXPTS = 140;
+  function sizeChart(){
+    var r = chart.parentElement.getBoundingClientRect();
+    chart.width = r.width * DPR; chart.height = r.height * DPR;
+    cctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  function drawChart(){
+    var w = chart.width / DPR, h = chart.height / DPR;
+    cctx.clearRect(0, 0, w, h);
+    // grid
+    cctx.strokeStyle = 'rgba(255,179,71,.08)';
+    cctx.lineWidth = 1;
+    for (var g = 1; g < 4; g++){
+      cctx.beginPath(); cctx.moveTo(0, h*g/4); cctx.lineTo(w, h*g/4); cctx.stroke();
+    }
+    for (var g2 = 1; g2 < 6; g2++){
+      cctx.beginPath(); cctx.moveTo(w*g2/6, 0); cctx.lineTo(w*g2/6, h); cctx.stroke();
+    }
+    series.forEach(function(s){
+      if (s.data.length < 2) return;
+      cctx.strokeStyle = s.color;
+      cctx.lineWidth = 1.6;
+      cctx.shadowColor = s.color;
+      cctx.shadowBlur = reduce ? 0 : 6;
+      cctx.beginPath();
+      s.data.forEach(function(v, i){
+        var x = (i / (MAXPTS - 1)) * w;
+        var y = h - (v - s.min) / (s.max - s.min) * (h - 14) - 7;
+        if (i === 0) cctx.moveTo(x, y); else cctx.lineTo(x, y);
+      });
+      cctx.stroke();
+      cctx.shadowBlur = 0;
+    });
+  }
+  function pushTelemetry(){
+    series.forEach(function(s){
+      s.data.push(s.gen());
+      if (s.data.length > MAXPTS) s.data.shift();
+    });
+    drawChart();
+    odoOut.set(String(Math.round(series[0].data[series[0].data.length-1])));
+    odoLoad.set(String(Math.round(series[1].data[series[1].data.length-1])));
+    odoFlux.set(String(Math.round(series[2].data[series[2].data.length-1])));
+  }
+  var teleTimer = null;
+  function scheduleTele(){
+    clearInterval(teleTimer);
+    teleTimer = setInterval(pushTelemetry, 420 / simSpeed);
+  }
+  sizeChart();
+  for (var i = 0; i < 60; i++) pushTelemetry();
+  scheduleTele();
+
+  /* ————— attitude ————— */
+  var attBall = document.getElementById('attBall');
+  var attP = document.getElementById('attP'), attY = document.getElementById('attY'), attR = document.getElementById('attR');
+  var pitch = 0, roll = 0, yaw = 0;
+  var attTimer = null;
+  function attStep(){
+    pitch = Math.sin(Date.now()/5300) * 9;
+    roll  = Math.sin(Date.now()/7100 + 1.2) * 14;
+    yaw   = (yaw + 0.4 * simSpeed) % 360;
+    attBall.style.transform = 'rotate(' + (-roll).toFixed(2) + 'deg) translateY(' + (pitch * 1.6).toFixed(2) + 'px)';
+    attP.textContent = (pitch >= 0 ? '+' : '') + pitch.toFixed(1) + '°';
+    attY.textContent = '+' + yaw.toFixed(1) + '°';
+    attR.textContent = (roll >= 0 ? '+' : '') + roll.toFixed(1) + '°';
+  }
+  attTimer = setInterval(attStep, 300);
+  // retime attitude cadence when the master clock changes
+  speedEl.addEventListener('input', function(){
+    clearInterval(attTimer);
+    attTimer = setInterval(attStep, 300 / simSpeed);
+  });
+
+  /* ————— fuel gauges ————— */
+  var gaugesEl = document.getElementById('gauges');
+  var tanks = [
+    {label: 'Main A', v: 0.82},
+    {label: 'Main B', v: 0.74},
+    {label: 'RCS',    v: 0.93},
+    {label: 'Reserve',v: 0.99}
+  ];
+  var gaugeFns = [];
+  tanks.forEach(function(t){
+    var holder = document.createElement('div');
+    holder.className = 'gauge';
+    holder.innerHTML =
+      '<svg viewBox="0 0 100 84">' +
+      '<circle cx="50" cy="46" r="34" fill="none" stroke="rgba(255,179,71,.14)" stroke-width="7"/>' +
+      '<circle class="arc" cx="50" cy="46" r="34" fill="none" stroke="#FFB347" stroke-width="7" ' +
+      'stroke-linecap="butt" stroke-dasharray="213.6" stroke-dashoffset="213.6" ' +
+      'transform="rotate(135 50 46)"/>' +
+      '<text x="50" y="50" text-anchor="middle" font-family="Courier New" font-size="17" fill="#E8DCC8" class="num">—</text>' +
+      '</svg><div class="gv">—</div><div class="gl">' + t.label + '</div>';
+    gaugesEl.appendChild(holder);
+    var arc = holder.querySelector('.arc');
+    var num = holder.querySelector('.num');
+    var gv = holder.querySelector('.gv');
+    gaugeFns.push(function(){
+      var drift = (Math.random() - 0.5) * 0.006;
+      t.v = Math.max(0.05, Math.min(1, t.v + drift - 0.00012 * simSpeed));
+      arc.setAttribute('stroke-dashoffset', (213.6 * (1 - t.v)).toFixed(1));
+      var pct = Math.round(t.v * 100);
+      num.textContent = pct;
+      gv.textContent = pct + '%';
+      if (t.v < 0.25) arc.setAttribute('stroke', '#FF5C5C');
+      else if (t.v < 0.5) arc.setAttribute('stroke', '#FFD166');
+      else arc.setAttribute('stroke', '#FFB347');
+    });
+  });
+  setInterval(function(){ gaugeFns.forEach(function(f){ f(); }); }, 900);
+
+  /* ————— crew ————— */
+  var crewEl = document.getElementById('crew');
+  var crew = [
+    {name: 'CDR Vasquez',  role: 'COMMAND',  st: 'ok'},
+    {name: 'PLT Okafor',   role: 'PILOT',    st: 'ok'},
+    {name: 'ENG Tanaka',   role: 'ENGINEER', st: 'ok'},
+    {name: 'SCI Larsen',   role: 'SCIENCE',  st: 'ex'},
+    {name: 'MED Chandra',  role: 'MEDICAL',  st: 'ok'}
+  ];
+  crew.forEach(function(c){
+    var el = document.createElement('div');
+    el.className = 'crewmember';
+    el.innerHTML = '<span class="pulse ' + c.st + '"></span><div><div>' + c.name + '</div>' +
+      '<div class="vitals">HR ' + (62 + Math.floor(Math.random()*14)) + ' · SpO₂ 97–99 · ' +
+      (c.st === 'ok' ? 'on duty' : 'EVA prep') + '</div></div><span class="role">' + c.role + '</span>';
+    crewEl.appendChild(el);
+  });
+  setInterval(function(){
+    var el = crewEl.children[Math.floor(Math.random() * crewEl.children.length)];
+    var v = el.querySelector('.vitals');
+    if (v) v.textContent = 'HR ' + (58 + Math.floor(Math.random()*20)) + ' · SpO₂ 97–99 · ' + (Math.random() < .8 ? 'on duty' : 'rest cycle');
+  }, 2600);
+
+  /* ————— comm waterfall ————— */
+  var wf = document.getElementById('wf');
+  var wctx = wf.getContext('2d');
+  function sizeWf(){
+    var r = wf.parentElement.getBoundingClientRect();
+    wf.width = Math.max(50, Math.floor(r.width / 4));   // chunky pixels
+    wf.height = Math.max(20, Math.floor(r.height / 4));
+    wctx.fillStyle = '#0A0D11';
+    wctx.fillRect(0, 0, wf.width, wf.height);
+  }
+  var carrier = Math.floor(wf.width * 0.7) || 70;
+  var drift = 0;
+  function wfStep(){
+    // scroll down one row
+    wctx.drawImage(wf, 0, 1);
+    wctx.fillStyle = '#0A0D11';
+    wctx.fillRect(0, 0, wf.width, 1);
+    // noise floor
+    for (var x = 0; x < wf.width; x++){
+      var inten = Math.random() * 26;
+      // moving carrier blob
+      var d = Math.abs(x - carrier);
+      if (d < 3) inten += 200 - d * 40;
+      if (d < 12 && Math.random() < 0.3) inten += 60;
+      // occasional harmonics
+      if (Math.abs(x - carrier * 0.5) < 2 && Math.random() < 0.6) inten += 70;
+      var g = Math.min(255, inten);
+      var rr = Math.min(255, g * 1.0), gg = Math.min(255, g * 0.72), bb = Math.min(255, g * 0.32);
+      wctx.fillStyle = 'rgb(' + (rr|0) + ',' + (gg|0) + ',' + (bb|0) + ')';
+      wctx.fillRect(x, 0, 1, 1);
+    }
+    drift += 0.13;
+    carrier = Math.floor(wf.width * 0.7 + Math.sin(drift) * wf.width * 0.05);
+  }
+  var wfTimer = null;
+  function scheduleWf(){
+    clearInterval(wfTimer);
+    wfTimer = setInterval(wfStep, 90 / simSpeed);
+  }
+  sizeWf();
+  carrier = Math.floor(wf.width * 0.7);
+  for (var w = 0; w < 40; w++) wfStep();
+  scheduleWf();
+
+  /* ————— module toggles ————— */
+  document.querySelectorAll('.mod-toggle').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var on = btn.getAttribute('aria-pressed') !== 'true';
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      var mod = document.getElementById(btn.dataset.mod);
+      if (mod) mod.classList.toggle('off', !on);
+      logLine(on ? 'ok' : 'warn', (btn.textContent || '').trim() + (on ? ' restored' : ' muted'));
+    });
+  });
+
+  /* ————— DRILL ————— */
+  var drillBtn = document.getElementById('drillBtn');
+  var drillNote = document.getElementById('drillNote');
+  var topStatus = document.getElementById('topStatus');
+  var statusText = document.getElementById('statusText');
+  var drilling = false;
+  drillBtn.addEventListener('click', function(){
+    if (drilling) return;
+    drilling = true;
+    drillBtn.disabled = true;
+    topStatus.classList.add('alert');
+    statusText.textContent = 'FLARE DRILL IN PROGRESS';
+
+    var mods = Array.prototype.slice.call(document.querySelectorAll('.module'));
+    mods.forEach(function(m, i){
+      setTimeout(function(){ m.classList.add('alerting'); }, i * 120 / simSpeed);
+    });
+    logLine('crit', 'DRILL — class-X solar flare simulated');
+    var drillLines = [
+      ['crit', 'priority: shelters open · hatch 1–4'],
+      ['warn', 'arrays to safe posture — output cut'],
+      ['warn', 'comm degraded to low-rate X-band'],
+      ['crit', 'radiation flux peaking 3,400 µSv/h'],
+      [''   , 'crew confirmed in shelter module']
+    ];
+    drillLines.forEach(function(l, i){
+      setTimeout(function(){ logLine(l[0], l[1]); }, (700 + i * 650) / simSpeed);
+    });
+
+    var end = 700 + drillLines.length * 650 + 1400;
+    setTimeout(function(){
+      mods.forEach(function(m){ m.classList.remove('alerting'); });
+      topStatus.classList.remove('alert');
+      statusText.textContent = 'All systems nominal';
+      logLine('ok', 'DRILL COMPLETE — all-clear, station nominal');
+      logLine('ok', 'arrays re-tracking · full output restored');
+      drillBtn.disabled = false;
+      drilling = false;
+    }, end / simSpeed);
+  });
+
+  window.addEventListener('resize', function(){
+    sizeChart(); drawChart(); sizeWf();
+  });
+
+  document.addEventListener('visibilitychange', function(){
+    if (document.hidden){
+      clearInterval(teleTimer); clearInterval(wfTimer); clearTimeout(logTimer);
+    } else {
+      scheduleTele(); scheduleWf(); scheduleLog();
+    }
+  });
+})();
+</script>
+</body>
+</html>

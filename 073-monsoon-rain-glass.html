@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PETRICHOR — rain on a night window</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body { font-family: system-ui, -apple-system, sans-serif; background:#05070c; }
+  #city { position:fixed; inset:0; }
+  #glass { position:fixed; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; }
+  .flash { position:fixed; inset:0; background:#dfe8ff; opacity:0; pointer-events:none; z-index:8; }
+  .hud {
+    position:fixed; left:22px; top:20px; z-index:10; color:#c9d2e8; text-shadow:0 1px 4px rgba(0,0,0,.7);
+  }
+  .hud h1 { font-size:17px; font-weight:300; letter-spacing:.52em; text-transform:uppercase; }
+  .hud p { font-size:9px; letter-spacing:.26em; text-transform:uppercase; margin-top:5px; color:#7a8699; }
+  .panel {
+    position:fixed; right:18px; top:16px; z-index:10; width:210px; padding:14px 16px;
+    background:rgba(8,12,20,.66); border:1px solid rgba(150,170,220,.16); border-radius:14px;
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    display:flex; flex-direction:column; gap:12px;
+  }
+  .panel label { font-size:8.5px; letter-spacing:.24em; text-transform:uppercase; color:#7a8699;
+    display:flex; justify-content:space-between; }
+  .panel label output { color:#c9d2e8; }
+  input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:3px; border-radius:99px;
+    background:#2a3350; outline:none; cursor:pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#c9d2e8; box-shadow:0 0 8px rgba(160,190,255,.8); }
+  .panel .btns { display:flex; gap:8px; }
+  .panel .btns button {
+    flex:1; background:rgba(150,170,220,.08); color:#c9d2e8; border:1px solid rgba(150,170,220,.28);
+    border-radius:99px; font:inherit; font-size:9px; letter-spacing:.14em; text-transform:uppercase;
+    padding:8px 6px; cursor:pointer; transition:all .15s;
+  }
+  .panel .btns button:hover { background:rgba(150,170,220,.22); }
+  .panel .btns button.on { background:#5a7ac9; border-color:#5a7ac9; color:#fff; }
+  .interior {
+    position:fixed; left:22px; bottom:20px; z-index:10; font-size:10px; letter-spacing:.18em;
+    text-transform:uppercase; color:rgba(201,210,232,.5);
+  }
+  @media (max-width:640px) { .panel { width:180px; } .interior { display:none; } }
+</style>
+</head>
+<body>
+  <canvas id="city"></canvas>
+  <canvas id="glass"></canvas>
+  <div class="flash" id="flash"></div>
+
+  <div class="hud">
+    <h1>Petrichor</h1>
+    <p>the smell of rain arriving</p>
+  </div>
+  <div class="interior">interior · 21°c · tea going cold</div>
+
+  <div class="panel">
+    <label>storm <output id="oStorm">moderate</output></label>
+    <input type="range" id="rStorm" min="5" max="100" value="45">
+    <div class="btns">
+      <button id="rainBtn" class="on">rain</button>
+      <button id="thunderBtn">thunder</button>
+      <button id="wipeBtn">wipe glass</button>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const city = $("city"), cg = city.getContext("2d");
+  const glass = $("glass"), gg = glass.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let storm = 0.45, rainOn = true, thunderOn = true;
+  let droplets = [], runners = [], fog = 0.35;
+
+  /* ---------- city bokeh (soft lights behind glass) ---------- */
+  const orbs = [];
+  function buildCity() {
+    orbs.length = 0;
+    const hues = [
+      ["255,170,90", "warm sodium"], ["255,110,130", "neon rose"],
+      ["90,180,230", "cool sign"], ["255,220,140", "window"],
+      ["150,160,255", "street led"], ["120,230,190", "laundry"],
+    ];
+    for (let i = 0; i < 26; i++) {
+      const h = hues[i % hues.length];
+      orbs.push({
+        x: Math.random() * W, y: H * (0.25 + Math.random() * 0.6),
+        r: 14 + Math.random() * 42,
+        col: h[0], tw: Math.random() * 6.28, sp: 0.4 + Math.random() * 0.8,
+      });
+    }
+    /* rooftop silhouettes */
+    city._roofs = [];
+    let x = -20;
+    while (x < W + 40) {
+      const w = 60 + Math.random() * 120;
+      city._roofs.push({ x, w, h: 40 + Math.random() * 130 });
+      x += w + 6;
+    }
+  }
+
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    [city, glass].forEach(c => { c.width = W * DPR; c.height = H * DPR; });
+    cg.setTransform(DPR, 0, 0, DPR, 0, 0);
+    gg.setTransform(DPR, 0, 0, DPR, 0, 0);
+    buildCity();
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  /* ---------- audio ---------- */
+  let AC = null, rainNode = null, rainGain = null;
+  function ensureAudio() {
+    if (AC) return AC;
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      /* rain = filtered looping noise */
+      const buf = AC.createBuffer(1, AC.sampleRate * 2, AC.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      rainNode = AC.createBufferSource(); rainNode.buffer = buf; rainNode.loop = true;
+      const f = AC.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 2600; f.Q.value = 0.4;
+      rainGain = AC.createGain(); rainGain.gain.value = 0;
+      rainNode.connect(f); f.connect(rainGain); rainGain.connect(AC.destination);
+      rainNode.start();
+    } catch (e) { AC = null; }
+    return AC;
+  }
+  function setRainVol() {
+    if (rainGain && AC) {
+      try { rainGain.gain.setTargetAtTime(rainOn ? storm * 0.05 : 0, AC.currentTime, 0.4); } catch (e) {}
+    }
+  }
+  function thunder(dist) {
+    const c = ensureAudio(); if (!c || !thunderOn) return;
+    try {
+      const dur = 1.6 + Math.random();
+      const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) {
+        const k = i / d.length;
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - k, 1.6) * (0.5 + 0.5 * Math.sin(k * 30));
+      }
+      const src = c.createBufferSource(); src.buffer = buf;
+      const f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 160 - dist * 60;
+      const gn = c.createGain(); gn.gain.value = 0.16 * (1 - dist * 0.5);
+      src.connect(f); f.connect(gn); gn.connect(c.destination);
+      src.start();
+    } catch (e) {}
+  }
+
+  /* ---------- droplets ---------- */
+  function spawnDroplet() {
+    droplets.push({
+      x: Math.random() * W, y: Math.random() * H * 0.4,
+      r: 1.5 + Math.random() * 3.4,
+      vy: 0, stuck: true,
+      life: 1,
+    });
+  }
+  for (let i = 0; i < 40; i++) spawnDroplet();
+
+  let lastFlash = 0;
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+
+    /* ---- city layer ---- */
+    cg.clearRect(0, 0, W, H);
+    const night = cg.createLinearGradient(0, 0, 0, H);
+    night.addColorStop(0, "#05070c");
+    night.addColorStop(1, "#0a0f18");
+    cg.fillStyle = night; cg.fillRect(0, 0, W, H);
+    /* rooftop silhouettes */
+    cg.fillStyle = "#03040a";
+    (city._roofs || []).forEach(rf => {
+      cg.fillRect(rf.x, H - rf.h, rf.w, rf.h);
+    });
+    /* bokeh orbs */
+    orbs.forEach(o => {
+      const tw = 0.6 + 0.4 * Math.sin(now / 1400 * o.sp + o.tw);
+      const rg = cg.createRadialGradient(o.x, o.y, 1, o.x, o.y, o.r * 2.4);
+      rg.addColorStop(0, "rgba(" + o.col + "," + (0.34 * tw) + ")");
+      rg.addColorStop(1, "rgba(" + o.col + ",0)");
+      cg.fillStyle = rg;
+      cg.beginPath(); cg.arc(o.x, o.y, o.r * 2.4, 0, 6.283); cg.fill();
+      /* bright core */
+      cg.fillStyle = "rgba(" + o.col + "," + 0.5 * tw + ")";
+      cg.beginPath(); cg.arc(o.x, o.y, o.r * 0.3, 0, 6.283); cg.fill();
+    });
+    /* blur the city = behind wet glass */
+    cg.save();
+    cg.globalAlpha = fog * 0.5;
+    cg.filter = "blur(0px)";
+    cg.drawImage(city, 0, 0, W, H);
+    cg.restore();
+
+    /* ---- lightning ---- */
+    if (thunderOn && Math.random() < 0.0012 + storm * 0.002) {
+      const dist = Math.random();
+      flashNow(dist);
+      setTimeout(() => thunder(dist), 400 + dist * 2200);
+    }
+
+    /* ---- glass layer ---- */
+    gg.clearRect(0, 0, W, H);
+    /* ambient condensation */
+    gg.fillStyle = "rgba(180,200,220," + (fog * 0.05) + ")";
+    gg.fillRect(0, 0, W, H);
+
+    /* rain streaks while raining */
+    if (rainOn) {
+      gg.strokeStyle = "rgba(190,210,235,.16)";
+      gg.lineWidth = 1.2;
+      const n = Math.floor(storm * 26);
+      for (let i = 0; i < n; i++) {
+        const x = Math.random() * W, y = Math.random() * H;
+        const len = 10 + Math.random() * 18;
+        gg.beginPath();
+        gg.moveTo(x, y);
+        gg.lineTo(x - 2, y + len);
+        gg.stroke();
+      }
+    }
+
+    /* droplets: grow, merge, run */
+    droplets.forEach(d => {
+      if (d.stuck) {
+        d.r += Math.random() * 0.02 * (rainOn ? storm + 0.3 : 0.1);
+        if (d.r > 3.4 && Math.random() < 0.004 + storm * 0.006) {
+          d.stuck = false; d.vy = 0.4 + Math.random() * 0.8;
+        }
+      } else {
+        d.vy += 0.028;
+        d.y += d.vy;
+        d.x += Math.sin(d.y * 0.02) * 0.3;
+        /* leave clearing trail (visual only) */
+        gg.strokeStyle = "rgba(210,228,248,.07)";
+        gg.lineWidth = d.r * 1.4;
+        gg.beginPath();
+        gg.moveTo(d.x, d.y - d.vy * 6);
+        gg.lineTo(d.x, d.y);
+        gg.stroke();
+      }
+      /* draw droplet: lens with highlight */
+      const grd = gg.createRadialGradient(d.x - d.r * 0.3, d.y - d.r * 0.3, 0.2, d.x, d.y, d.r);
+      grd.addColorStop(0, "rgba(240,248,255,.5)");
+      grd.addColorStop(0.6, "rgba(160,185,215,.28)");
+      grd.addColorStop(1, "rgba(120,150,190,.14)");
+      gg.fillStyle = grd;
+      gg.beginPath(); gg.arc(d.x, d.y, d.r, 0, 6.283); gg.fill();
+      /* sparkle */
+      gg.fillStyle = "rgba(255,255,255,.5)";
+      gg.beginPath(); gg.arc(d.x - d.r * 0.35, d.y - d.r * 0.35, Math.max(0.4, d.r * 0.18), 0, 6.283); gg.fill();
+    });
+    /* recycle droplets */
+    droplets = droplets.filter(d => d.y < H + 10 && d.life > 0);
+    while (droplets.length < 46) spawnDroplet();
+  }
+  requestAnimationFrame(loop);
+
+  function flashNow(dist) {
+    const f = $("flash");
+    f.style.transition = "none";
+    f.style.opacity = String(0.85 - dist * 0.4);
+    requestAnimationFrame(() => {
+      f.style.transition = "opacity " + (0.3 + dist * 0.4) + "s ease-out";
+      f.style.opacity = "0";
+    });
+  }
+
+  /* ---------- wiping the glass ---------- */
+  let wiping = false;
+  glass.addEventListener("pointerdown", (e) => { wiping = true; ensureAudio(); setRainVol(); wipe(e); });
+  glass.addEventListener("pointermove", (e) => { if (wiping) wipe(e); });
+  addEventListener("pointerup", () => { wiping = false; });
+  function wipe(e) {
+    /* remove droplets under the pointer; leave a clear streak */
+    droplets = droplets.filter(d => Math.hypot(d.x - e.clientX, d.y - e.clientY) > 26);
+    /* permanent-ish streak: paint transparent onto fog via lighter patches */
+    gg.save();
+    gg.globalCompositeOperation = "destination-out";
+    gg.strokeStyle = "rgba(0,0,0,.5)";
+    gg.lineWidth = 44;
+    gg.lineCap = "round";
+    gg.beginPath();
+    gg.moveTo(e.clientX, e.clientY - 20);
+    gg.lineTo(e.clientX, e.clientY + 20);
+    gg.stroke();
+    gg.restore();
+  }
+
+  /* ---------- controls ---------- */
+  $("rStorm").addEventListener("input", (e) => {
+    storm = parseInt(e.target.value, 10) / 100;
+    $("oStorm").textContent = storm < 0.3 ? "drizzle" : storm < 0.6 ? "moderate" : storm < 0.85 ? "heavy" : "deluge";
+    setRainVol();
+  });
+  $("rainBtn").addEventListener("click", function () {
+    rainOn = !rainOn;
+    this.classList.toggle("on", rainOn);
+    setRainVol();
+  });
+  $("thunderBtn").addEventListener("click", function () {
+    thunderOn = !thunderOn;
+    this.classList.toggle("on", thunderOn);
+    ensureAudio();
+  });
+  $("wipeBtn").addEventListener("click", () => {
+    /* full squeegee */
+    gg.clearRect(0, 0, W, H);
+    droplets.length = 0;
+    fog = Math.max(0.1, fog - 0.12);
+  });
+
+  /* first gesture unlocks audio */
+  addEventListener("pointerdown", function once() {
+    ensureAudio();
+    setRainVol();
+    removeEventListener("pointerdown", once);
+  });
+})();
+</script>
+</body>
+</html>

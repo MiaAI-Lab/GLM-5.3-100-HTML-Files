@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KARESANSUI — a dry garden</title>
+<style>
+  :root{
+    --paper:#F4EEE1; --paper-2:#EDE5D3; --ink:#2B2721; --ink-soft:#6B6154;
+    --sand:#E8DCC8; --rake:#C2AE8B; --wood:#5D4732; --wood-2:#7B5E43;
+    --seal:#A63B2A; --moss:#6E7F4E;
+    --hairline:rgba(43,39,33,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(120% 90% at 50% -10%, rgba(255,252,240,.9), rgba(255,252,240,0) 55%),
+      linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 78%, #E4DAC4 100%);
+    display:flex; flex-direction:column; min-height:100vh; overflow:hidden;
+  }
+  /* faint washi fibre texture via layered gradients */
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; opacity:.5;
+    background:
+      repeating-linear-gradient(93deg, rgba(120,100,70,.022) 0 2px, rgba(0,0,0,0) 2px 7px),
+      repeating-linear-gradient(0deg, rgba(120,100,70,.015) 0 1px, rgba(0,0,0,0) 1px 5px);
+  }
+  header{
+    display:flex; align-items:baseline; gap:.8rem 1.4rem; flex-wrap:wrap;
+    padding:.9rem 1.4rem .5rem; position:relative; z-index:3;
+  }
+  h1{
+    font-family:Georgia,"Times New Roman",serif; font-weight:400;
+    font-size:clamp(1.3rem, 3.4vw, 2.2rem); letter-spacing:.34em;
+  }
+  h1 .kanji{
+    font-size:.72em; letter-spacing:.2em; color:var(--seal); margin-left:.2em;
+  }
+  .sub{
+    font-size:.68rem; letter-spacing:.24em; text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+  .head-actions{margin-left:auto; display:flex; gap:.5rem; flex-wrap:wrap}
+  .plaque{
+    font-family:Georgia,serif; font-size:.72rem; font-style:italic;
+    color:var(--ink-soft); letter-spacing:.06em;
+  }
+  main{
+    flex:1; display:flex; align-items:center; justify-content:center;
+    padding:0 1.4rem 1.6rem; min-height:0; position:relative; z-index:2;
+  }
+  /* wooden frame around the garden */
+  .frame{
+    position:relative; width:min(100%, 1500px); height:100%;
+    max-height:860px; border-radius:10px;
+    background:
+      repeating-linear-gradient(90deg, rgba(0,0,0,.10) 0 1px, rgba(255,255,255,.04) 1px 3px, rgba(0,0,0,0) 3px 9px),
+      linear-gradient(160deg, var(--wood-2), var(--wood) 55%, #4A3826);
+    padding:clamp(10px, 1.6vw, 22px);
+    box-shadow:
+      inset 0 2px 3px rgba(255,255,255,.18),
+      inset 0 -3px 6px rgba(0,0,0,.4),
+      0 18px 50px -18px rgba(60,42,20,.55),
+      0 4px 14px rgba(60,42,20,.28);
+  }
+  .matt{
+    position:relative; width:100%; height:100%;
+    background:#D8CCB2; border-radius:4px; overflow:hidden;
+    box-shadow: inset 0 0 0 1px rgba(43,31,15,.5), inset 0 4px 14px rgba(0,0,0,.28);
+  }
+  canvas#sand{display:block; width:100%; height:100%; touch-action:none; cursor:crosshair}
+  /* tool rail floating over the garden, bottom centre */
+  .tools{
+    position:absolute; left:50%; bottom:14px; transform:translateX(-50%);
+    display:flex; gap:.4rem; align-items:center; flex-wrap:wrap; justify-content:center;
+    padding:.4rem .5rem; border-radius:999px; max-width:calc(100% - 20px);
+    background:rgba(244,238,225,.9); backdrop-filter:blur(4px);
+    box-shadow:0 2px 10px rgba(43,31,15,.25), inset 0 0 0 1px rgba(43,39,33,.15);
+  }
+  button{
+    font-family:inherit; font-size:.66rem; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--ink); background:transparent; border:0; border-radius:999px;
+    padding:.48rem .8rem; cursor:pointer; transition:background .18s, color .18s, box-shadow .18s;
+    display:inline-flex; align-items:center; gap:.4em; white-space:nowrap;
+  }
+  button .glyph{font-family:Georgia,serif; font-size:.85rem; letter-spacing:0}
+  button:hover{background:rgba(43,39,33,.08)}
+  button:focus-visible{outline:2px solid var(--seal); outline-offset:2px}
+  button.tool[aria-pressed="true"]{
+    background:var(--ink); color:var(--paper); box-shadow:0 1px 4px rgba(0,0,0,.3);
+  }
+  .tools .sep{width:1px; height:1.3rem; background:var(--hairline); flex:none}
+  button.act:hover{background:rgba(166,59,42,.12); color:var(--seal)}
+  footer{
+    display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap;
+    padding:.35rem 1.5rem .8rem; font-family:"Courier New",monospace;
+    font-size:.64rem; letter-spacing:.14em; color:var(--ink-soft); position:relative; z-index:2;
+  }
+  footer .hint b{color:var(--seal); font-weight:700}
+  .meter{
+    position:absolute; top:10px; right:12px; font-family:"Courier New",monospace;
+    font-size:.6rem; letter-spacing:.14em; color:rgba(74,60,38,.75);
+    text-align:right; pointer-events:none;
+  }
+  .gtitle{
+    position:absolute; top:12px; left:14px; pointer-events:none;
+    font-family:Georgia,serif; font-size:.7rem; letter-spacing:.3em;
+    color:rgba(74,60,38,.6); text-transform:uppercase;
+  }
+  .veil{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(232,220,200,.4); backdrop-filter:blur(2px);
+    font-family:"Courier New",monospace; font-size:.7rem; letter-spacing:.3em;
+    color:var(--ink-soft); text-transform:uppercase; transition:opacity .5s;
+    pointer-events:none;
+  }
+  .veil.hide{opacity:0}
+  @media (max-width:640px){
+    header{padding:.7rem .9rem .3rem; gap:.3rem .8rem}
+    .plaque{display:none}
+    main{padding:0 .7rem .9rem}
+    footer{padding:.3rem .9rem .6rem}
+    footer .hint{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .tools,button,.veil{transition:none}
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>KARESANSUI<span class="kanji">枯山水</span></h1>
+    <p class="sub">fifteen stones · raked at dawn</p>
+    <div class="head-actions">
+      <span class="plaque">Ryōan-ji style · simulation no. 011</span>
+      <button id="btnWind" class="act" aria-label="Send a gust of wind across the garden"><span class="glyph">🍃</span>Wind</button>
+      <button id="btnReset" class="act" aria-label="Smooth the sand back to blank"><span class="glyph">◦</span>Reset</button>
+      <button id="btnSound" class="act" aria-pressed="false" aria-label="Toggle granular raking sound"><span class="glyph">♪</span>Sound</button>
+    </div>
+  </header>
+  <main>
+    <div class="frame">
+      <div class="matt">
+        <canvas id="sand" aria-label="Zen sand garden. Drag to rake the sand, drag stones to move them."></canvas>
+        <div class="gtitle">the dry landscape</div>
+        <div class="meter" id="meter">strokes 000 · stones 000</div>
+        <div class="tools" role="toolbar" aria-label="Garden tools">
+          <button class="tool" data-tool="rake3" aria-pressed="true"><span class="glyph">彡</span>Rake III</button>
+          <button class="tool" data-tool="rake5" aria-pressed="false"><span class="glyph">川</span>Rake V</button>
+          <button class="tool" data-tool="broom" aria-pressed="false"><span class="glyph">〰</span>Broom</button>
+          <span class="sep" aria-hidden="true"></span>
+          <button class="tool" data-tool="stone" aria-pressed="false"><span class="glyph">石</span>Stone</button>
+        </div>
+        <div class="veil hide" id="veil">smoothing the sand …</div>
+      </div>
+    </div>
+  </main>
+  <footer>
+    <span class="hint">drag to <b>rake</b> · drag a stone to <b>move</b> it · ripples re-rake themselves</span>
+    <span id="readout">KARESANSUI v1.0 · canvas · gesture-gated audio</span>
+  </footer>
+<script>
+"use strict";
+(function(){
+  const cvs = document.getElementById("sand");
+  const ctx = cvs.getContext("2d");
+  const meter = document.getElementById("meter");
+  const veil  = document.getElementById("veil");
+  const readout = document.getElementById("readout");
+  const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let W=0, H=0, DPR=1;
+  let grain=null;            // static grain tile canvas
+  let trail=null, tctx=null; // persistent rake marks
+  let strokes=0;
+
+  const SAND={r:232,g:220,b:200};
+  const state={
+    tool:"rake3",
+    dragging:null,          // stone being dragged
+    stroking:false,
+    last:null, lastDir:null,
+    leaf:null,              // active wind leaf {…}
+    smoothing:0,            // reset animation frames remaining
+    running:true,
+    t:0
+  };
+  const stones=[];
+
+  /* ---------- sizing ---------- */
+  function resize(){
+    const rect=cvs.getBoundingClientRect();
+    DPR=Math.min(window.devicePixelRatio||1,2);
+    W=Math.max(80,rect.width); H=Math.max(80,rect.height);
+    cvs.width=Math.round(W*DPR); cvs.height=Math.round(H*DPR);
+    const old=trail;
+    trail=document.createElement("canvas");
+    trail.width=cvs.width; trail.height=cvs.height;
+    tctx=trail.getContext("2d");
+    tctx.scale(DPR,DPR);
+    if(old){ tctx.setTransform(1,0,0,1,0,0); tctx.drawImage(old,0,0); tctx.setTransform(DPR,0,0,DPR,0,0); }
+    buildGrain();
+  }
+  window.addEventListener("resize",resize);
+
+  /* ---------- sand grain (static tile) ---------- */
+  function buildGrain(){
+    grain=document.createElement("canvas");
+    grain.width=grain.height=280;
+    const g=grain.getContext("2d");
+    g.fillStyle="rgb("+SAND.r+","+SAND.g+","+SAND.b+")"; g.fillRect(0,0,280,280);
+    for(let i=0;i<2600;i++){
+      const x=Math.random()*280, y=Math.random()*280;
+      const l=Math.random();
+      g.fillStyle = l<.5 ? "rgba(140,118,88,"+(0.03+Math.random()*0.06)+")"
+                         : "rgba(255,252,242,"+(0.03+Math.random()*0.06)+")";
+      g.fillRect(x,y,1+(l>.9?1:0),1);
+    }
+    for(let i=0;i<90;i++){ // faint mica flecks
+      g.fillStyle="rgba(255,255,250,"+(0.05+Math.random()*0.10)+")";
+      g.fillRect(Math.random()*280,Math.random()*280,1,1);
+    }
+  }
+
+  /* ---------- stones ---------- */
+  function makeStone(x,y,r){
+    const pts=[], n=11+((Math.random()*3)|0);
+    const seed=Math.random()*7;
+    for(let i=0;i<n;i++){
+      const a=i/n*Math.PI*2;
+      const rr=r*(0.78+0.30*(0.5+0.5*Math.sin(a*2.3+seed))*(0.6+Math.random()*0.5));
+      pts.push([Math.cos(a)*rr, Math.sin(a)*rr*0.78]);
+    }
+    const moss=[];
+    for(let i=0;i<6;i++){
+      moss.push([ (Math.random()-0.5)*r*0.9, -r*(0.15+Math.random()*0.42),
+                  r*(0.16+Math.random()*0.22) ]);
+    }
+    return {x,y,r,pts,moss,rot:(Math.random()-0.5)*0.5,tone:0.86+Math.random()*0.2};
+  }
+  function seedGarden(){
+    stones.length=0;
+    const layout=[[0.30,0.38,54],[0.42,0.62,38],[0.55,0.30,46],[0.62,0.55,28],[0.74,0.72,40]];
+    layout.forEach(s=>stones.push(makeStone(W*s[0],H*s[1],Math.max(22,Math.min(s[2],Math.min(W,H)*0.09)))));
+    updateMeter();
+  }
+  function stoneAt(px,py){
+    for(let i=stones.length-1;i>=0;i--){
+      const s=stones[i], dx=px-s.x, dy=(py-s.y)/0.8;
+      if(dx*dx+dy*dy < (s.r*1.12)*(s.r*1.12)) return s;
+    }
+    return null;
+  }
+  function updateMeter(){
+    meter.textContent="strokes "+String(strokes).padStart(3,"0")+" · stones "+String(stones.length).padStart(3,"0");
+  }
+
+  /* ---------- raking: carve segments into trail canvas ---------- */
+  function carve(p0,p1){
+    const dx=p1.x-p0.x, dy=p1.y-p0.y;
+    const len=Math.hypot(dx,dy); if(len<0.4) return;
+    let dir=Math.atan2(dy,dx);
+    if(state.lastDir!==null){
+      let d=dir-state.lastDir;
+      while(d> Math.PI) d-=Math.PI*2;
+      while(d<-Math.PI) d+=Math.PI*2;
+      dir=state.lastDir+d*0.45; // smooth tooth orientation
+    }
+    state.lastDir=dir;
+    const nx=-Math.sin(dir), ny=Math.cos(dir);
+    const tx=Math.cos(dir), ty=Math.sin(dir);
+    const spd=Math.min(len,26);
+    const depth=0.30+0.9/Math.sqrt(spd+2);     // slower stroke → deeper groove
+    const c=tctx;
+    c.lineCap="round";
+    if(state.tool==="broom"){
+      c.globalAlpha=Math.min(0.20,0.10+depth*0.06);
+      c.strokeStyle="rgba(120,98,66,1)";
+      c.lineWidth=16;
+      c.beginPath(); c.moveTo(p0.x,p0.y); c.lineTo(p1.x,p1.y); c.stroke();
+      c.globalAlpha=Math.min(0.16,0.08+depth*0.05);
+      c.strokeStyle="rgba(255,250,238,1)";
+      c.lineWidth=7; c.beginPath();
+      c.moveTo(p0.x+nx*4,p0.y+ny*4); c.lineTo(p1.x+nx*4,p1.y+ny*4); c.stroke();
+      c.globalAlpha=1; return;
+    }
+    const gap = state.tool==="rake5" ? 8.5 : 11.5;
+    const offs = state.tool==="rake5" ? [-2,-1,0,1,2] : [-1,0,1];
+    for(const k of offs){
+      const ox=nx*gap*k, oy=ny*gap*k;
+      const fade=1-Math.abs(k)*0.16;
+      c.globalAlpha=Math.min(0.85,depth*0.55)*fade;
+      c.strokeStyle="rgba(124,102,70,1)";
+      c.lineWidth=2.6;
+      c.beginPath();
+      c.moveTo(p0.x+ox-tx*2, p0.y+oy-ty*2);
+      c.lineTo(p1.x+ox, p1.y+oy);
+      c.stroke();
+      c.globalAlpha=Math.min(0.7,depth*0.42)*fade;
+      c.strokeStyle="rgba(255,251,238,1)";
+      c.lineWidth=1.1;
+      c.beginPath();
+      c.moveTo(p0.x+ox+nx*0.9, p0.y+oy+ny*0.9);
+      c.lineTo(p1.x+ox+nx*0.9, p1.y+oy+ny*0.9);
+      c.stroke();
+    }
+    c.globalAlpha=1;
+    if(state.leaf===null && Math.random()<0.3) grainKick(p1.x,p1.y,dir);
+  }
+
+  /* sand grains displaced by a fresh stroke */
+  function grainKick(x,y,dir){
+    const c=tctx;
+    for(let i=0;i<3;i++){
+      const a=dir+(Math.random()-0.5)*2.4;
+      const d=2+Math.random()*7;
+      c.fillStyle="rgba(150,128,96,"+(0.3+Math.random()*0.3).toFixed(2)+")";
+      c.fillRect(x+Math.cos(a)*d, y+Math.sin(a)*d, 1.2, 1.2);
+    }
+  }
+
+  /* ---------- pointer handling ---------- */
+  const pt=e=>{const r=cvs.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
+  cvs.addEventListener("pointerdown",e=>{
+    cvs.setPointerCapture(e.pointerId);
+    const p=pt(e);
+    const s=stoneAt(p.x,p.y);
+    if(s){ state.dragging=s; state.dragOff={x:p.x-s.x,y:p.y-s.y}; return; }
+    if(state.tool==="stone"){
+      if(stones.length>=12){ flashVeil("the garden holds twelve stones at most"); return; }
+      stones.push(makeStone(p.x,p.y, 26+Math.random()*26 + Math.min(W,H)*0.015));
+      updateMeter(); return;
+    }
+    state.stroking=true; state.last=p; state.lastDir=null; strokes++; updateMeter();
+    audioOn();
+    carve(p,{x:p.x+0.5,y:p.y+0.5});
+  });
+  cvs.addEventListener("pointermove",e=>{
+    const p=pt(e);
+    if(state.dragging){
+      state.dragging.x=Math.max(10,Math.min(W-10,p.x-state.dragOff.x));
+      state.dragging.y=Math.max(10,Math.min(H-10,p.y-state.dragOff.y));
+      audioOn(0.35);
+      return;
+    }
+    if(state.stroking && state.last){
+      carve(state.last,p); state.last=p;
+    }
+  });
+  const endStroke=e=>{ state.stroking=false; state.dragging=null; state.last=null; };
+  cvs.addEventListener("pointerup",endStroke);
+  cvs.addEventListener("pointercancel",endStroke);
+  cvs.addEventListener("pointerleave",e=>{ if(state.stroking&&state.last){const p=pt(e);carve(state.last,p);} endStroke(); });
+
+  /* ---------- tools UI ---------- */
+  document.querySelectorAll(".tools .tool").forEach(b=>{
+    b.addEventListener("click",()=>{
+      document.querySelectorAll(".tools .tool").forEach(x=>x.setAttribute("aria-pressed","false"));
+      b.setAttribute("aria-pressed","true");
+      state.tool=b.dataset.tool;
+      cvs.style.cursor = state.tool==="stone" ? "copy" : "crosshair";
+    });
+  });
+
+  /* ---------- wind leaf ---------- */
+  const LEAF_NAMES=["momiji","kayo","iroha","kaede"];
+  function gust(){
+    if(state.leaf) return;
+    const fromLeft=Math.random()<0.5;
+    state.leaf={
+      x: fromLeft ? -20 : W+20,
+      y: H*(0.2+Math.random()*0.6),
+      vx:(fromLeft?1:-1)*(2.2+Math.random()*1.6),
+      vy:0, spin:(Math.random()-0.5)*0.14, rot:Math.random()*6,
+      wob:Math.random()*6, size:7+Math.random()*6,
+      name:LEAF_NAMES[(Math.random()*LEAF_NAMES.length)|0],
+      trail:[]
+    };
+    readout.textContent="a "+state.leaf.name+" leaf crosses the garden";
+  }
+  document.getElementById("btnWind").addEventListener("click",gust);
+  function stepLeaf(){
+    const L=state.leaf; if(!L) return;
+    L.wob+=0.11;
+    L.x+=L.vx; L.y+=L.vy+Math.sin(L.wob)*0.55;
+    L.vy+= (H*0.55-L.y)*0.0009 + Math.sin(L.wob*0.7)*0.02;
+    L.rot+=L.spin+Math.sin(L.wob)*0.02;
+    L.trail.push([L.x,L.y]); if(L.trail.length>26) L.trail.shift();
+    // leaf skims the sand, leaving a faint wake
+    if(state.t%2===0){
+      tctx.globalAlpha=0.06;
+      tctx.strokeStyle="rgba(150,128,96,1)"; tctx.lineWidth=1.4;
+      tctx.beginPath(); tctx.moveTo(L.x-L.vx*2,L.y); tctx.lineTo(L.x,L.y); tctx.stroke();
+      tctx.globalAlpha=1;
+    }
+    if(L.x<-30||L.x>W+30) { state.leaf=null; readout.textContent="the leaf is gone · the garden remains"; }
+  }
+  function drawLeaf(){
+    const L=state.leaf; if(!L) return;
+    // dotted drift path
+    if(L.trail.length>2){
+      ctx.fillStyle="rgba(120,96,60,.30)";
+      for(let i=0;i<L.trail.length;i+=3){
+        const p=L.trail[i];
+        ctx.fillRect(p[0],p[1],1.4,1.4);
+      }
+    }
+    ctx.save(); ctx.translate(L.x,L.y); ctx.rotate(L.rot);
+    ctx.fillStyle="#8C4A32";
+    ctx.beginPath();
+    ctx.moveTo(-L.size,0);
+    ctx.quadraticCurveTo(0,-L.size*0.75,L.size,0);
+    ctx.quadraticCurveTo(0,L.size*0.75,-L.size,0);
+    ctx.fill();
+    ctx.strokeStyle="rgba(70,36,20,.6)"; ctx.lineWidth=0.8;
+    ctx.beginPath(); ctx.moveTo(-L.size*0.8,0); ctx.lineTo(L.size*0.8,0); ctx.stroke();
+    ctx.restore();
+  }
+
+  /* ---------- reset (smooth animation) ---------- */
+  let veilTimer=null;
+  function flashVeil(msg){
+    veil.textContent=msg; veil.classList.remove("hide");
+    clearTimeout(veilTimer);
+    veilTimer=setTimeout(()=>veil.classList.add("hide"),1400);
+  }
+  document.getElementById("btnReset").addEventListener("click",()=>{
+    state.smoothing = REDUCED ? 1 : 90;
+    flashVeil("smoothing the sand …");
+    readout.textContent="the monks rise · the sand is made new";
+  });
+  function stepSmooth(){
+    if(!state.smoothing) return;
+    // dissolve trails with a rising matte wipe
+    tctx.globalAlpha= REDUCED?1:0.06;
+    tctx.fillStyle="rgb("+SAND.r+","+SAND.g+","+SAND.b+")";
+    tctx.fillRect(0,0,W,H);
+    tctx.globalAlpha=1;
+    state.smoothing--;
+    if(!state.smoothing){ strokes=0; updateMeter(); }
+  }
+
+  /* ---------- gesture-gated granular audio ---------- */
+  let AC=null, master=null, soundOn=false, noiseBuf=null;
+  document.getElementById("btnSound").addEventListener("click",function(){
+    soundOn=!soundOn;
+    this.setAttribute("aria-pressed",String(soundOn));
+    if(soundOn && !AC){
+      try{
+        AC=new (window.AudioContext||window.webkitAudioContext)();
+        master=AC.createGain(); master.gain.value=0.0; master.connect(AC.destination);
+        const len=AC.sampleRate*1.2;
+        noiseBuf=AC.createBuffer(1,len,AC.sampleRate);
+        const d=noiseBuf.getChannelData(0);
+        for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+      }catch(err){ soundOn=false; this.setAttribute("aria-pressed","false"); }
+    }
+    if(AC){ try{ if(soundOn) AC.resume(); }catch(e){} }
+    readout.textContent= soundOn ? "granular sound on · rake to hear" : "sound off";
+  });
+  let grains=[];
+  function audioOn(vol){
+    if(!soundOn||!AC||!noiseBuf) return;
+    if(AC.state!=="running") return;
+    if(grains.length>10) return;
+    try{
+      const src=AC.createBufferSource(); src.buffer=noiseBuf;
+      src.playbackRate.value=0.5+Math.random()*0.8;
+      const bp=AC.createBiquadFilter(); bp.type="bandpass";
+      bp.frequency.value=900+Math.random()*1600; bp.Q.value=1.2;
+      const g=AC.createGain();
+      const t=AC.currentTime;
+      const v=(vol===undefined?0.11:0.11*vol);
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.002,v),t+0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.14);
+      src.connect(bp); bp.connect(g); g.connect(master);
+      src.start(t, Math.random()*0.8, 0.18);
+      grains.push(src);
+      src.onended=()=>{ grains=grains.filter(x=>x!==src); };
+    }catch(e){}
+  }
+
+  /* ---------- render ---------- */
+  function rippleArc(cx,cy,rad,amp,rr){
+    // dashed rake ripple around a stone
+    const c=ctx;
+    c.save();
+    c.translate(cx,cy);
+    c.rotate(rr||0);
+    c.setLineDash([rad*0.42, rad*0.16]);
+    c.lineDashOffset = rad*0.2;
+    c.strokeStyle="rgba(120,98,66,"+amp+")";
+    c.lineWidth=2.1;
+    c.beginPath(); c.ellipse(0,0,rad,rad*0.82,0,0,Math.PI*2); c.stroke();
+    c.strokeStyle="rgba(255,251,238,"+(amp*0.62)+")";
+    c.lineWidth=1.0;
+    c.beginPath(); c.ellipse(0,0,rad+2.2,(rad+2.2)*0.82,0,0,Math.PI*2); c.stroke();
+    c.restore();
+    c.setLineDash([]);
+  }
+  function drawStone(s){
+    const c=ctx;
+    c.save(); c.translate(s.x,s.y); c.rotate(s.rot);
+    // shadow
+    c.fillStyle="rgba(90,72,46,.30)";
+    c.beginPath();
+    s.pts.forEach((p,i)=> i? c.lineTo(p[0]+3,p[1]+4.5) : c.moveTo(p[0]+3,p[1]+4.5));
+    c.closePath(); c.fill();
+    // body gradient
+    const g=c.createLinearGradient(-s.r,-s.r,s.r,s.r);
+    const t=s.tone;
+    g.addColorStop(0,"rgb("+(108*t|0)+","+(102*t|0)+","+(92*t|0)+")");
+    g.addColorStop(0.55,"rgb("+(84*t|0)+","+(79*t|0)+","+(71*t|0)+")");
+    g.addColorStop(1,"rgb("+(58*t|0)+","+(54*t|0)+","+(48*t|0)+")");
+    c.fillStyle=g;
+    c.beginPath();
+    s.pts.forEach((p,i)=> i? c.lineTo(p[0],p[1]) : c.moveTo(p[0],p[1]));
+    c.closePath(); c.fill();
+    // rim light top-left
+    c.strokeStyle="rgba(235,228,210,.55)"; c.lineWidth=1.4;
+    c.beginPath();
+    s.pts.forEach((p,i)=>{
+      if(p[1]<0) i? c.lineTo(p[0],p[1]) : c.moveTo(p[0],p[1]);
+    });
+    c.stroke();
+    // moss caps
+    s.moss.forEach(m=>{
+      const mg=c.createRadialGradient(m[0],m[1],0,m[0],m[1],m[2]);
+      mg.addColorStop(0,"rgba(122,140,80,.9)");
+      mg.addColorStop(1,"rgba(110,127,78,0)");
+      c.fillStyle=mg;
+      c.beginPath(); c.arc(m[0],m[1],m[2],0,Math.PI*2); c.fill();
+    });
+    c.restore();
+  }
+
+  function render(){
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    // base sand + grain
+    ctx.fillStyle="rgb("+SAND.r+","+SAND.g+","+SAND.b+")";
+    ctx.fillRect(0,0,W,H);
+    if(grain){
+      const pat=ctx.createPattern(grain,"repeat");
+      ctx.fillStyle=pat; ctx.fillRect(0,0,W,H);
+    }
+    // raked trails
+    ctx.drawImage(trail,0,0,W,H);
+    // per-stone ripple rings (2–3 each, breathing slightly)
+    const breath = REDUCED?0 : Math.sin(state.t*0.012)*2.2;
+    stones.forEach(s=>{
+      const rings=[1.85,2.6,3.4];
+      rings.forEach((k,i)=>{
+        if(s.r*k > Math.min(W,H)*0.46) return;
+        rippleArc(s.x,s.y, s.r*k + breath*(1-i*0.35), 0.34-i*0.09, s.rot*0.3);
+      });
+    });
+    stones.forEach(drawStone);
+    if(state.dragging){
+      const s=state.dragging;
+      ctx.strokeStyle="rgba(166,59,42,.5)"; ctx.setLineDash([4,4]); ctx.lineWidth=1.2;
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.r*1.18,0,Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    drawLeaf();
+    // soft daylight from top-left
+    const light=ctx.createRadialGradient(W*0.3,H*0.1,10, W*0.4,H*0.3, Math.max(W,H)*0.9);
+    light.addColorStop(0,"rgba(255,253,244,.28)");
+    light.addColorStop(1,"rgba(120,100,70,.14)");
+    ctx.fillStyle=light; ctx.fillRect(0,0,W,H);
+  }
+
+  /* ---------- main loop ---------- */
+  function frame(){
+    if(state.running){
+      state.t++;
+      stepLeaf();
+      stepSmooth();
+      render();
+    }
+    requestAnimationFrame(frame);
+  }
+  document.addEventListener("visibilitychange",()=>{
+    state.running = !document.hidden;
+  });
+
+  /* ---------- init ---------- */
+  resize();
+  seedGarden();
+  // opening gift: a few serene serpentine strokes so first paint has value
+    const N=REDUCED?2:4;
+    for(let k=0;k<N;k++){
+      state.tool = k%2 ? "rake3" : "rake5";
+      const y0=H*(0.16+0.22*k);
+      state.lastDir=null;
+      let prev={x:W*0.08,y:y0};
+      const segs=26;
+      for(let i=1;i<=segs;i++){
+        const u=i/segs;
+        const x=W*0.08+(W*0.84)*u;
+        const y=y0+Math.sin(u*Math.PI*2+k)*H*0.045;
+        carve(prev,{x,y}); prev={x,y};
+      }
+    }
+    state.tool="rake3";
+    document.querySelectorAll('.tools .tool').forEach(x=>{
+      x.setAttribute("aria-pressed", String(x.dataset.tool==="rake3"));
+    });
+    strokes=0; updateMeter();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

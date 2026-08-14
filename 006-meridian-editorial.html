@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MERIDIAN — Issue 07</title>
+<style>
+  :root{
+    --paper:#F7F3EC;
+    --paper-deep:#EFE9DD;
+    --ink:#1C1A16;
+    --ink-soft:#4A463E;
+    --ink-faint:#8A8478;
+    --accent:#C4551B;
+    --hairline:rgba(28,26,22,.28);
+    --serif:Georgia,'Palatino Linotype','Book Antiqua',Palatino,'Times New Roman',serif;
+    --caps:'Courier New',ui-monospace,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--serif);
+    line-height:1.55;
+    overflow-x:hidden;
+  }
+  /* paper grain over everything */
+  body::after{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:60;
+    background-image:url("data:image/png;base64,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");
+    mix-blend-mode:multiply;
+  }
+  ::selection{background:var(--accent);color:var(--paper)}
+
+  .page{
+    max-width:1280px;
+    margin:0 auto;
+    padding:0 clamp(16px,4vw,56px);
+    position:relative;
+  }
+
+  /* ————— vertical 12-col guides (subtle) ————— */
+  .guides{
+    position:fixed;inset:0;pointer-events:none;z-index:0;
+    display:grid;grid-template-columns:repeat(12,1fr);
+    max-width:1280px;margin:0 auto;padding:0 clamp(16px,4vw,56px);
+    opacity:.55;
+  }
+  .guides i{border-left:1px solid rgba(28,26,22,.05)}
+
+  /* ————— MASTHEAD ————— */
+  header.masthead{
+    position:relative;
+    padding-top:clamp(18px,3vw,34px);
+    z-index:2;
+  }
+  .mast-topline{
+    display:flex;justify-content:space-between;align-items:baseline;
+    font-family:var(--caps);font-size:11px;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--ink-soft);
+    border-bottom:1px solid var(--hairline);
+    padding-bottom:10px;
+  }
+  .mast-topline b{color:var(--accent);font-weight:700}
+  h1.masthead-word{
+    font-size:clamp(64px,15.5vw,224px);
+    line-height:.86;
+    font-weight:400;
+    letter-spacing:-.015em;
+    margin:clamp(10px,2vw,26px) 0 clamp(6px,1.4vw,14px);
+    position:relative;
+    display:flex;
+  }
+  .masthead-word .lt{
+    display:inline-block;
+    animation:inkRise 1.1s cubic-bezier(.2,.7,.2,1) both;
+    animation-delay:calc(var(--i) * 70ms);
+  }
+  .masthead-word .lt.accent{color:var(--accent);font-style:italic}
+  @keyframes inkRise{
+    from{opacity:0;transform:translateY(.35em) skewX(-6deg);filter:blur(4px)}
+    to{opacity:1;transform:none;filter:blur(0)}
+  }
+  .mast-meta{
+    display:flex;flex-wrap:wrap;gap:8px clamp(18px,4vw,56px);
+    align-items:baseline;justify-content:space-between;
+    border-top:3px double var(--hairline);
+    border-bottom:1px solid var(--hairline);
+    padding:10px 0;
+    font-family:var(--caps);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+  .mast-meta .price{color:var(--accent)}
+
+  /* ————— FASHION-WEEK TICKER ————— */
+  .ticker{
+    border-bottom:1px solid var(--hairline);
+    overflow:hidden;white-space:nowrap;
+    background:var(--ink);
+    color:var(--paper);
+  }
+  .ticker-track{
+    display:inline-flex;
+    font-family:var(--caps);font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;
+    padding:9px 0;
+    animation:tick 38s linear infinite;
+    will-change:transform;
+  }
+  .ticker:hover .ticker-track{animation-play-state:paused}
+  .ticker-track span{padding:0 26px;position:relative}
+  .ticker-track span::after{
+    content:"◆";position:absolute;right:-7px;font-size:7px;top:2px;color:var(--accent);
+  }
+  @keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+  /* ————— CONTENTS RAIL + GRID LAYOUT ————— */
+  .spread{
+    display:grid;
+    grid-template-columns:minmax(150px,200px) 1fr;
+    gap:clamp(20px,3.5vw,52px);
+    padding-top:clamp(26px,4vw,54px);
+    position:relative;z-index:2;
+  }
+  @media(max-width:820px){
+    .spread{grid-template-columns:1fr}
+  }
+  aside.rail{
+    position:sticky;top:24px;align-self:start;
+    font-family:var(--caps);
+  }
+  .rail h2{
+    font-family:var(--serif);font-style:italic;font-weight:400;
+    font-size:22px;margin-bottom:14px;color:var(--ink);
+  }
+  .rail ol{list-style:none}
+  .rail a{
+    display:flex;gap:10px;align-items:baseline;
+    text-decoration:none;color:var(--ink-soft);
+    font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    padding:7px 0;border-bottom:1px solid rgba(28,26,22,.12);
+    transition:color .25s,padding-left .25s;
+  }
+  .rail a i{font-style:normal;color:var(--ink-faint);font-size:10px;transition:color .25s}
+  .rail a::after{
+    content:"→";margin-left:auto;opacity:0;transform:translateX(-6px);
+    transition:opacity .25s,transform .25s;color:var(--accent);
+  }
+  .rail a:hover{color:var(--accent);padding-left:8px}
+  .rail a:hover::after{opacity:1;transform:none}
+  .rail a:hover i{color:var(--accent)}
+  .rail .issue-mark{
+    margin-top:22px;font-size:10px;letter-spacing:.2em;color:var(--ink-faint);
+    text-transform:uppercase;line-height:1.9;
+  }
+
+  main.stories{
+    display:grid;
+    grid-template-columns:repeat(12,1fr);
+    gap:clamp(16px,2.4vw,34px) clamp(14px,2vw,28px);
+    align-items:start;
+  }
+  section.story{grid-column:span 12}
+  @media(min-width:760px){
+    .story[data-cols="7"]{grid-column:span 7}
+    .story[data-cols="5"]{grid-column:span 5}
+    .story[data-cols="8"]{grid-column:span 8}
+    .story[data-cols="4"]{grid-column:span 4}
+    .story[data-cols="6"]{grid-column:span 6}
+  }
+
+  /* folio numeral */
+  .folio{
+    font-size:clamp(56px,8vw,120px);
+    line-height:.8;
+    color:transparent;
+    -webkit-text-stroke:1px var(--hairline);
+    font-style:italic;
+    margin-bottom:6px;
+    user-select:none;
+  }
+  .kicker{
+    font-family:var(--caps);font-size:10.5px;letter-spacing:.3em;text-transform:uppercase;
+    color:var(--accent);margin-bottom:10px;
+    display:flex;align-items:center;gap:12px;
+  }
+  .kicker::after{content:"";height:1px;flex:1;background:var(--hairline)}
+  .story h3{
+    font-weight:400;
+    font-size:clamp(28px,3.6vw,52px);
+    line-height:1.04;letter-spacing:-.01em;
+    margin-bottom:14px;
+  }
+  .story h3 em{color:var(--accent)}
+  .story p{color:var(--ink-soft);font-size:clamp(15px,1.25vw,17.5px);max-width:58ch}
+  .story p + p{margin-top:10px}
+
+  /* drop cap */
+  .story.has-cap > p:first-of-type::first-letter{
+    float:left;
+    font-size:3.9em;line-height:.78;
+    padding:.06em .12em 0 0;
+    color:var(--accent);
+    font-style:italic;
+  }
+  .byline{
+    font-family:var(--caps);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--ink-faint);margin:12px 0 14px;
+  }
+  .byline b{color:var(--ink);font-weight:700}
+
+  /* pull quote */
+  blockquote.pull{
+    margin:0;
+    font-style:italic;
+    font-size:clamp(26px,3.4vw,44px);
+    line-height:1.16;
+    letter-spacing:-.01em;
+    padding:clamp(18px,2.6vw,34px) 0;
+    border-top:1px solid var(--hairline);
+    border-bottom:1px solid var(--hairline);
+    position:relative;
+  }
+  blockquote.pull::before{
+    content:"“";
+    position:absolute;left:-.1em;top:-0.12em;
+    font-size:2.4em;color:var(--accent);opacity:.9;
+  }
+  blockquote.pull .attr{
+    display:block;margin-top:12px;
+    font-family:var(--caps);font-style:normal;font-size:10.5px;
+    letter-spacing:.26em;text-transform:uppercase;color:var(--ink-faint);
+  }
+
+  /* ————— DUOTONE ART PANELS ————— */
+  figure.panel{
+    position:relative;
+    cursor:crosshair;
+    margin:0 0 10px;
+    aspect-ratio:4/5;
+    overflow:hidden;
+    background:var(--ink);
+    filter:saturate(1.02);
+    transition:transform .5s cubic-bezier(.2,.7,.2,1);
+    outline:1px solid var(--hairline);
+    outline-offset:-1px;
+  }
+  .story:hover figure.panel{transform:translateY(-3px)}
+  .panel .mesh{
+    position:absolute;inset:-12%;
+    background:
+      radial-gradient(58% 64% at 26% 30%, var(--duo-a) 0%, transparent 62%),
+      radial-gradient(52% 60% at 76% 24%, var(--duo-b) 0%, transparent 58%),
+      radial-gradient(70% 74% at 52% 88%, var(--duo-c) 0%, transparent 66%),
+      linear-gradient(168deg, #141210 8%, #2A2620 52%, #100F0D 96%);
+    mix-blend-mode:normal;
+    filter:grayscale(1) contrast(1.15) brightness(.96) sepia(.42);
+    transition:filter .6s ease, transform .8s cubic-bezier(.2,.7,.2,1);
+    transform:scale(1.03);
+  }
+  .story:hover .panel .mesh{
+    filter:grayscale(1) contrast(1.2) brightness(1.0) sepia(.42) hue-rotate(var(--hue-shift,26deg)) saturate(1.15);
+    transform:scale(1.07);
+  }
+  .panel .weave{
+    position:absolute;inset:0;pointer-events:none;
+    background:
+      repeating-linear-gradient(0deg, transparent 0 7px, rgba(247,243,236,.045) 7px 8px),
+      repeating-linear-gradient(90deg, transparent 0 7px, rgba(247,243,236,.03) 7px 8px);
+    mix-blend-mode:screen;
+  }
+  .panel .grain{
+    position:absolute;inset:0;pointer-events:none;mix-blend-mode:overlay;opacity:.16;
+    background-image:url("data:image/png;base64,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");
+  }
+  .panel .flare{
+    position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(80% 60% at 50% 108%, rgba(247,243,236,.14), transparent 60%);
+    mix-blend-mode:soft-light;
+  }
+  .panel figcaption{
+    position:absolute;left:0;right:0;bottom:0;
+    font-family:var(--caps);font-size:9.5px;letter-spacing:.26em;text-transform:uppercase;
+    color:#F1EAE0;
+    background:linear-gradient(transparent, rgba(12,11,9,.82));
+    padding:26px 12px 10px;
+    z-index:2;
+  }
+  .panel figcaption b{color:var(--accent);font-weight:700}
+  /* per-panel duotone palettes */
+  .panel.p1{--duo-a:#E8A46B;--duo-b:#C4551B;--duo-c:#5A4632;--hue-shift:24deg}
+  .panel.p2{--duo-a:#9FB4C8;--duo-b:#41586E;--duo-c:#C9BFA8;--hue-shift:-30deg}
+  .panel.p3{--duo-a:#D8C89E;--duo-b:#8A6B3A;--duo-c:#3A3226;--hue-shift:40deg}
+  .panel.p4{--duo-a:#C98B8B;--duo-b:#7E4A52;--duo-c:#403034;--hue-shift:-18deg}
+
+  /* tall hero panel variant */
+  figure.panel.tall{aspect-ratio:3/4.6}
+
+  /* ————— reveal-on-scroll ————— */
+  .reveal{
+    opacity:0;transform:translateY(26px);
+    transition:opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1);
+    transition-delay:var(--d,0ms);
+  }
+  .reveal.in{opacity:1;transform:none}
+
+  /* ————— closing colophon ————— */
+  .colophon{
+    margin-top:clamp(40px,6vw,84px);
+    border-top:3px double var(--hairline);
+    padding:26px 0 60px;
+    display:grid;grid-template-columns:repeat(12,1fr);gap:20px;
+    position:relative;z-index:2;
+  }
+  @media(max-width:760px){.colophon{grid-template-columns:1fr}}
+  .colophon .mark{grid-column:span 4;font-style:italic;font-size:20px}
+  .colophon .mark span{color:var(--accent)}
+  .colophon .fine{
+    grid-column:span 8;grid-column-start:6;
+    font-family:var(--caps);font-size:10px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--ink-faint);line-height:2.1;
+    text-align:right;
+  }
+  .colophon .fine b{color:var(--ink-soft)}
+
+  .backtop{
+    position:fixed;right:18px;bottom:18px;z-index:50;
+    font-family:var(--caps);font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--paper);background:var(--ink);text-decoration:none;
+    padding:10px 14px;border:1px solid transparent;
+    transition:background .3s,color .3s,border-color .3s;
+  }
+  .backtop:hover{background:var(--paper);color:var(--ink);border-color:var(--ink)}
+
+  @media (prefers-reduced-motion: reduce){
+    .ticker-track{animation:none}
+    .masthead-word .lt{animation:none}
+    .reveal{opacity:1;transform:none;transition:none}
+    html{scroll-behavior:auto}
+    .panel .mesh,.story:hover .panel .mesh{transition:none}
+  }
+</style>
+</head>
+<body>
+<div class="guides" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+<div class="page">
+
+  <header class="masthead" id="top">
+    <div class="mast-topline">
+      <span>The Quarterly of Cut &amp; Colour</span>
+      <span>Est. <b>MCMLXII</b> — Paris · Milan · New York</span>
+      <span>Vol. VII</span>
+    </div>
+    <h1 class="masthead-word" aria-label="MERIDIAN">
+      <span class="lt" style="--i:0">M</span><span class="lt" style="--i:1">E</span><span class="lt" style="--i:2">R</span><span class="lt" style="--i:3">I</span><span class="lt" style="--i:4">D</span><span class="lt" style="--i:5">I</span><span class="lt" style="--i:6">A</span><span class="lt" style="--i:7">N</span><span class="lt accent" style="--i:8">.</span>
+    </h1>
+    <div class="mast-meta">
+      <span>Issue 07 — Autumn</span>
+      <span class="price">№ 07 / Twelve Dollars</span>
+      <span>Words on silhouette, shadow &amp; the season</span>
+    </div>
+  </header>
+
+  <div class="ticker" aria-label="fashion week ticker">
+    <div class="ticker-track" id="tickerTrack">
+      <span>Paris — Womenswear S/S</span><span>Milan — Men of Meridian closing show</span><span>New York — Atelier open studios</span><span>Copenhagen — Timberline collective</span><span>Antwerp — Cutting Room residency</span><span>London — The Ivory Sessions</span><span>Tokyo — Fold &amp; Drape symposium</span>
+    </div>
+  </div>
+
+  <div class="spread">
+
+    <aside class="rail">
+      <h2>In this issue</h2>
+      <ol>
+        <li><a href="#s1"><i>01</i>The Cut Remembers</a></li>
+        <li><a href="#s2"><i>02</i>Drape, in Three Moods</a></li>
+        <li><a href="#s3"><i>03</i>Ivory &amp; Ember</a></li>
+        <li><a href="#s4"><i>04</i>Nightwear, Reconsidered</a></li>
+        <li><a href="#s5"><i>05</i>Letters to the Atelier</a></li>
+      </ol>
+      <div class="issue-mark">
+        Printed on 90gsm ivory.<br>
+        Set in Georgia &amp; Palatino.<br>
+        Bound by hand, Lisbon.
+      </div>
+    </aside>
+
+    <main class="stories">
+
+      <!-- STORY 1 -->
+      <section class="story has-cap reveal" id="s1" data-cols="7">
+        <div class="folio">01</div>
+        <div class="kicker">The Lead — Pattern</div>
+        <h3>The cut <em>remembers</em> everything the fabric forgets</h3>
+        <p class="byline">Words by <b>Ada Vex</b> · Photographs replaced in ink</p>
+        <p>Every bolt arrives with a memory — the mill, the moisture, the month it waited. The cutter's first act is an act of listening: chalk to selvedge, the long hiss of shears, and somewhere in the arithmetic of notches a silhouette begins to agree with itself.</p>
+        <p>We spent a week at the Meridian atelier watching one jacket pass through eleven pairs of hands. Nobody hurried. The pressing cloth went down like a page being closed on a good sentence.</p>
+        <blockquote class="pull" style="--d:80ms">
+          A garment is a rumour about the body, repeated until it becomes weather.
+          <span class="attr">— Ada Vex, on the fitting stool</span>
+        </blockquote>
+        <p>The rest of this feature unfolds across four panels of tone: ember, slate, straw and wine. Hover each plate to shift its duotone, the way light moves when a fitting-room blind is drawn.</p>
+      </section>
+
+      <!-- PANEL A -->
+      <figure class="panel tall p1 reveal" style="--d:120ms" data-cols="5">
+        <div class="mesh"></div><div class="weave"></div><div class="grain"></div><div class="flare"></div>
+        <figcaption>Plate I — <b>Ember study</b>, dry-point on mesh</figcaption>
+      </figure>
+
+      <!-- PANEL B -->
+      <figure class="panel p2 reveal" style="--d:60ms" data-cols="4">
+        <div class="mesh"></div><div class="weave"></div><div class="grain"></div><div class="flare"></div>
+        <figcaption>Plate II — <b>Slate mood</b>, winter cloth</figcaption>
+      </figure>
+
+      <!-- STORY 2 -->
+      <section class="story reveal" id="s2" data-cols="8">
+        <div class="folio">02</div>
+        <div class="kicker">Portfolio — Drape</div>
+        <h3>Drape, in <em>three</em> moods</h3>
+        <p class="byline">Styling <b>Noor Haddad</b> · Plates II–IV</p>
+        <p>Mood one is architectural: fabric held like a held breath. Mood two is liquid — bias-cut, gravity-flattered, moving a half-second after the wearer. Mood three refuses both and simply falls, the way Sunday falls.</p>
+        <p>The camera was denied, so the house rendered its season as tone studies: mesh gradients pressed through grain, blend modes standing in for shadow. What the eye gives up in likeness it earns back in temperature.</p>
+      </section>
+
+      <!-- PANEL C -->
+      <figure class="panel p3 reveal" style="--d:90ms" data-cols="4">
+        <div class="mesh"></div><div class="weave"></div><div class="grain"></div><div class="flare"></div>
+        <figcaption>Plate III — <b>Straw hour</b>, five-to-seven light</figcaption>
+      </figure>
+
+      <!-- STORY 3 -->
+      <section class="story has-cap reveal" id="s3" data-cols="6">
+        <div class="folio">03</div>
+        <div class="kicker">Essay — Colour</div>
+        <h3>Ivory &amp; <em>ember</em>: a theory of one accent</h3>
+        <p>A palette of two is a conversation; three is a committee. This house holds ivory against ink and spends its single accent — burnt orange — the way a good essay spends a semicolon: rarely, and only where the sentence would otherwise fall over.</p>
+        <p>The accent appears eleven times in this issue. We counted, because the printer asked, and because counting is its own kind of devotion.</p>
+      </section>
+
+      <!-- PANEL D -->
+      <figure class="panel p4 reveal" style="--d:70ms" data-cols="6">
+        <div class="mesh"></div><div class="weave"></div><div class="grain"></div><div class="flare"></div>
+        <figcaption>Plate IV — <b>Wine dark</b>, the last fitting</figcaption>
+      </figure>
+
+      <!-- STORY 4 -->
+      <section class="story reveal" id="s4" data-cols="6">
+        <div class="folio">04</div>
+        <div class="kicker">Objects — Nightwear</div>
+        <h3>Nightwear, <em>reconsidered</em></h3>
+        <p class="byline">Objects column · <b>The House</b></p>
+        <p>If a robe cannot survive a corridor, a kettle and a small crisis, it is costume. The pieces here are drawn in duotone because night is mostly tone anyway — one warm note against the dark, pocketed generously, hemmed for stairwells.</p>
+      </section>
+
+      <!-- STORY 5 -->
+      <section class="story reveal" id="s5" data-cols="6">
+        <div class="folio">05</div>
+        <div class="kicker">Back Matter — Letters</div>
+        <h3>Letters to the <em>atelier</em></h3>
+        <p>"Sirs — your autumn plates arrived water-stained and I have decided I prefer them that way. Enclose no replacement. — A reader, Marseille."</p>
+        <p>"The drop cap on page one is insolent. More of this. — T.B., via post."</p>
+        <p>The editors read everything, answer most, and archive the rest under <i>weather</i>.</p>
+      </section>
+
+    </main>
+  </div>
+
+  <footer class="colophon">
+    <div class="mark">Meridian<span>.</span> — Issue 07</div>
+    <div class="fine">
+      Editor <b>Ada Vex</b> · Art <b>The House</b> · Plates rendered in-browser<br>
+      12-column asymmetric grid · Georgia &amp; Palatino · One burnt-orange accent<br>
+      Set, pressed &amp; published for the season — no photographs were taken
+    </div>
+  </footer>
+
+</div>
+
+<a class="backtop" href="#top">↑ Masthead</a>
+
+<script>
+(function(){
+  "use strict";
+  // Duplicate ticker content for a seamless -50% loop
+  var track = document.getElementById('tickerTrack');
+  if (track) { track.innerHTML += track.innerHTML; }
+
+  // Staggered fade-rise on scroll
+  var items = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting) {
+          en.target.classList.add('in');
+          io.unobserve(en.target);
+        }
+      });
+    }, {threshold: 0.12, rootMargin: '0px 0px -8% 0px'});
+    items.forEach(function(el){ io.observe(el); });
+  } else {
+    items.forEach(function(el){ el.classList.add('in'); });
+  }
+
+  // Subtle parallax breath on panels' meshes (pointer, rAF-throttled)
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!reduce) {
+    var panels = Array.prototype.slice.call(document.querySelectorAll('.panel'));
+    var queued = false, mx = 0, my = 0;
+    document.addEventListener('pointermove', function(e){
+      mx = e.clientX; my = e.clientY;
+      if (!queued) {
+        queued = true;
+        requestAnimationFrame(function(){
+          queued = false;
+          panels.forEach(function(p){
+            var r = p.getBoundingClientRect();
+            if (r.bottom < -80 || r.top > window.innerHeight + 80) return;
+            var dx = (mx - (r.left + r.width/2)) / Math.max(r.width, 1);
+            var dy = (my - (r.top + r.height/2)) / Math.max(r.height, 1);
+            var mesh = p.querySelector('.mesh');
+            if (mesh) mesh.style.backgroundPosition = (dx * 18) + 'px ' + (dy * 14) + 'px';
+          });
+        });
+      }
+    }, {passive:true});
+  }
+})();
+</script>
+</body>
+</html>

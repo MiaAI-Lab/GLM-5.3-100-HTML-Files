@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GLASSHOUSE — the hot shop</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background:#0a0705; color:#e8dcc8;
+    display:flex; flex-direction:column; touch-action:none; user-select:none; -webkit-user-select:none;
+  }
+  header {
+    padding:12px 20px; display:flex; align-items:center; gap:14px; z-index:10;
+    background:rgba(8,5,3,.7); border-bottom:1px solid rgba(232,220,200,.1);
+  }
+  h1 { font-size:15px; font-weight:300; letter-spacing:.4em; text-transform:uppercase; }
+  h1 b { color:#ff9d42; font-weight:600; }
+  .heatmeter { display:flex; align-items:center; gap:8px; margin-left:auto; }
+  .heatmeter .lab { font-size:9px; letter-spacing:.2em; color:#a08c6e; text-transform:uppercase; }
+  .heatmeter .bar { width:120px; height:8px; border-radius:99px; background:#241a12; overflow:hidden; }
+  .heatmeter .bar i { display:block; height:100%; width:70%; background:linear-gradient(90deg,#e86a2e,#ffd98a); transition:width .3s; }
+  .shelf { display:flex; gap:6px; align-items:center; }
+  .shelf .lab { font-size:9px; letter-spacing:.18em; color:#a08c6e; text-transform:uppercase; }
+
+  #shop { flex:1; position:relative; overflow:hidden; }
+  canvas#c { position:absolute; inset:0; width:100%; height:100%; cursor:crosshair; }
+
+  /* furnace mouth */
+  .furnace {
+    position:absolute; left:4%; top:16%; width:110px; height:130px; z-index:4;
+    border-radius:14px 14px 40px 40px;
+    background:linear-gradient(180deg, #2c2119, #1c1510);
+    box-shadow:0 14px 40px rgba(0,0,0,.6);
+    cursor:pointer; text-align:center;
+  }
+  .furnace .mouth {
+    position:absolute; left:50%; top:46%; transform:translate(-50%,-50%);
+    width:64px; height:48px; border-radius:40px 40px 60px 60px;
+    background:radial-gradient(ellipse at 50% 60%, #ffd98a, #ff7a1e 55%, #b3300a 90%);
+    box-shadow:0 0 40px 12px rgba(255,140,30,.55);
+    animation:glow 2.4s ease-in-out infinite alternate;
+  }
+  @keyframes glow { to { box-shadow:0 0 60px 20px rgba(255,160,40,.75); } }
+  .furnace .lab { position:absolute; bottom:8px; left:0; right:0; font-size:8px; letter-spacing:.24em; color:#a08c6e; text-transform:uppercase; }
+
+  /* glory hole (reheat) */
+  .glory {
+    position:absolute; right:5%; top:20%; width:88px; height:88px; border-radius:50%; z-index:4;
+    background:radial-gradient(circle at 50% 45%, #ffb347, #c2571e 60%, #6e2c0c);
+    box-shadow:0 0 44px 10px rgba(255,150,50,.5), inset 0 0 18px rgba(120,40,0,.7);
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    font-size:8px; letter-spacing:.2em; color:#ffe8c8; text-transform:uppercase; text-align:center;
+    animation:glow 1.8s ease-in-out infinite alternate-reverse;
+  }
+
+  /* tool rail */
+  .rail {
+    position:absolute; left:50%; bottom:14px; transform:translateX(-50%); z-index:8;
+    display:flex; gap:10px; padding:10px 14px; border-radius:16px;
+    background:rgba(12,8,5,.85); border:1px solid rgba(232,220,200,.16);
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  }
+  .rail button {
+    background:rgba(232,220,200,.08); color:#e8dcc8; border:1px solid rgba(232,220,200,.22);
+    border-radius:10px; font:inherit; font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+    padding:10px 14px; cursor:pointer; transition:all .15s;
+  }
+  .rail button:hover { background:rgba(232,220,200,.2); }
+  .rail button.on { background:#8a4a1e; border-color:#c9762e; color:#ffe8c8; }
+  .shelf2 { position:absolute; right:16px; bottom:14px; z-index:8; display:flex; flex-direction:column; gap:6px; }
+  .shelf2 .slot {
+    width:34px; height:44px; border-radius:6px 6px 10px 10px;
+    border:1px dashed rgba(120,200,190,.4); background:rgba(20,30,30,.4);
+    display:flex; align-items:flex-end; justify-content:center; overflow:hidden;
+  }
+  .shelf2 .slot .vessel { width:22px; height:30px; border-radius:40% 40% 50% 50%; background:#2a9d8f; opacity:.9; }
+  .shelf2 .lab { font-size:8px; letter-spacing:.2em; color:#7fa8a0; text-transform:uppercase; text-align:center; }
+
+  .msg {
+    position:absolute; left:50%; top:14px; transform:translateX(-50%); z-index:9;
+    background:rgba(12,8,5,.85); border:1px solid rgba(232,220,200,.2); border-radius:999px;
+    padding:8px 18px; font-size:11px; letter-spacing:.1em; color:#ffd9a0;
+    opacity:0; transition:opacity .3s; pointer-events:none; white-space:nowrap;
+  }
+  .msg.show { opacity:1; }
+
+  @media (max-width:640px) {
+    .furnace { width:80px; height:100px; left:3%; top:10%; }
+    .glory { width:64px; height:64px; right:4%; top:14%; }
+    .rail { flex-wrap:wrap; justify-content:center; width:92%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .furnace .mouth, .glory { animation:none; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Glass<b>house</b></h1>
+    <div class="heatmeter">
+      <span class="lab">heat</span>
+      <div class="bar"><i id="heatBar"></i></div>
+    </div>
+    <div class="shelf">
+      <span class="lab">gallery</span>
+    </div>
+  </header>
+
+  <div id="shop">
+    <canvas id="c"></canvas>
+
+    <div class="furnace" id="furnace" title="gather molten glass">
+      <div class="mouth"></div>
+      <div class="lab">furnace · 1090°C</div>
+    </div>
+
+    <div class="glory" id="glory" title="reheat the piece">glory<br>hole</div>
+
+    <div class="rail">
+      <button id="tGather">gather</button>
+      <button id="tBlow" class="on">blow (hold)</button>
+      <button id="tTurn">turn</button>
+      <button id="tJacks">jacks (pinch)</button>
+      <button id="tBlock">block (round)</button>
+      <button id="tAnneal">anneal &amp; finish</button>
+    </div>
+
+    <div class="shelf2" aria-label="finished pieces">
+      <div class="slot" id="slotA"></div>
+      <div class="lab">shelf</div>
+    </div>
+
+    <div class="msg" id="msg"></div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const cv = $("c"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  /* the blowpipe and gather */
+  const state = {
+    heat: 0.75,        /* 0 cold → 1 molten */
+    size: 0,           /* gather radius */
+    targetSize: 0,
+    stretch: 1,        /* vertical stretch */
+    rotation: 0,       /* pipe rotation */
+    tilt: -0.15,
+    tool: "blow",
+    blowing: false,
+    turnVel: 0,
+    hasGlass: false,
+    cracks: 0,
+    wobble: 0,
+  };
+  let blowX = 0.62, blowY = 0.62; /* pipe anchor in canvas fraction */
+  let particles = [], shelfCount = 0;
+
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  /* ---------- messages ---------- */
+  let msgTimer = null;
+  function say(m) {
+    const el = $("msg");
+    el.textContent = m;
+    el.classList.add("show");
+    clearTimeout(msgTimer);
+    msgTimer = setTimeout(() => el.classList.remove("show"), 2200);
+  }
+
+  /* ---------- audio ---------- */
+  let AC = null;
+  function ac() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+    return AC;
+  }
+  function puff(f, vol, dur) {
+    const c = ac(); if (!c) return;
+    try {
+      const t0 = c.currentTime;
+      const o = c.createOscillator(), gn = c.createGain();
+      o.type = "sine"; o.frequency.setValueAtTime(f, t0);
+      o.frequency.exponentialRampToValueAtTime(f * 0.6, t0 + (dur || 0.2));
+      gn.gain.setValueAtTime(vol || 0.05, t0);
+      gn.gain.exponentialRampToValueAtTime(0.0001, t0 + (dur || 0.2));
+      o.connect(gn); gn.connect(c.destination);
+      o.start(t0); o.stop(t0 + (dur || 0.2) + 0.02);
+    } catch (e) {}
+  }
+  function crackSnd() {
+    const c = ac(); if (!c) return;
+    try {
+      const buf = c.createBuffer(1, c.sampleRate * 0.2, c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+      const src = c.createBufferSource(); src.buffer = buf;
+      const f = c.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 1800;
+      const gn = c.createGain(); gn.gain.value = 0.12;
+      src.connect(f); f.connect(gn); gn.connect(c.destination);
+      src.start();
+    } catch (e) {}
+  }
+
+  /* ---------- tools ---------- */
+  document.querySelectorAll(".rail button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(".rail button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    state.tool = b.id.slice(1).toLowerCase();
+    say("tool: " + b.textContent.trim().toLowerCase());
+  }));
+
+  $("furnace").addEventListener("click", () => {
+    state.hasGlass = true;
+    state.size = 18; state.targetSize = 18;
+    state.heat = 1; state.stretch = 1; state.cracks = 0;
+    say("gathered molten glass — work fast");
+    puff(160, 0.07, 0.4);
+  });
+  $("glory").addEventListener("click", () => {
+    if (!state.hasGlass) { say("gather glass first"); return; }
+    state.heat = Math.min(1, state.heat + 0.45);
+    say("reheated — glowing again");
+    puff(220, 0.06, 0.3);
+  });
+
+  /* blow: hold the button */
+  const blowBtn = $("tBlow");
+  blowBtn.addEventListener("pointerdown", () => { state.blowing = true; });
+  addEventListener("pointerup", () => { state.blowing = false; });
+  /* also hold anywhere on canvas with blow tool */
+  cv.addEventListener("pointerdown", (e) => {
+    if (state.tool === "blow") state.blowing = true;
+    if (state.tool === "turn") state.turnVel = 4;
+    if (state.tool === "jacks" && state.hasGlass) {
+      state.stretch = Math.max(0.5, state.stretch - 0.18);
+      state.neck = true;
+      puff(680, 0.05, 0.1);
+      say("jacks pinch a neck");
+    }
+    if (state.tool === "block" && state.hasGlass) {
+      state.stretch = 1; state.wobble = 0;
+      puff(300, 0.05, 0.16);
+      say("blocked round");
+    }
+  });
+  cv.addEventListener("pointerup", () => { state.blowing = false; });
+  cv.addEventListener("pointermove", (e) => {
+    blowX = e.clientX / W; blowY = e.clientY / H;
+  });
+
+  $("tAnneal").addEventListener("click", () => {
+    if (!state.hasGlass || state.size < 26) { say("too small to sign — blow bigger"); return; }
+    if (state.heat > 0.45) { say("too hot to anneal — let it cool a touch"); return; }
+    /* finished! */
+    say("annealed · signed · shelved ✦");
+    puff(523, 0.06, 0.4); setTimeout(() => puff(784, 0.06, 0.5), 180);
+    const slot = $("slotA");
+    slot.innerHTML = "";
+    const v = document.createElement("div");
+    v.className = "vessel";
+    v.style.borderRadius = (40 - state.stretch * 20) + "% " + (40 - state.stretch * 20) + "% 50% 50%";
+    slot.appendChild(v);
+    state.hasGlass = false; state.size = 0; state.targetSize = 0; state.stretch = 1;
+  });
+
+  /* ---------- physics loop ---------- */
+  let last = performance.now();
+  function loop(now) {
+    requestAnimationFrame(loop);
+    const dt = Math.min(50, now - last) / 1000; last = now;
+    if (document.hidden) return;
+
+    /* cooling */
+    state.heat = Math.max(0, state.heat - dt * 0.022);
+    $("heatBar").style.width = (state.heat * 100) + "%";
+
+    if (state.hasGlass) {
+      /* blowing swells when hot enough */
+      if (state.blowing && state.heat > 0.4) {
+        state.targetSize += dt * 26;
+        state.wobble = Math.min(1, state.wobble + dt * 0.8);
+      }
+      /* turn adds spin */
+      state.rotation += state.turnVel * dt * 2;
+      state.turnVel *= 0.96;
+      /* gravity stretch when hot */
+      if (state.heat > 0.6) state.stretch += dt * 0.06 * state.heat;
+      /* size eases to target, faster when hot */
+      const k = state.heat > 0.5 ? 1.6 : 0.4;
+      state.size += (state.targetSize - state.size) * dt * k;
+      /* cold + big = crack risk */
+      if (state.heat < 0.18 && state.targetSize > 20 && Math.random() < dt * 0.25) {
+        crack();
+      }
+    }
+
+    /* particles: heat shimmer sparks */
+    if (state.hasGlass && state.heat > 0.5 && Math.random() < 0.3) {
+      particles.push({
+        x: blowX * W + (Math.random() - 0.5) * state.size * 2,
+        y: blowY * H + (Math.random() - 0.5) * state.size,
+        vx: (Math.random() - 0.5) * 0.6, vy: -0.8 - Math.random(),
+        life: 1,
+      });
+    }
+    particles = particles.filter(p => p.life > 0);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+    });
+
+    draw();
+  }
+  function crack() {
+    state.cracks++;
+    crackSnd();
+    say("✖ it cracked — back to the furnace");
+    if (state.cracks > 2) {
+      state.hasGlass = false; state.size = 0; state.targetSize = 0;
+      state.cracks = 0;
+      say("the piece is gone. gather again.");
+    }
+  }
+
+  /* ---------- rendering ---------- */
+  function heatColor(h) {
+    /* cold teal → cherry → white-hot */
+    if (h > 0.8) return "#fff3d6";
+    if (h > 0.6) return "#ffb347";
+    if (h > 0.35) return "#ff6a2e";
+    if (h > 0.2) return "#b3300a";
+    return "#2a9d8f";
+  }
+  function draw() {
+    g.clearRect(0, 0, W, H);
+    /* hot shop floor glow */
+    const fl = g.createLinearGradient(0, 0, 0, H);
+    fl.addColorStop(0, "#0d0906");
+    fl.addColorStop(1, "#160c07");
+    g.fillStyle = fl; g.fillRect(0, 0, W, H);
+
+    /* the blowpipe: from left edge to anchor */
+    const ax = blowX * W, ay = blowY * H;
+    g.save();
+    g.strokeStyle = "#4a3a2c";
+    g.lineWidth = 7; g.lineCap = "round";
+    g.beginPath();
+    g.moveTo(0, ay + 90);
+    g.quadraticCurveTo(ax * 0.4, ay + 60, ax - state.size - 14, ay);
+    g.stroke();
+    g.restore();
+
+    /* the gather */
+    if (state.hasGlass && state.size > 2) {
+      const wob = Math.sin(performance.now() / 300) * state.wobble * 3;
+      g.save();
+      g.translate(ax, ay);
+      g.rotate(Math.sin(state.rotation) * 0.1);
+      const rx = state.size * (1 + wob * 0.02);
+      const ry = state.size * state.stretch;
+      const grad = g.createRadialGradient(-rx * 0.3, -ry * 0.35, rx * 0.1, 0, 0, Math.max(rx, ry));
+      const col = heatColor(state.heat);
+      grad.addColorStop(0, col);
+      grad.addColorStop(0.7, col);
+      grad.addColorStop(1, "rgba(20,10,5,.55)");
+      g.fillStyle = grad;
+      g.shadowColor = col;
+      g.shadowBlur = 30 * state.heat + 6;
+      g.beginPath();
+      g.ellipse(0, 0, rx, ry, 0, 0, 6.283);
+      g.fill();
+      g.shadowBlur = 0;
+      /* highlight */
+      g.fillStyle = "rgba(255,255,255," + (0.14 + state.heat * 0.3) + ")";
+      g.beginPath();
+      g.ellipse(-rx * 0.3, -ry * 0.4, rx * 0.26, ry * 0.18, -0.5, 0, 6.283);
+      g.fill();
+      /* neck if jacked */
+      if (state.neck) {
+        g.strokeStyle = "rgba(20,10,5,.5)";
+        g.lineWidth = 3;
+        g.beginPath(); g.moveTo(0, -ry * 0.85); g.lineTo(0, -ry * 0.6); g.stroke();
+      }
+      g.restore();
+    }
+
+    /* sparks */
+    particles.forEach(p => {
+      g.fillStyle = "rgba(255," + (150 + Math.random() * 80) + ",60," + p.life * 0.7 + ")";
+      g.fillRect(p.x, p.y, 2, 2);
+    });
+  }
+  requestAnimationFrame(loop);
+
+  say("gather glass from the furnace to begin");
+})();
+</script>
+</body>
+</html>

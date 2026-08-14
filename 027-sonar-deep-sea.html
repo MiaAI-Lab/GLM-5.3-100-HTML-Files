@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PING — deep survey</title>
+<style>
+  :root {
+    --bg:#04090b; --panel:#071318; --line:#0e2b30;
+    --ph:#39e6cf; --ph-dim:#1d7f74; --ph-faint:#0f4a45;
+    --amber:#e8b84b; --txt:#bfe9e2;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    background:
+      radial-gradient(120% 90% at 50% 110%, #06222a 0%, var(--bg) 60%);
+    color:var(--txt);
+    font-family: "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+    overflow-x:hidden;
+  }
+  /* film grain */
+  body::after {
+    content:""; position:fixed; inset:-10px; pointer-events:none; z-index:60;
+    opacity:.16; mix-blend-mode:screen;
+    background-image:
+      radial-gradient(rgba(180,255,245,.5) .5px, transparent .7px),
+      radial-gradient(rgba(120,220,210,.35) .5px, transparent .7px);
+    background-size: 3px 3px, 5px 5px;
+    background-position: 0 0, 2px 3px;
+    animation: grain .9s steps(4) infinite;
+  }
+  @keyframes grain {
+    0% { transform:translate(0,0); } 25% { transform:translate(-2px,1px); }
+    50% { transform:translate(1px,-2px); } 75% { transform:translate(-1px,-1px); }
+    100% { transform:translate(2px,2px); }
+  }
+  @media (prefers-reduced-motion: reduce){ body::after { animation:none; } }
+
+  header {
+    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+    padding:14px 20px 8px; border-bottom:1px solid var(--line);
+  }
+  header h1 { font-size:15px; letter-spacing:.4em; color:var(--ph); font-weight:700; }
+  header h1 span { color:var(--amber); }
+  header .sub { font-size:10px; letter-spacing:.24em; color:var(--ph-dim); }
+  .sndbtn {
+    margin-left:auto; background:none; border:1px solid var(--ph-faint);
+    color:var(--ph-dim); font:inherit; font-size:9.5px; letter-spacing:.2em;
+    padding:5px 10px; cursor:pointer; border-radius:3px;
+  }
+  .sndbtn.on { color:var(--ph); border-color:var(--ph-dim); }
+
+  .deck {
+    display:grid; gap:14px; padding:16px 20px 26px;
+    grid-template-columns: 190px minmax(300px, 560px) 218px;
+    grid-template-areas: "tape scope gauges" "log scope gauges" "log card card";
+    justify-content:center; align-items:start;
+  }
+  .mod {
+    background:linear-gradient(180deg, #08181d, var(--panel));
+    border:1px solid var(--line); border-radius:6px; padding:10px 12px 12px;
+  }
+  .mod h2 {
+    font-size:9px; letter-spacing:.3em; color:var(--ph-dim); font-weight:600;
+    margin-bottom:8px; text-transform:uppercase;
+  }
+  .tape-mod { grid-area:tape; }
+  .scope-mod { grid-area:scope; padding:12px; }
+  .gauge-mod { grid-area:gauges; display:flex; flex-direction:column; gap:14px; }
+  .log-mod { grid-area:log; max-height:230px; overflow:auto; }
+  .card-mod { grid-area:card; min-height:120px; }
+
+  canvas.matrix { display:block; width:100%; height:44px; }
+  canvas.scope { display:block; width:100%; aspect-ratio:1/1; touch-action:none; cursor:crosshair; }
+
+  .depthrow { display:flex; align-items:center; gap:10px; }
+  .depthrow input[type=range] {
+    writing-mode: vertical-lr; direction:rtl; height:150px; width:26px;
+    accent-color: var(--ph); cursor:pointer;
+  }
+  .depthval { font-size:22px; color:var(--ph); font-variant-numeric:tabular-nums; }
+  .depthval small { font-size:10px; color:var(--ph-dim); display:block; letter-spacing:.2em; }
+  .bathy { font-size:10.5px; line-height:1.9; color:var(--txt); }
+  .bathy b { color:var(--ph); font-weight:600; }
+  .bathy .warn { color:var(--amber); }
+
+  .contactrow {
+    display:flex; gap:8px; align-items:center; font-size:10.5px;
+    padding:4px 6px; border-radius:3px; cursor:pointer; border:1px solid transparent;
+  }
+  .contactrow:hover { background:#0b2228; border-color:var(--ph-faint); }
+  .contactrow .tag { color:var(--ph); width:2.2em; }
+  .contactrow .rb { color:var(--txt); font-variant-numeric:tabular-nums; }
+  .logline { font-size:10px; color:var(--ph-dim); padding:3px 6px; line-height:1.5; }
+  .logline em { color:var(--amber); font-style:normal; }
+
+  .card-inner { display:flex; gap:14px; align-items:flex-start; }
+  .card-inner svg { width:120px; height:86px; flex:none; }
+  .card-info { font-size:11px; line-height:1.85; }
+  .card-info b { color:var(--ph); letter-spacing:.14em; }
+  .card-info .hint { color:var(--ph-dim); font-size:9.5px; letter-spacing:.1em; }
+  .card-mod .empty { color:var(--ph-dim); font-size:10.5px; letter-spacing:.14em; padding:8px 2px; }
+
+  footer {
+    text-align:center; font-size:9px; letter-spacing:.26em; color:var(--ph-faint);
+    padding:6px 0 18px;
+  }
+  @media (max-width: 940px) {
+    .deck {
+      grid-template-columns: minmax(280px, 560px);
+      grid-template-areas: "tape" "scope" "gauges" "log" "card";
+    }
+    .gauge-mod { flex-direction:row; flex-wrap:wrap; }
+    .gauge-mod > .mod { flex:1 1 200px; }
+  }
+  @media (max-width: 420px){ .deck { padding:12px; } header{ padding:12px 12px 8px; } }
+</style>
+</head>
+<body>
+  <header>
+    <h1>PING<span>·</span>DEEP SURVEY</h1>
+    <span class="sub">RV GLM-X · HYDROGRAPHIC STATION 7</span>
+    <button class="sndbtn" id="snd">HYDROPHONES: OFF</button>
+  </header>
+
+  <div class="deck">
+    <div class="mod tape-mod">
+      <h2>Heading tape</h2>
+      <canvas class="matrix" id="matrix" width="340" height="44"></canvas>
+    </div>
+
+    <div class="mod scope-mod">
+      <h2>Sonar scope — drag to drop a marker · click a blip to identify</h2>
+      <canvas class="scope" id="scope"></canvas>
+    </div>
+
+    <div class="gauge-mod">
+      <div class="mod">
+        <h2>Depth</h2>
+        <div class="depthrow">
+          <input type="range" id="depth" min="0" max="60" value="22" aria-label="Survey depth">
+          <div class="depthval"><span id="depthNum">2200</span><small>METERS</small></div>
+        </div>
+      </div>
+      <div class="mod">
+        <h2>Bathymetry</h2>
+        <div class="bathy" id="bathy"></div>
+      </div>
+    </div>
+
+    <div class="mod log-mod">
+      <h2>Contacts &amp; log</h2>
+      <div id="contacts"></div>
+      <div id="loglines"></div>
+    </div>
+
+    <div class="mod card-mod" id="cardMod">
+      <h2>Identification</h2>
+      <div class="empty" id="cardEmpty">NO CONTACT SELECTED — CLICK A BLIP</div>
+      <div class="card-inner" id="cardInner" style="display:none">
+        <svg id="silh" viewBox="0 0 120 86" aria-hidden="true"></svg>
+        <div class="card-info" id="cardInfo"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>PHOSPHOR TEAL · ABYSSAL SURVEY · ALL CONTACTS SIMULATED</footer>
+
+<script>
+'use strict';
+/* ---------- PING: state, contacts, depth bands ---------- */
+const scope = document.getElementById('scope');
+const sctx = scope.getContext('2d');
+const matrix = document.getElementById('matrix');
+const mctx = matrix.getContext('2d');
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const state = {
+  sweep: -Math.PI/2,      // sweep angle
+  heading: 47,            // ship heading (degrees)
+  depthIdx: 22,           // slider 0..60 -> hundreds of meters
+  contacts: [],           // {x,y,r0,ang,dist,tag,type,seen,flare,tracked}
+  sel: null,
+  time: 0,
+};
+
+const BANDS = [
+  { d:[0,8],    floor:'ABYSSAL PLAIN', sed:'SILT / CLAY', slope:'0.5°', creature:'LANTERNFISH SHOAL' },
+  { d:[8,18],   floor:'CONTINENTAL RISE', sed:'TURBIDITE SAND', slope:'2.4°', creature:'DUMBO OCTOPUS' },
+  { d:[18,30],  floor:'MID-CANYON WALL', sed:'ROCK / EXPOSED BASALT', slope:'21°', creature:'SPERM WHALE (FORAGING)' },
+  { d:[30,42],  floor:'SEAMOUNT FLANK', sed:'FORAMINIFERAL OOZE', slope:'8.1°', creature:'HELMET JELLY' },
+  { d:[42,52],  floor:'HYDROTHERMAL MARGIN', sed:'SULFIDE TALUS', slope:'33°', creature:'YETI CRAB COLONY' },
+  { d:[52,60],  floor:'HADAL TRENCH AXIS', sed:'SERPENTINE MUD', slope:'1.2°', creature:'SNAILFISH (PALE)' },
+];
+function band(){ return BANDS.find(b => state.depthIdx >= b.d[0] && state.depthIdx < b.d[1]) || BANDS[BANDS.length-1]; }
+
+const TYPES = [
+  { name:'SPERM WHALE',    size:'16 m',  spd:'2.1 kn', note:'BIOTIC — ECHOGENIC LUNG MASS', shape:'whale' },
+  { name:'DUMBO OCTOPUS',  size:'0.6 m', spd:'0.2 kn', note:'BIOTIC — SOFT-BODIED, WEAK ECHO', shape:'octo' },
+  { name:'SEAMOUNT KNUCKLE', size:'—',   spd:'0.0 kn', note:'GEOLOGIC — HARD RETURNS', shape:'rock' },
+  { name:'WRECK (UNKNOWN)', size:'64 m', spd:'0.0 kn', note:'CULTURAL — POSSIBLE TRAWLER', shape:'wreck' },
+  { name:'TRAWL GEAR',     size:'~40 m', spd:'—',      note:'DERELICT GHOST GEAR', shape:'net' },
+  { name:'LANTERNFISH SHOAL', size:'mass', spd:'1.4 kn', note:'BIOTIC — SCATTERING LAYER', shape:'fish' },
+];
+
+let tagCounter = 1;
+function spawnContact(tracked, px, py){
+  const ang = tracked ? Math.atan2(py-0.5, px-0.5) : Math.random()*Math.PI*2;
+  const dist = tracked ? Math.hypot(px-0.5, py-0.5) : 0.14 + Math.random()*0.32;
+  const t = TYPES[Math.floor(Math.random()*TYPES.length)];
+  const c = {
+    x: 0.5 + Math.cos(ang)*dist, y: 0.5 + Math.sin(ang)*dist,
+    ang, dist, tag: 'C-' + String(tagCounter++).padStart(2,'0'),
+    type: t, seen: 0, flare: 0, tracked: !!tracked,
+    drift: (Math.random()-0.5)*0.00012,
+  };
+  state.contacts.push(c);
+  return c;
+}
+
+/* ---------- WebAudio: gesture-gated ambience + whale song ---------- */
+let AC=null, master=null, hydro=false, whaleTimer=0;
+const sndBtn = document.getElementById('snd');
+function ensureAudio(){
+  if (AC) return true;
+  try {
+    AC = new (window.AudioContext||window.webkitAudioContext)();
+    master = AC.createGain(); master.gain.value = 0.1; master.connect(AC.destination);
+  } catch(e){ AC=null; }
+  return !!AC;
+}
+sndBtn.addEventListener('click', function(){
+  hydro = !hydro;
+  sndBtn.classList.toggle('on', hydro);
+  sndBtn.textContent = 'HYDROPHONES: ' + (hydro ? 'ON' : 'OFF');
+  if (hydro && ensureAudio() && AC.state==='suspended') AC.resume().catch(function(){});
+});
+function pingSound(){
+  if (!hydro || !AC) return;
+  const t = AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type='sine'; o.frequency.setValueAtTime(1180, t);
+  o.frequency.exponentialRampToValueAtTime(760, t+0.28);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(0.25,t+0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+0.5);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t+0.55);
+}
+function whaleCall(){
+  if (!hydro || !AC) return;
+  const t = AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type='sine';
+  o.frequency.setValueAtTime(90+Math.random()*60, t);
+  o.frequency.linearRampToValueAtTime(220+Math.random()*180, t+1.1);
+  o.frequency.linearRampToValueAtTime(70+Math.random()*40, t+2.2);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(0.16,t+0.5);
+  g.gain.linearRampToValueAtTime(0.0001,t+2.3);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t+2.4);
+}
+
+/* ---------- log ---------- */
+const loglines = document.getElementById('loglines');
+function log(msg, hot){
+  const div = document.createElement('div');
+  div.className='logline';
+  div.innerHTML = hot ? '<em>'+msg+'</em>' : msg;
+  loglines.prepend(div);
+  while (loglines.children.length > 26) loglines.lastChild.remove();
+}
+
+/* ---------- depth slider re-sonifies ---------- */
+const depthEl = document.getElementById('depth');
+const depthNum = document.getElementById('depthNum');
+const bathyEl = document.getElementById('bathy');
+function renderBathy(){
+  const b = band();
+  const m = state.depthIdx*100;
+  depthNum.textContent = m.toLocaleString('en-US');
+  const warn = m >= 4800 ? ' <span class="warn">▲ NEAR HULL RATED LIMIT</span>' : '';
+  bathyEl.innerHTML =
+    'FLOOR&nbsp; <b>'+b.floor+'</b><br>'+
+    'SEDIMENT&nbsp; '+b.sed+'<br>'+
+    'SLOPE&nbsp; '+b.slope+warn+'<br>'+
+    'FAUNA&nbsp; '+b.creature;
+}
+let lastBand = band();
+depthEl.addEventListener('input', function(){
+  state.depthIdx = +depthEl.value;
+  renderBathy();
+  const nb = band();
+  if (nb !== lastBand){
+    lastBand = nb;
+    // re-sonify: clear and repopulate
+    state.contacts.length = 0; state.sel=null; hideCard();
+    for (let i=0;i<3+Math.floor(Math.random()*3);i++) spawnContact(false);
+    log('RE-SONIFY @ '+ (state.depthIdx*100) +' M — '+ nb.floor, true);
+    log('BIOLOGIST NOTE: '+ nb.creature);
+  }
+});
+function hideCard(){
+  document.getElementById('cardInner').style.display='none';
+  document.getElementById('cardEmpty').style.display='block';
+}
+
+/* ---------- ID card with hand-drawn silhouette ---------- */
+const silh = document.getElementById('silh');
+const SILH = {
+  whale: 'M8 52 Q30 30 58 34 Q84 38 100 48 L112 40 L106 54 L112 62 L98 56 Q74 62 50 56 Q24 60 8 52 Z M30 40 l4 -10 M44 38 l3 -11',
+  octo:  'M60 30 Q82 30 84 48 Q85 62 70 64 M60 30 Q38 30 36 48 Q35 62 50 64 M36 52 q-12 2 -16 12 M84 52 q12 2 16 12 M46 64 q2 12 14 12 q12 0 14 -12 M60 66 l0 10',
+  rock:  'M18 64 L30 34 L52 22 L78 30 L98 52 L102 66 Z M52 22 L58 44 L78 30 M58 44 L38 64',
+  wreck: 'M12 60 L20 44 L34 40 L36 24 L44 36 L60 32 L66 46 L84 50 L104 60 Z M36 24 L40 18 M44 36 L44 50 M60 32 L58 48',
+  net:   'M20 22 L100 26 L92 62 L26 60 Z M20 22 L36 60 M100 26 L26 60 M36 24 L38 58 M58 25 L56 60 M78 26 L30 58 M20 22 L92 62',
+  fish:  'M16 46 Q36 26 60 34 Q84 42 92 46 L104 34 L98 50 L104 62 L92 52 Q66 60 44 56 Q24 54 16 46 Z M30 44 l1.5 1.5 M31 44 a1.5 1.5 0 1 0 .1 0',
+};
+function showCard(c){
+  const t = c.type;
+  document.getElementById('cardEmpty').style.display='none';
+  const inner = document.getElementById('cardInner');
+  inner.style.display='flex';
+  silh.innerHTML =
+    '<path d="'+ (SILH[t.shape]||SILH.rock) +'" fill="none" stroke="#39e6cf" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>'+
+    '<rect x="4" y="4" width="112" height="78" fill="none" stroke="#0f4a45" stroke-width="1.6" stroke-dasharray="5 4"/>';
+  const brg = ((c.ang*180/Math.PI + 90 + 360) % 360);
+  const rng = Math.round(c.dist * 4200);
+  document.getElementById('cardInfo').innerHTML =
+    '<b>'+ t.name +'</b><br>'+
+    'TAG ' + c.tag + ' · ' + (c.tracked ? 'MARKED BY OPERATOR' : 'PASSIVE CONTACT') + '<br>'+
+    'RANGE ' + rng.toLocaleString('en-US') + ' m · BRG ' + String(Math.round(brg)).padStart(3,'0') + '°<br>'+
+    'SIZE ' + t.size + ' · SPEED ' + t.spd + '<br>'+
+    t.note + '<br>'+
+    '<span class="hint">SILHOUETTE: HAND-RENDERED FROM ECHO ENVELOPE</span>';
+  state.sel = c;
+}
+
+/* ---------- scope drawing ---------- */
+let W=0, H=0, DPR=1;
+function resize(){
+  DPR = Math.min(2, window.devicePixelRatio||1);
+  const r = scope.getBoundingClientRect();
+  W = r.width; H = r.width;
+  scope.width = W*DPR; scope.height = H*DPR;
+  sctx.setTransform(DPR,0,0,DPR,0,0);
+  const mr = matrix.getBoundingClientRect();
+  matrix.width = mr.width*DPR; matrix.height = 44*DPR;
+  mctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', resize);
+
+function drawScope(dt){
+  const cx=W/2, cy=H/2, R=W/2-10;
+  sctx.clearRect(0,0,W,H);
+  // scope background
+  const g = sctx.createRadialGradient(cx,cy,0,cx,cy,R);
+  g.addColorStop(0,'#0a2a30'); g.addColorStop(1,'#050e12');
+  sctx.fillStyle=g;
+  sctx.beginPath(); sctx.arc(cx,cy,R,0,Math.PI*2); sctx.fill();
+  // rings
+  sctx.strokeStyle='#0f4a45'; sctx.lineWidth=1;
+  for (let i=1;i<=4;i++){
+    sctx.beginPath(); sctx.arc(cx,cy,R*i/4,0,Math.PI*2); sctx.stroke();
+  }
+  // crosshair + bearing ticks
+  sctx.beginPath();
+  sctx.moveTo(cx-R,cy); sctx.lineTo(cx+R,cy);
+  sctx.moveTo(cx,cy-R); sctx.lineTo(cx,cy+R);
+  sctx.stroke();
+  for (let a=0;a<360;a+=30){
+    const rad=(a-90)*Math.PI/180;
+    sctx.beginPath();
+    sctx.moveTo(cx+Math.cos(rad)*(R-2), cy+Math.sin(rad)*(R-2));
+    sctx.lineTo(cx+Math.cos(rad)*(R-9), cy+Math.sin(rad)*(R-9));
+    sctx.strokeStyle = a%90===0 ? '#1d7f74' : '#0f4a45';
+    sctx.stroke();
+  }
+  // sweep trail (fading wedge)
+  const trail = 1.35;
+  for (let i=0;i<14;i++){
+    const a0 = state.sweep - (i/14)*trail;
+    sctx.beginPath();
+    sctx.moveTo(cx,cy);
+    sctx.arc(cx,cy,R,a0-0.1,a0);
+    sctx.closePath();
+    sctx.fillStyle = 'rgba(57,230,207,'+(0.16*(1-i/14))+')';
+    sctx.fill();
+  }
+  // beam
+  sctx.beginPath();
+  sctx.moveTo(cx,cy);
+  sctx.lineTo(cx+Math.cos(state.sweep)*R, cy+Math.sin(state.sweep)*R);
+  sctx.strokeStyle='rgba(120,255,238,.85)'; sctx.lineWidth=1.6; sctx.stroke();
+  // contacts
+  for (const c of state.contacts){
+    const px = cx + (c.x-0.5)*2*R*0.92;
+    const py = cy + (c.y-0.5)*2*R*0.92;
+    let angTo = Math.atan2(py-cy, px-cx);
+    let diff = (angTo - state.sweep) % (Math.PI*2);
+    if (diff < 0) diff += Math.PI*2;
+    if (diff < 0.12){ c.seen = 1; c.flare = 1; }
+    const vis = Math.max(c.seen, c.flare);
+    if (vis > 0.02){
+      const alpha = 0.15 + vis*0.85;
+      sctx.fillStyle = 'rgba(57,230,207,'+alpha+')';
+      sctx.beginPath(); sctx.arc(px,py, c.tracked?5:4 + c.flare*3, 0, Math.PI*2); sctx.fill();
+      if (c.tracked || state.sel===c){
+        sctx.strokeStyle='rgba(232,184,75,'+(0.4+vis*0.6)+')';
+        sctx.lineWidth=1.2;
+        sctx.beginPath(); sctx.arc(px,py,10+ (1-vis)*4, 0, Math.PI*2); sctx.stroke();
+        sctx.fillStyle='rgba(232,184,75,.9)';
+        sctx.font='9px monospace';
+        sctx.fillText(c.tag, px+12, py+3);
+      }
+      c.seen *= 0.995; c.flare *= 0.94;
+    }
+  }
+  // center dot
+  sctx.fillStyle='#39e6cf';
+  sctx.beginPath(); sctx.arc(cx,cy,3,0,Math.PI*2); sctx.fill();
+}
+
+/* ---------- dot-matrix heading tape ---------- */
+function drawMatrix(){
+  const w = matrix.getBoundingClientRect().width, h=44;
+  mctx.clearRect(0,0,w,h);
+  mctx.fillStyle='#050e12'; mctx.fillRect(0,0,w,h);
+  const cols = Math.floor(w/6), rows=5;
+  state.heading = (state.heading + 0.06) % 360;
+  const hdgPx = w/2;
+  for (let gx=-cols; gx<=cols; gx++){
+    const deg = Math.round(state.heading/5)*5 + gx*5;
+    const x = hdgPx + (deg - state.heading) * (w/80);
+    if (x < -20 || x > w+20) continue;
+    const major = ((deg%360)+360)%360 % 45 === 0;
+    const rowsN = major ? 5 : 3;
+    for (let ry=0; ry<rowsN; ry++){
+      for (let cx=0; cx<2; cx++){
+        const lit = Math.random() < 0.04;
+        mctx.fillStyle = lit ? '#1d7f74' : (major ? '#39e6cf' : '#1a6b63');
+        mctx.fillRect(Math.round(x+cx*3), 8+ry*5, 2, 2);
+      }
+    }
+    if (major){
+      const label = ('000'+(((deg%360)+360)%360)).slice(-3);
+      mctx.fillStyle='#e8b84b'; mctx.font='8px monospace';
+      mctx.fillText(label, x-6, 42);
+    }
+  }
+  // center caret
+  mctx.fillStyle='#e8b84b';
+  mctx.beginPath(); mctx.moveTo(hdgPx-4,4); mctx.lineTo(hdgPx+4,4); mctx.lineTo(hdgPx,9);
+  mctx.closePath(); mctx.fill();
+}
+
+/* ---------- scope interaction: drag = marker, click = identify ---------- */
+const contactsEl = document.getElementById('contacts');
+function renderContacts(){
+  contactsEl.innerHTML='';
+  for (const c of state.contacts){
+    const row = document.createElement('div');
+    row.className='contactrow';
+    const brg = ((c.ang*180/Math.PI + 90 + 360) % 360);
+    row.innerHTML = '<span class="tag">'+c.tag+'</span>'+
+      '<span class="rb">'+ String(Math.round(brg)).padStart(3,'0')+'° / '+
+      (Math.round(c.dist*4200/100)/10).toFixed(1)+' km</span>'+
+      '<span style="color:#5f8f89">'+ (c.tracked?'◉ MARKED':'○') +'</span>';
+    row.addEventListener('click', function(){ showCard(c); });
+    contactsEl.appendChild(row);
+  }
+}
+
+let dragStart = null;
+scope.addEventListener('pointerdown', function(e){
+  const r = scope.getBoundingClientRect();
+  dragStart = { x:(e.clientX-r.left)/r.width, y:(e.clientY-r.top)/r.height, moved:false };
+  scope.setPointerCapture(e.pointerId);
+});
+scope.addEventListener('pointermove', function(e){
+  if (!dragStart) return;
+  const r = scope.getBoundingClientRect();
+  const x=(e.clientX-r.left)/r.width, y=(e.clientY-r.top)/r.height;
+  if (Math.hypot(x-dragStart.x, y-dragStart.y) > 0.02) dragStart.moved=true;
+});
+scope.addEventListener('pointerup', function(e){
+  if (!dragStart) return;
+  const r = scope.getBoundingClientRect();
+  const x=(e.clientX-r.left)/r.width, y=(e.clientY-r.top)/r.height;
+  if (dragStart.moved){
+    if (Math.hypot(x-0.5,y-0.5) < 0.46){
+      const c = spawnContact(true, x, y);
+      c.seen=1; c.flare=1;
+      log('MARKER DROPPED — TRACKING '+c.tag+' ('+c.type.name+')', true);
+      pingSound();
+      renderContacts();
+    }
+  } else {
+    // click: identify nearest contact within radius
+    let best=null, bd=0.06;
+    for (const c of state.contacts){
+      const d = Math.hypot(c.x-x, c.y-y);
+      if (d < bd){ bd=d; best=c; }
+    }
+    if (best){ showCard(best); best.flare=1; }
+  }
+  dragStart=null;
+});
+
+/* ---------- main loop ---------- */
+let last=performance.now(), lastPing=0, contactTimer=0;
+function frame(now){
+  const dt = Math.min(50, now-last); last=now;
+  state.time += dt;
+  if (!reduced) state.sweep += dt*0.0016;
+  if (state.sweep >= Math.PI*2){
+    state.sweep -= Math.PI*2;
+    if (!reduced) pingSound();
+    renderContacts();
+  }
+  // drift tracked contacts slightly
+  for (const c of state.contacts){
+    c.ang += c.drift * dt * 0.06;
+    c.x = 0.5 + Math.cos(c.ang)*c.dist;
+    c.y = 0.5 + Math.sin(c.ang)*c.dist;
+  }
+  contactTimer += dt;
+  if (contactTimer > 9000 && state.contacts.length < 9){
+    contactTimer = 0;
+    const c = spawnContact(false);
+    log('NEW FAINT RETURN — CLASSIFYING… '+c.tag);
+  }
+  whaleTimer += dt;
+  if (whaleTimer > 16000 + Math.random()*14000){
+    whaleTimer = 0;
+    whaleCall();
+    log('HYDROPHONE: LOW-FREQUENCY MOAN LOGGED');
+  }
+  drawScope(dt);
+  drawMatrix();
+  requestAnimationFrame(frame);
+}
+
+/* ---------- boot ---------- */
+resize();
+renderBathy();
+for (let i=0;i<4;i++) spawnContact(false);
+renderContacts();
+log('SURVEY COMMENCED — DEPTH '+(state.depthIdx*100)+' M', true);
+log('DRAG INSIDE SCOPE TO DROP A TRACKING MARKER');
+log('CLICK A BLIP OR CONTACT ROW TO IDENTIFY');
+requestAnimationFrame(frame);
+
+</script>
+</body>
+</html>

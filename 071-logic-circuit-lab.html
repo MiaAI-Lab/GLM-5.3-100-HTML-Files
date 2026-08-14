@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GATEWORKS — a logic circuit lab</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: "Courier New", Courier, monospace;
+    background:#14161c; color:#c8ccd8; touch-action:none; user-select:none; -webkit-user-select:none;
+  }
+  #board { position:fixed; inset:0; overflow:hidden; cursor:crosshair; }
+  canvas#c { position:absolute; inset:0; width:100%; height:100%; }
+
+  .rail {
+    position:fixed; left:0; top:0; bottom:0; width:170px; z-index:20;
+    background:rgba(18,20,26,.94); border-right:1px solid #262a34;
+    display:flex; flex-direction:column; padding:14px 12px; gap:8px; overflow-y:auto;
+  }
+  .rail h1 { font-size:12px; letter-spacing:.3em; color:#e8e8f0; margin-bottom:4px; }
+  .rail .sub { font-size:8px; letter-spacing:.2em; color:#5a5f70; margin-bottom:10px; }
+  .part {
+    border:1px solid #2e3340; background:#1a1d24; color:#c8ccd8; border-radius:8px;
+    font:inherit; font-size:11px; padding:10px 12px; cursor:grab; text-align:left; transition:all .13s;
+  }
+  .part:hover { border-color:#e0a52e; color:#ffe4b0; }
+  .part b { color:#e0a52e; }
+  .mission {
+    margin-top:12px; border-top:1px solid #262a34; padding-top:12px;
+  }
+  .mission h3 { font-size:8.5px; letter-spacing:.24em; color:#5a5f70; text-transform:uppercase; margin-bottom:8px; }
+  .mission .card { font-size:10px; line-height:1.7; color:#a8aec0; }
+  .mission .card b { color:#7dd87d; }
+  .mission .done { color:#7dd87d !important; }
+  .tools { margin-top:auto; display:flex; flex-direction:column; gap:6px; }
+  .tools button {
+    background:#1a1d24; border:1px solid #2e3340; color:#c8ccd8; font:inherit; font-size:10px;
+    padding:8px; border-radius:8px; cursor:pointer; letter-spacing:.1em;
+  }
+  .tools button:hover { border-color:#e0a52e; }
+  .tools button.on { background:#8a3030; border-color:#c05050; color:#ffd8d8; }
+
+  #board.shift-left { left:170px; }
+  .boardwrap { position:fixed; left:170px; right:0; top:0; bottom:0; }
+  @media (max-width:640px) {
+    .rail { width:130px; }
+    .boardwrap { left:130px; }
+  }
+</style>
+</head>
+<body>
+  <div class="rail">
+    <h1>Gateworks</h1>
+    <div class="sub">drag parts · click ports to wire</div>
+    <button class="part" data-t="AND"><b>AND</b> · both</button>
+    <button class="part" data-t="OR"><b>OR</b> · either</button>
+    <button class="part" data-t="NOT"><b>NOT</b> · invert</button>
+    <button class="part" data-t="XOR"><b>XOR</b> · different</button>
+    <button class="part" data-t="SWITCH"><b>SWITCH</b> · toggle</button>
+    <button class="part" data-t="LAMP"><b>LAMP</b> · output</button>
+    <button class="part" data-t="CLOCK"><b>CLOCK</b> · pulse</button>
+
+    <div class="mission">
+      <h3>missions</h3>
+      <div class="card" id="m1">▸ <b>1.</b> light the lamp</div>
+      <div class="card" id="m2">▸ <b>2.</b> build XOR from AND/OR/NOT</div>
+      <div class="card" id="m3">▸ <b>3.</b> make a latch (memory)</div>
+    </div>
+
+    <div class="tools">
+      <button id="delBtn">wire knife (off)</button>
+      <button id="clrBtn">clear board</button>
+    </div>
+  </div>
+
+  <div class="boardwrap"><canvas id="c"></canvas></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const cv = $("c"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let parts = [], wires = [];
+  let dragging = null, dragOff = { x: 0, y: 0 };
+  let wiringFrom = null;
+  let knifeMode = false;
+  let t = 0;
+
+  const PART_W = 84, PART_H = 46;
+
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    const r = cv.getBoundingClientRect();
+    W = r.width; H = r.height;
+    cv.width = W * DPR; cv.height = H * DPR;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  /* ---------- parts model ---------- */
+  function addPart(type, x, y) {
+    const p = {
+      type, x, y,
+      on: type === "SWITCH" ? false : false,
+      phase: Math.random() * 6.28,
+      id: Math.random().toString(36).slice(2, 7),
+    };
+    parts.push(p);
+    return p;
+  }
+  function ports(p) {
+    /* outputs on right, inputs on left */
+    if (p.type === "SWITCH" || p.type === "CLOCK") {
+      return { out: [{ x: p.x + PART_W, y: p.y + PART_H / 2 }], ins: [] };
+    }
+    if (p.type === "LAMP") {
+      return { out: [], ins: [{ x: p.x, y: p.y + PART_H / 2 }] };
+    }
+    if (p.type === "NOT") {
+      return { out: [{ x: p.x + PART_W, y: p.y + PART_H / 2 }], ins: [{ x: p.x, y: p.y + PART_H / 2 }] };
+    }
+    return {
+      out: [{ x: p.x + PART_W, y: p.y + PART_H / 2 }],
+      ins: [{ x: p.x, y: p.y + PART_H * 0.3 }, { x: p.x, y: p.y + PART_H * 0.7 }],
+    };
+  }
+  function evaluate(p, depth) {
+    depth = depth || 0;
+    if (depth > 12) return false;
+    if (p.type === "SWITCH") return p.on;
+    if (p.type === "CLOCK") return Math.floor(t / 30) % 2 === 0;
+    const ins = ports(p).ins.map(pt => {
+      /* find wire feeding this port */
+      const w = wires.find(w2 => w2.to.p === p && dist(w2.to.pt, pt) < 2);
+      if (!w) return false;
+      return evaluate(w.from.p, depth + 1);
+    });
+    if (p.type === "NOT") return !ins[0];
+    if (p.type === "AND") return ins[0] && ins[1];
+    if (p.type === "OR") return ins[0] || ins[1];
+    if (p.type === "XOR") return ins[0] !== ins[1];
+    if (p.type === "LAMP") return ins[0];
+    return false;
+  }
+  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+  /* ---------- render ---------- */
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+    t++;
+    g.clearRect(0, 0, W, H);
+    /* grid dots */
+    g.fillStyle = "rgba(200,204,216,.07)";
+    for (let x = 20; x < W; x += 28) {
+      for (let y = 20; y < H; y += 28) g.fillRect(x, y, 1.4, 1.4);
+    }
+    /* wires */
+    wires.forEach(w => {
+      const hot = evaluate(w.from.p, 0);
+      g.strokeStyle = hot ? "#ffb347" : "#3d5a80";
+      g.lineWidth = hot ? 2.6 : 2;
+      g.shadowColor = hot ? "#ffb347" : "transparent";
+      g.shadowBlur = hot ? 7 : 0;
+      g.beginPath();
+      const a = w.from.pt, b = w.to.pt;
+      g.moveTo(a.x, a.y);
+      g.bezierCurveTo(a.x + 46, a.y, b.x - 46, b.y, b.x, b.y);
+      g.stroke();
+      g.shadowBlur = 0;
+    });
+    /* pending wire */
+    if (wiringFrom) {
+      g.strokeStyle = "#e0a52e";
+      g.setLineDash([5, 5]);
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(wiringFrom.pt.x, wiringFrom.pt.y);
+      g.lineTo(mouse.x, mouse.y);
+      g.stroke();
+      g.setLineDash([]);
+    }
+    /* parts */
+    parts.forEach(p => {
+      const hot = evaluate(p, 0);
+      /* body */
+      g.fillStyle = p.type === "LAMP" ? (hot ? "#5a4a18" : "#1a1d24") : "#1a1d24";
+      g.strokeStyle = p.type === "LAMP" && hot ? "#e0a52e" : "#2e3340";
+      g.lineWidth = 1.6;
+      roundRect(p.x, p.y, PART_W, PART_H, 8);
+      g.fill(); g.stroke();
+      /* label */
+      g.fillStyle = "#e8e8f0";
+      g.font = "bold 12px 'Courier New', monospace";
+      g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(p.type, p.x + PART_W / 2, p.y + PART_H / 2 - (p.type === "SWITCH" ? 6 : 0));
+      /* lamp glow */
+      if (p.type === "LAMP" && hot) {
+        const rg = g.createRadialGradient(p.x + PART_W / 2, p.y + PART_H / 2, 4, p.x + PART_W / 2, p.y + PART_H / 2, 42);
+        rg.addColorStop(0, "rgba(255,200,90,.5)");
+        rg.addColorStop(1, "rgba(255,200,90,0)");
+        g.fillStyle = rg;
+        g.beginPath(); g.arc(p.x + PART_W / 2, p.y + PART_H / 2, 42, 0, 6.283); g.fill();
+      }
+      /* switch state */
+      if (p.type === "SWITCH") {
+        g.fillStyle = p.on ? "#7dd87d" : "#5a5f70";
+        g.fillRect(p.x + PART_W / 2 - 12, p.y + PART_H - 14, 24, 6);
+        g.fillRect(p.x + PART_W / 2 - 12 + (p.on ? 12 : 0), p.y + PART_H - 15, 12, 8);
+      }
+      /* ports */
+      const ps = ports(p);
+      ps.out.forEach(pt => drawPort(pt, "#ffb347"));
+      ps.ins.forEach(pt => drawPort(pt, "#3d5a80"));
+    });
+    checkMissions();
+  }
+  requestAnimationFrame(loop);
+  function roundRect(x, y, w, h, r) {
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.arcTo(x + w, y, x + w, y + h, r);
+    g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r);
+    g.arcTo(x, y, x + w, y, r);
+    g.closePath();
+  }
+  function drawPort(pt, col) {
+    g.fillStyle = col;
+    g.beginPath(); g.arc(pt.x, pt.y, 4.4, 0, 6.283); g.fill();
+    g.strokeStyle = "#14161c"; g.lineWidth = 1.4; g.stroke();
+  }
+
+  /* ---------- input ---------- */
+  const mouse = { x: 0, y: 0 };
+  cv.addEventListener("pointermove", (e) => {
+    const r = cv.getBoundingClientRect();
+    mouse.x = e.clientX - r.left;
+    mouse.y = e.clientY - r.top;
+    if (dragging) {
+      dragging.x = mouse.x - dragOff.x;
+      dragging.y = mouse.y - dragOff.y;
+    }
+  });
+  cv.addEventListener("pointerdown", (e) => {
+    const r = cv.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    /* port hits first */
+    for (const p of parts) {
+      const ps = ports(p);
+      for (const pt of ps.out) {
+        if (dist(pt, { x, y }) < 8) {
+          if (knifeMode) return;
+          wiringFrom = { p, pt };
+          return;
+        }
+      }
+      for (const pt of ps.ins) {
+        if (dist(pt, { x, y }) < 8) {
+          if (knifeMode) {
+            wires = wires.filter(w => !(w.to.p === p && dist(w.to.pt, pt) < 2));
+            return;
+          }
+          if (wiringFrom && wiringFrom.p !== p) {
+            wires.push({ from: wiringFrom, to: { p, pt } });
+            wiringFrom = null;
+            return;
+          }
+        }
+      }
+    }
+    /* body hits: drag or toggle */
+    for (const p of parts) {
+      if (x > p.x && x < p.x + PART_W && y > p.y && y < p.y + PART_H) {
+        if (p.type === "SWITCH") { p.on = !p.on; return; }
+        dragging = p;
+        dragOff = { x: x - p.x, y: y - p.y };
+        return;
+      }
+    }
+    wiringFrom = null;
+  });
+  addEventListener("pointerup", () => { dragging = null; });
+  cv.addEventListener("pointerdown", (e) => {
+    /* click empty space completes wire? no — cancel */
+    setTimeout(() => { /* let port logic run first */ }, 0);
+  });
+
+  /* rail drag-to-board */
+  document.querySelectorAll(".part").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const type = btn.dataset.t;
+      const p = addPart(type, W * 0.4 + Math.random() * 120 - 60, H * 0.3 + Math.random() * 160);
+      p.x = Math.max(20, Math.min(W - PART_W - 20, p.x));
+      p.y = Math.max(20, Math.min(H - PART_H - 20, p.y));
+    });
+  });
+
+  /* ---------- tools ---------- */
+  $("delBtn").addEventListener("click", function () {
+    knifeMode = !knifeMode;
+    this.classList.toggle("on", knifeMode);
+    this.textContent = knifeMode ? "wire knife (ON)" : "wire knife (off)";
+  });
+  $("clrBtn").addEventListener("click", () => { parts = []; wires = []; });
+
+  /* ---------- missions ---------- */
+  let m1d = false, m2d = false, m3d = false;
+  function checkMissions() {
+    const lamps = parts.filter(p => p.type === "LAMP" && evaluate(p));
+    if (!m1d && lamps.length) { m1d = true; $("m1").innerHTML = "✓ <b>1.</b> light the lamp"; $("m1").classList.add("done"); }
+    /* xor from and/or/not only driving lamp with both inputs from switches */
+    if (!m2d) {
+      const lamp = parts.find(p => p.type === "LAMP" && evaluate(p));
+      if (lamp) {
+        const gatesUsed = new Set();
+        let ok = false, queue = [lamp], seen = new Set();
+        while (queue.length) {
+          const p = queue.pop();
+          if (seen.has(p.id)) continue;
+          seen.add(p.id);
+          if (["AND", "OR", "NOT"].includes(p.type)) gatesUsed.add(p.type);
+          if (p.type === "XOR") { ok = false; break; }
+          ports(p).ins.forEach(pt => {
+            const w = wires.find(w2 => w2.to.p === p && dist(w2.to.pt, pt) < 2);
+            if (w) queue.push(w.from.p);
+          });
+          if (gatesUsed.size >= 3) ok = true;
+        }
+        if (ok) { m2d = true; $("m2").innerHTML = "✓ <b>2.</b> XOR from basics"; $("m2").classList.add("done"); }
+      }
+    }
+    /* latch: a lamp fed by an OR whose output loops to its own input */
+    if (!m3d) {
+      for (const p of parts) {
+        if (p.type !== "OR") continue;
+        const fedBySelf = wires.some(w => w.from.p === p && w.to.p === p);
+        const lampLit = parts.some(l => l.type === "LAMP" && evaluate(l));
+        if (fedBySelf && lampLit) {
+          m3d = true;
+          $("m3").innerHTML = "✓ <b>3.</b> latch built";
+          $("m3").classList.add("done");
+          break;
+        }
+      }
+    }
+  }
+
+  /* starter circuit */
+  addPart("SWITCH", 60, 140);
+  addPart("LAMP", 420, 140);
+})();
+</script>
+</body>
+</html>

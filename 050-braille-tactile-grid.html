@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POINTS OF LIGHT — a living braille field</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    background:#232830; color:#dfe3ea;
+    font-family: system-ui, -apple-system, sans-serif;
+    display:flex; flex-direction:column;
+  }
+  header {
+    padding:18px 26px 14px; display:flex; align-items:baseline; gap:18px; flex-wrap:wrap;
+    border-bottom:1px solid rgba(255,255,255,.08);
+  }
+  header h1 { font-size:17px; font-weight:300; letter-spacing:.42em; text-transform:uppercase; }
+  header h1 b { font-weight:600; color:#ffb347; }
+  header .sub { font-size:10px; letter-spacing:.2em; color:#8a92a0; text-transform:uppercase; }
+
+  .field {
+    flex:1; display:flex; align-items:center; justify-content:center;
+    position:relative; overflow:hidden; cursor:crosshair; touch-action:none;
+    background:radial-gradient(ellipse at 50% 40%, #2a303a 0%, #1e222a 70%, #181b21 100%);
+  }
+  .grid {
+    display:grid; gap:10px;
+    grid-template-columns:repeat(var(--cols, 30), 1fr);
+    width:min(92vw, 1100px);
+  }
+  .cell {
+    aspect-ratio:1; border-radius:50%; position:relative;
+    background:radial-gradient(circle at 38% 34%, #39404c, #262b33 70%);
+    box-shadow: inset 0 2px 3px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.05);
+    transition:transform .18s, background .3s, box-shadow .3s;
+  }
+  .cell::after {
+    content:""; position:absolute; left:26%; top:20%; width:30%; height:22%; border-radius:50%;
+    background:linear-gradient(180deg, rgba(255,255,255,.16), transparent);
+  }
+  .cell.up {
+    background:radial-gradient(circle at 38% 34%, #fff7e6, #d8b877 55%, #a8863e);
+    box-shadow:0 0 14px rgba(255,179,71,.75), inset 0 -2px 4px rgba(120,80,20,.5);
+    transform:translateY(-2px) scale(1.06);
+  }
+  .cell.press { transform:translateY(1px) scale(.94); }
+  .cell.cool {
+    background:radial-gradient(circle at 38% 34%, #eaf6ff, #9fc4dd 55%, #6d8fa8);
+    box-shadow:0 0 12px rgba(159,196,221,.55);
+    transform:scale(1.04);
+  }
+
+  /* message strip */
+  .strip {
+    border-top:1px solid rgba(255,255,255,.08); padding:14px 26px;
+    display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+    background:rgba(20,23,28,.6);
+  }
+  .strip label { font-size:9px; letter-spacing:.24em; color:#8a92a0; text-transform:uppercase; }
+  input[type=text] {
+    flex:1; min-width:140px; background:#181b21; border:1px solid #333a44; color:#eef1f6;
+    font:inherit; font-size:15px; padding:9px 14px; border-radius:8px; outline:none; letter-spacing:.08em;
+  }
+  input[type=text]:focus { border-color:#ffb347; }
+  .modes { display:flex; gap:8px; flex-wrap:wrap; }
+  .modes button, .strip button.act {
+    background:#262b33; color:#c9cfd8; border:1px solid #39404c; border-radius:999px;
+    font:inherit; font-size:10px; letter-spacing:.16em; text-transform:uppercase; padding:8px 14px; cursor:pointer;
+    transition:all .15s;
+  }
+  .modes button:hover, .strip button.act:hover { border-color:#ffb347; color:#ffd9a0; }
+  .modes button.on { background:#ffb347; color:#232830; border-color:#ffb347; font-weight:700; }
+  .note { font-size:9.5px; line-height:1.7; color:#727a88; max-width:380px; letter-spacing:.03em; }
+  .note b { color:#aeb6c2; }
+
+  @media (max-width:720px) {
+    .grid { grid-template-columns:repeat(var(--cols, 14), 1fr) !important; }
+    header h1 { letter-spacing:.24em; font-size:14px; }
+    .note { display:none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cell { transition:none; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Points <b>of</b> Light</h1>
+    <span class="sub">a living braille field · 480 raised dots</span>
+  </header>
+
+  <div class="field" id="field">
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="strip">
+    <label for="msg">spell</label>
+    <input type="text" id="msg" maxlength="24" placeholder="type a word…" autocomplete="off" spellcheck="false">
+    <div class="modes" id="modes">
+      <button data-m="ripple" class="on">ripple</button>
+      <button data-m="rain">rain</button>
+      <button data-m="spiral">spiral</button>
+      <button data-m="message">message</button>
+    </div>
+    <button class="act" id="clearBtn">calm</button>
+    <p class="note">
+      Each cell is one braille dot position. In <b>message</b> mode your word is translated to
+      braille letter-cells and scrolls across the field, dot by raised dot. Touch the field to read.
+    </p>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const grid = $("grid"), field = $("field");
+  let cols = 30, rows = 16, cells = [];
+  let mode = "ripple";
+
+  /* ---------- braille translation ---------- */
+  /* dot numbering: 1..8 per cell; we map a-z (with simple substitutions) + digits */
+  const BRAILLE = {
+    a:[1], b:[1,2], c:[1,4], d:[1,4,5], e:[1,5], f:[1,2,4], g:[1,2,4,5], h:[1,2,5], i:[2,4], j:[2,4,5],
+    k:[1,3], l:[1,2,3], m:[1,3,4], n:[1,3,4,5], o:[1,3,5], p:[1,2,3,4], q:[1,2,3,4,5], r:[1,2,3,5], s:[2,3,4], t:[2,3,4,5],
+    u:[1,3,6], v:[1,2,3,6], w:[2,4,5,6], x:[1,3,4,6], y:[1,3,4,5,6], z:[1,3,5,6],
+    "1":[1],"2":[1,2],"3":[1,4],"4":[1,4,5],"5":[1,5],"6":[1,2,4],"7":[1,2,4,5],"8":[1,2,5],"9":[2,4],"0":[2,4,5],
+    " ":[],".":[2,5,6],",":[2],"?":[1,4,5,6],"!":[2,3,5],"'":[3],
+  };
+  /* each letter occupies a 2-wide × 4-tall dot block */
+  function messageDots(text) {
+    const dots = [];
+    [...text.toLowerCase()].forEach((ch, li) => {
+      const spec = BRAILLE[ch] || [];
+      const col0 = li * 2;
+      spec.forEach(d => {
+        /* braille dot rows: 1,2,3 top→bottom left; 4,5,6 right */
+        let cx, cy;
+        if (d <= 3) { cx = col0; cy = d - 1; }
+        else if (d <= 6) { cx = col0 + 1; cy = d - 4; }
+        else if (d === 7) { cx = col0; cy = 3; }
+        else { cx = col0 + 1; cy = 3; }
+        dots.push({ x: col0 + (cx - col0), y: cy });
+      });
+    });
+    return dots;
+  }
+
+  /* ---------- build grid ---------- */
+  function build() {
+    const wide = innerWidth > 720;
+    cols = wide ? 30 : 14;
+    rows = wide ? 16 : 18;
+    grid.style.setProperty("--cols", cols);
+    grid.innerHTML = "";
+    cells = [];
+    const total = cols * rows;
+    for (let i = 0; i < total; i++) {
+      const d = document.createElement("div");
+      d.className = "cell";
+      grid.appendChild(d);
+      cells.push({ el: d, on: false, heat: 0 });
+    }
+  }
+  build();
+  let rebuildTimer = null;
+  addEventListener("resize", () => {
+    clearTimeout(rebuildTimer);
+    rebuildTimer = setTimeout(build, 250);
+  });
+
+  const idx = (x, y) => (x < 0 || y < 0 || x >= cols || y >= rows) ? null : y * cols + x;
+
+  function raise(i, cool) {
+    if (i === null || i < 0 || i >= cells.length) return;
+    const c = cells[i];
+    c.on = true;
+    c.heat = 1;
+    c.el.classList.remove("up", "cool", "press");
+    void c.el.offsetWidth;
+    c.el.classList.add(cool ? "cool" : "up");
+  }
+  function lowerAll() {
+    cells.forEach(c => {
+      c.on = false; c.heat = 0;
+      c.el.classList.remove("up", "cool", "press");
+    });
+  }
+
+  /* ---------- touch reading ---------- */
+  field.addEventListener("pointermove", (e) => {
+    if (e.pointerType === "mouse" && e.buttons === 0 && !touchFollow) return;
+    if (!touchFollow) return;
+    const r = grid.getBoundingClientRect();
+    const cw = r.width / cols, ch = r.height / rows;
+    const gx = Math.floor((e.clientX - r.left) / cw);
+    const gy = Math.floor((e.clientY - r.top) / ch);
+    const i = idx(gx, gy);
+    if (i !== null) {
+      raise(i, true);
+      /* neighbors dimple */
+      [idx(gx - 1, gy), idx(gx + 1, gy), idx(gx, gy - 1), idx(gx, gy + 1)].forEach(n => {
+        if (n !== null) cells[n].el.classList.add("press");
+      });
+    }
+  });
+  field.addEventListener("pointerdown", (e) => {
+    touchFollow = true;
+    pulse(e);
+  });
+  addEventListener("pointerup", () => {
+    touchFollow = false;
+    cells.forEach(c => c.el.classList.remove("press"));
+  });
+  let touchFollow = false;
+
+  function pulse(e) {
+    const r = grid.getBoundingClientRect();
+    const cw = r.width / cols, ch = r.height / rows;
+    const gx = Math.floor((e.clientX - r.left) / cw);
+    const gy = Math.floor((e.clientY - r.top) / ch);
+    /* ripple ring */
+    let ring = 0;
+    const iv = setInterval(() => {
+      ring++;
+      for (let x = 0; x < cols; x++) {
+        for (let y = 0; y < rows; y++) {
+          const d = Math.round(Math.hypot(x - gx, y - gy));
+          if (d === ring) raise(idx(x, y));
+        }
+      }
+      if (ring > Math.max(cols, rows)) clearInterval(iv);
+    }, 46);
+  }
+
+  /* ---------- ambient patterns ---------- */
+  let t = 0;
+  function ambient() {
+    if (!document.hidden) {
+      t++;
+      if (mode === "rain") {
+        if (Math.random() < 0.5) {
+          const x = Math.floor(Math.random() * cols);
+          raise(idx(x, 0));
+        }
+        /* gravity: drop dots downward */
+        for (let x = 0; x < cols; x++) {
+          for (let y = rows - 1; y >= 0; y--) {
+            const i = idx(x, y);
+            if (cells[i] && cells[i].on && cells[i].heat < 0.6) {
+              /* move down sometimes */
+            }
+          }
+        }
+      } else if (mode === "ripple") {
+        if (t % 24 === 0) {
+          const cx = Math.floor(cols / 2 + Math.sin(t / 60) * cols / 3);
+          const cy = Math.floor(rows / 2 + Math.cos(t / 80) * rows / 3);
+          let ring = 0;
+          const iv = setInterval(() => {
+            ring++;
+            for (let x = 0; x < cols; x++) for (let y = 0; y < rows; y++) {
+              if (Math.round(Math.hypot(x - cx, y - cy)) === ring) raise(idx(x, y));
+            }
+            if (ring > 24) clearInterval(iv);
+          }, 55);
+        }
+      } else if (mode === "spiral") {
+        if (t % 3 === 0) {
+          const cx = cols / 2, cy = rows / 2;
+          const a = t * 0.11;
+          const r = 2 + (t % 60) / 60 * Math.max(cols, rows) / 2.2;
+          raise(idx(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * 0.9)));
+        }
+      } else if (mode === "message") {
+        scrollMessage();
+      }
+      /* decay */
+      cells.forEach(c => {
+        if (c.on) {
+          c.heat -= 0.02;
+          if (c.heat <= 0) { c.on = false; c.el.classList.remove("up", "cool"); }
+        }
+      });
+    }
+    requestAnimationFrame(ambient);
+  }
+  requestAnimationFrame(ambient);
+
+  /* ---------- message scrolling ---------- */
+  let msgOffset = 0, lastMsgT = 0;
+  function scrollMessage() {
+    if (t - lastMsgT < 7) return;
+    lastMsgT = t;
+    const text = ($("msg").value || "points of light").slice(0, Math.floor(cols / 2) - 1);
+    const dots = messageDots(text + "  ");
+    const midY = Math.floor(rows / 2) - 2;
+    /* clear the message band */
+    for (let x = 0; x < cols; x++) for (let y = midY; y < midY + 4 && y < rows; y++) {
+      const i = idx(x, y);
+      if (cells[i]) { cells[i].heat = Math.min(cells[i].heat, 0.3); }
+    }
+    dots.forEach(d => {
+      const x = ((d.x + msgOffset) % (cols + 4)) - 2;
+      const y = midY + d.y;
+      if (x >= 0 && x < cols) raise(idx(x, y));
+    });
+    msgOffset = (msgOffset + 1) % ((text.length + 2) * 2);
+    if (msgOffset === 0) msgOffset = 1;
+  }
+  $("msg").addEventListener("input", () => { msgOffset = 0; });
+
+  /* ---------- modes ---------- */
+  $("modes").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    $("modes").querySelectorAll("button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    mode = b.dataset.m;
+    lowerAll();
+    t = 0;
+  }));
+  $("clearBtn").addEventListener("click", lowerAll);
+
+  /* welcome ripple */
+  setTimeout(() => {
+    let ring = 0;
+    const cx = Math.floor(cols / 2), cy = Math.floor(rows / 2);
+    const iv = setInterval(() => {
+      ring++;
+      for (let x = 0; x < cols; x++) for (let y = 0; y < rows; y++) {
+        if (Math.round(Math.hypot(x - cx, y - cy)) === ring) raise(idx(x, y));
+      }
+      if (ring > 22) clearInterval(iv);
+    }, 50);
+  }, 500);
+})();
+</script>
+</body>
+</html>

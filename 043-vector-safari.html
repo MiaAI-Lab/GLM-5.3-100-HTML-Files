@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WILDLINE — a savanna that draws itself</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:#f2e8d4; color:#4a3a28; touch-action:none; user-select:none; -webkit-user-select:none;
+  }
+  #scene { position:fixed; inset:0; }
+  canvas#c { position:absolute; inset:0; width:100%; height:100%; }
+
+  .hud { position:fixed; left:22px; top:18px; z-index:10; }
+  .hud h1 { font-size:17px; font-weight:400; letter-spacing:.5em; text-transform:uppercase; color:#5a4a32; }
+  .hud p { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.28em; color:#a08c6a; text-transform:uppercase; margin-top:5px; }
+
+  /* field guide card */
+  .guide {
+    position:fixed; right:18px; bottom:18px; z-index:20; width:250px;
+    background:rgba(246,238,222,.94); border:1px solid rgba(90,74,50,.3); border-radius:14px;
+    padding:16px 18px; transform:translateY(20px); opacity:0; transition:all .4s; pointer-events:none;
+    box-shadow:0 16px 40px rgba(74,58,40,.25);
+  }
+  .guide.show { transform:none; opacity:1; }
+  .guide h3 { font-style:italic; font-size:17px; color:#4a3a28; }
+  .guide .lat { font-family:system-ui, sans-serif; font-size:8.5px; letter-spacing:.22em; color:#a08c6a; text-transform:uppercase; margin:4px 0 8px; }
+  .guide p { font-size:11.5px; line-height:1.7; color:#6a5a44; }
+  .guide .sk { margin-top:10px; }
+
+  .controls {
+    position:fixed; left:22px; bottom:18px; z-index:20; display:flex; gap:10px; align-items:center;
+    padding:12px 16px; border-radius:99px;
+    background:rgba(246,238,222,.85); border:1px solid rgba(90,74,50,.28);
+    backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); flex-wrap:wrap;
+  }
+  .controls .lab { font-family:system-ui, sans-serif; font-size:8.5px; letter-spacing:.22em; color:#a08c6a; text-transform:uppercase; }
+  input[type=range] { -webkit-appearance:none; appearance:none; width:110px; height:3px; background:#c9b896; border-radius:99px; outline:none; cursor:pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#f6eee0; border:2px solid #8a6e44; }
+  .controls button {
+    background:rgba(90,74,50,.08); color:#5a4a32; border:1px solid rgba(90,74,50,.3);
+    font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.16em; text-transform:uppercase;
+    padding:8px 14px; border-radius:99px; cursor:pointer; transition:all .15s;
+  }
+  .controls button:hover { background:rgba(90,74,50,.2); }
+  @media (max-width:640px) { .controls { max-width: calc(100vw - 44px); } }
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <div class="hud">
+    <h1>Wildline</h1>
+    <p>field study · one-line savanna</p>
+  </div>
+
+  <div class="controls">
+    <span class="lab">time</span>
+    <input type="range" id="dayR" min="0" max="100" value="20" aria-label="time of day">
+    <button id="shutterBtn">shutter</button>
+  </div>
+
+  <div class="guide" id="guide">
+    <h3 id="gName">—</h3>
+    <div class="lat" id="gLat">—</div>
+    <p id="gBody">—</p>
+    <div class="sk">
+      <svg id="gSketch" width="120" height="54" viewBox="0 0 120 54" aria-hidden="true">
+        <path id="gPath" d="" fill="none" stroke="#4a3a28" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const cv = $("c"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let dayT = 0.2; /* 0 dawn .. 1 starlit */
+  let flashT = 0;
+
+  /* ---------- palette ---------- */
+  function palette() {
+    if (dayT < 0.33) {
+      const k = dayT / 0.33;
+      return mix(["#f2e0d0", "#e8c8a8", "#d4a884"], ["#f4ecd8", "#e8dcc0", "#d8c094"], k);
+    }
+    if (dayT < 0.72) {
+      const k = (dayT - 0.33) / 0.39;
+      return mix(["#f4ecd8", "#e8dcc0", "#d8c094"], ["#c9a884", "#a8865e", "#7a5a3e"], k);
+    }
+    const k = (dayT - 0.72) / 0.28;
+    return mix(["#c9a884", "#a8865e", "#7a5a3e"], ["#1c1a2e", "#2a2440", "#3a3050"], k);
+  }
+  function mix(a, b, t) {
+    return a.map((ca, i) => {
+      const pa = hexRGB(ca), pb = hexRGB(b[i]);
+      return "rgb(" + Math.round(pa[0] + (pb[0] - pa[0]) * t) + "," + Math.round(pa[1] + (pb[1] - pa[1]) * t) + "," + Math.round(pa[2] + (pb[2] - pa[2]) * t) + ")";
+    });
+  }
+  function hexRGB(h) { return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
+
+  /* ---------- animals: continuous-line SVG walkers ---------- */
+  const ANIMALS = [
+    {
+      name: "the elephant", lat: "loxodonta africana",
+      body: "Moves like weather. Reads the ground with her feet for signals we need machines to hear.",
+      path: "M8 40 Q 26 30 44 34 Q 52 20 66 22 Q 82 22 90 32 L 104 36 Q 108 44 100 46 L 92 44 M 66 40 L 64 52 M 78 38 L 78 52 M 50 38 L 46 52 M 38 40 L 34 52 M 100 40 L 108 24",
+      speed: 0.12, yFrac: 0.66, size: 1.2, flip: false,
+    },
+    {
+      name: "the giraffe", lat: "giraffa camelopardalis",
+      body: "Seven neck bones, same as you. Uses them to reach arguments no one else can win.",
+      path: "M20 52 L 24 30 Q 22 18 30 10 Q 38 4 44 10 Q 46 14 42 16 M 30 34 L 46 38 M 24 40 L 22 52 M 34 38 L 34 52 M 46 40 L 48 52 M 52 40 L 54 52",
+      speed: 0.09, yFrac: 0.6, size: 1.1, flip: false,
+    },
+    {
+      name: "the secretary bird", lat: "sagittarius serpentarius",
+      body: "A raptor that chose to walk. Stomps snakes for a living with the confidence of a typist.",
+      path: "M40 10 Q 48 6 54 12 Q 60 10 58 16 Q 66 18 70 24 M 56 18 L 52 32 L 40 46 M 52 32 L 62 46 M 40 46 L 36 52 M 62 46 L 64 52",
+      speed: 0.16, yFrac: 0.78, size: 0.9, flip: false,
+    },
+    {
+      name: "the zebra", lat: "equus quagga",
+      body: "Nobody knows why the stripes. Everyone has a theory. The zebra has not commented.",
+      path: "M14 42 Q 30 34 46 38 Q 56 26 70 28 Q 84 28 92 36 L 104 40 M 68 34 Q 74 26 78 28 M 48 40 L 46 52 M 62 40 L 62 52 M 80 42 L 82 52 M 34 42 L 30 52 M 100 42 L 106 30",
+      speed: 0.13, yFrac: 0.72, size: 1, flip: true,
+    },
+  ];
+  /* walking state */
+  const walkers = ANIMALS.map((a, i) => ({
+    def: a,
+    x: (i / ANIMALS.length) * 1.2 - 0.1,
+    phase: Math.random() * 6.28,
+    dashOffset: 600,
+    dashTarget: 0,
+    drawn: 0,
+  }));
+
+  /* acacia trees + grass */
+  const trees = [];
+  function buildTrees() {
+    trees.length = 0;
+    for (let i = 0; i < 3; i++) {
+      trees.push({ x: 0.15 + i * 0.35 + Math.random() * 0.08, s: 0.8 + Math.random() * 0.5, sway: Math.random() * 6.28 });
+    }
+  }
+  const grass = [];
+  function buildGrass() {
+    grass.length = 0;
+    for (let i = 0; i < 90; i++) {
+      grass.push({ x: Math.random(), y: 0.84 + Math.random() * 0.14, len: 10 + Math.random() * 18, ph: Math.random() * 6.28 });
+    }
+  }
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  addEventListener("resize", resize);
+  resize(); buildTrees(); buildGrass();
+
+  /* ---------- audio ---------- */
+  let AC = null;
+  function call(freq) {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      const t0 = AC.currentTime;
+      const o = AC.createOscillator(), gn = AC.createGain();
+      o.type = "sawtooth";
+      o.frequency.setValueAtTime(freq, t0);
+      o.frequency.linearRampToValueAtTime(freq * 0.8, t0 + 0.5);
+      const f = AC.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 800;
+      gn.gain.setValueAtTime(0.0001, t0);
+      gn.gain.linearRampToValueAtTime(0.05, t0 + 0.08);
+      gn.gain.linearRampToValueAtTime(0.0001, t0 + 0.7);
+      o.connect(f); f.connect(gn); gn.connect(AC.destination);
+      o.start(t0); o.stop(t0 + 0.75);
+    } catch (e) {}
+  }
+
+  /* ---------- render loop ---------- */
+  let t = 0;
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+    t = now;
+    const pal = palette();
+    const ink = dayT > 0.72 ? "#d8d0c0" : "#4a3a28";
+
+    /* sky */
+    const sky = g.createLinearGradient(0, 0, 0, H * 0.8);
+    sky.addColorStop(0, pal[0]); sky.addColorStop(1, pal[1]);
+    g.fillStyle = sky; g.fillRect(0, 0, W, H);
+    /* ground */
+    g.fillStyle = pal[2];
+    g.fillRect(0, H * 0.8, W, H * 0.2);
+
+    /* sun with ray ticks */
+    const sunX = W * 0.72, sunY = H * (0.3 - dayT * 0.12);
+    g.save();
+    g.translate(sunX, sunY);
+    g.strokeStyle = ink; g.globalAlpha = 0.6; g.lineWidth = 1.4;
+    for (let i = 0; i < 12; i++) {
+      const a = (6.283 / 12) * i + now / 40000;
+      g.beginPath();
+      g.moveTo(Math.cos(a) * 34, Math.sin(a) * 34);
+      g.lineTo(Math.cos(a) * (40 + (i % 3) * 6), Math.sin(a) * (40 + (i % 3) * 6));
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+    g.fillStyle = ink;
+    g.beginPath(); g.arc(0, 0, 24, 0, 6.283); g.fill();
+    g.restore();
+
+    /* stars at night */
+    if (dayT > 0.75) {
+      g.fillStyle = "rgba(240,238,220," + ((dayT - 0.75) / 0.25 * 0.8) + ")";
+      for (let i = 0; i < 50; i++) g.fillRect((i * 151) % W, (i * 77) % (H * 0.5), 1.4, 1.4);
+    }
+
+    /* acacia trees: self-drawing flat-top line art */
+    trees.forEach(tr => {
+      const tx = tr.x * W + Math.sin(now / 3000 + tr.sway) * 3;
+      const base = H * 0.8;
+      const s = tr.s;
+      g.strokeStyle = ink; g.lineWidth = 2; g.lineCap = "round";
+      /* trunk fork */
+      g.beginPath();
+      g.moveTo(tx, base);
+      g.lineTo(tx - 4 * s, base - 44 * s);
+      g.moveTo(tx, base);
+      g.lineTo(tx + 10 * s, base - 50 * s);
+      g.stroke();
+      /* flat canopy */
+      g.beginPath();
+      g.moveTo(tx - 44 * s, base - 58 * s);
+      g.quadraticCurveTo(tx, base - 74 * s, tx + 48 * s, base - 60 * s);
+      g.moveTo(tx - 30 * s, base - 62 * s);
+      g.quadraticCurveTo(tx + 6 * s, base - 72 * s, tx + 34 * s, base - 64 * s);
+      g.stroke();
+    });
+
+    /* grass stroking in wind */
+    grass.forEach(bl => {
+      const gx = bl.x * W, gy = bl.y * H;
+      const sway = Math.sin(now / 700 + bl.ph) * 4;
+      g.strokeStyle = ink; g.globalAlpha = 0.6; g.lineWidth = 1.2;
+      g.beginPath();
+      g.moveTo(gx, gy);
+      g.quadraticCurveTo(gx + sway * 0.4, gy - bl.len * 0.6, gx + sway, gy - bl.len);
+      g.stroke();
+    });
+    g.globalAlpha = 1;
+
+    /* animals: canvas re-stroke of the svg-style paths, walking + self-drawing */
+    walkers.forEach(wk => {
+      wk.x += wk.def.speed / 600;
+      if (wk.x > 1.15) wk.x = -0.15;
+      wk.drawn = Math.min(1, wk.drawn + 0.004);
+      const wx = wk.x * W;
+      const wy = H * wk.def.yFrac + Math.sin(now / 500 + wk.phase) * 2;
+      const s = wk.def.size * (H / 640);
+      /* draw path via Path2D with dash reveal */
+      const p = new Path2D();
+      drawAnimalPath(p, wk.def.path, wx, wy, s, wk.def.flip);
+      g.strokeStyle = ink;
+      g.lineWidth = 2.2;
+      g.lineCap = "round";
+      g.lineJoin = "round";
+      /* stroke-dash animation approximated by drawing fraction of subpaths: simply draw whole once half-drawn */
+      if (wk.drawn > 0.999) {
+        g.setLineDash([]);
+      } else {
+        g.setLineDash([1200 * wk.drawn, 1200]);
+      }
+      g.stroke(p);
+      g.setLineDash([]);
+    });
+
+    /* camera flash overlay */
+    if (flashT > 0) {
+      flashT -= 0.04;
+      g.fillStyle = "rgba(255,255,255," + flashT + ")";
+      g.fillRect(0, 0, W, H);
+    }
+  }
+  requestAnimationFrame(loop);
+
+  /* parse the simple path mini-language into Path2D with scale/offset/flip */
+  function drawAnimalPath(p, d, ox, oy, s, flip) {
+    const fx = flip ? -1 : 1;
+    const cmds = d.split(/(?=[MmLQ])/);
+    cmds.forEach(cmd => {
+      const op = cmd[0];
+      const nums = cmd.slice(1).trim().split(/[ ,]+/).map(Number).filter(n => !isNaN(n));
+      if (op === "M" && nums.length >= 2) p.moveTo(ox + fx * nums[0] * s * 8, oy + nums[1] * s * 8 - 20 * s);
+      if (op === "L" && nums.length >= 2) p.lineTo(ox + fx * nums[0] * s * 8, oy + nums[1] * s * 8 - 20 * s);
+      if (op === "Q" && nums.length >= 4) p.quadraticCurveTo(
+        ox + fx * nums[0] * s * 8, oy + nums[1] * s * 8 - 20 * s,
+        ox + fx * nums[2] * s * 8, oy + nums[3] * s * 8 - 20 * s
+      );
+    });
+  }
+
+  /* ---------- clicks: portrait cards ---------- */
+  cv.addEventListener("click", (e) => {
+    for (const wk of walkers) {
+      const wx = wk.x * W, wy = H * wk.def.yFrac;
+      if (Math.abs(e.clientX - wx) < 80 && Math.abs(e.clientY - wy) < 60) {
+        $("gName").textContent = wk.def.name;
+        $("gLat").textContent = wk.def.lat;
+        $("gBody").textContent = wk.def.body;
+        $("gPath").setAttribute("d", wk.def.path);
+        $("guide").classList.add("show");
+        call(wk.def.name.includes("bird") ? 880 : 140 + Math.random() * 60);
+        clearTimeout($("guide")._t);
+        $("guide")._t = setTimeout(() => $("guide").classList.remove("show"), 6000);
+        return;
+      }
+    }
+    $("guide").classList.remove("show");
+  });
+
+  /* ---------- controls ---------- */
+  $("dayR").addEventListener("input", (e) => { dayT = parseInt(e.target.value, 10) / 100; });
+  $("shutterBtn").addEventListener("click", () => {
+    flashT = 0.85;
+    /* freeze frame: snapshot to a download */
+    try {
+      const a = document.createElement("a");
+      a.download = "wildline-" + Date.now() + ".png";
+      a.href = cv.toDataURL("image/png");
+      a.click();
+    } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>

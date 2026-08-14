@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CENTO — one hundred</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background:#141419; color:#e8e8f0; overflow-x:hidden;
+  }
+  .wrap { max-width:1160px; margin:0 auto; padding:44px 22px 120px; }
+  header { text-align:center; margin-bottom:38px; }
+  .over { font-size:9px; letter-spacing:.5em; color:#6a6a78; text-transform:uppercase; }
+  h1 { font-size:clamp(28px, 5.4vw, 54px); font-weight:200; letter-spacing:.3em; margin:12px 0 10px; color:#f2f2f8; }
+  h1 b { font-weight:700; color:#c9a84a; }
+  .tag { font-size:11px; letter-spacing:.3em; color:#8a8a96; text-transform:uppercase; }
+
+  .controls { display:flex; gap:10px; justify-content:center; margin-bottom:30px; flex-wrap:wrap; }
+  .controls button {
+    background:rgba(232,232,240,.06); color:#c9c9d4; border:1px solid rgba(232,232,240,.18);
+    border-radius:999px; font:inherit; font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+    padding:10px 18px; cursor:pointer; transition:all .18s;
+  }
+  .controls button:hover { background:rgba(232,232,240,.16); border-color:rgba(232,232,240,.4); }
+
+  /* the wall */
+  .wall {
+    display:grid; grid-template-columns:repeat(10, 1fr); gap:8px;
+  }
+  .tile {
+    aspect-ratio:1; border-radius:10px; position:relative; overflow:hidden; cursor:pointer;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
+    transition:transform .25s cubic-bezier(.2,1.3,.4,1), box-shadow .25s;
+  }
+  .tile:hover { transform:scale(1.06); z-index:3; box-shadow:inset 0 0 0 1px rgba(255,255,255,.2), 0 10px 30px rgba(0,0,0,.5); }
+  .tile canvas { width:100%; height:100%; display:block; }
+  .tile .no {
+    position:absolute; left:6px; top:5px; font-size:8px; letter-spacing:.12em; color:rgba(255,255,255,.5);
+    font-variant-numeric:tabular-nums; z-index:2; text-shadow:0 1px 2px rgba(0,0,0,.6);
+  }
+
+  /* lightbox */
+  .lb {
+    position:fixed; inset:0; z-index:60; background:rgba(10,10,14,.92);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px;
+    opacity:0; pointer-events:none; transition:opacity .3s;
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  }
+  .lb.show { opacity:1; pointer-events:auto; }
+  .lb .big {
+    width:min(60vmin, 480px); height:min(60vmin, 480px); border-radius:20px; overflow:hidden;
+    box-shadow:0 40px 100px rgba(0,0,0,.7);
+  }
+  .lb .big canvas { width:100%; height:100%; display:block; }
+  .lb .cap { text-align:center; max-width:520px; padding:0 20px; }
+  .lb .cap .n { font-size:10px; letter-spacing:.4em; color:#c9a84a; text-transform:uppercase; }
+  .lb .cap .t { font-size:22px; font-weight:300; margin:8px 0 6px; color:#f2f2f8; letter-spacing:.06em; }
+  .lb .cap .p { font-size:12.5px; font-style:italic; color:#9a9aa6; line-height:1.7; }
+  .lb .esc { font-size:9px; letter-spacing:.3em; color:#6a6a78; text-transform:uppercase; }
+
+  .hintline { text-align:center; margin-top:26px; font-size:9.5px; letter-spacing:.26em; color:#5a5a66; text-transform:uppercase; }
+
+  @media (max-width:900px) { .wall { grid-template-columns:repeat(8, 1fr); } }
+  @media (max-width:640px) {
+    .wall { grid-template-columns:repeat(5, 1fr); gap:6px; }
+    .tile .no { font-size:7px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="over">the closing gallery · plate c</div>
+      <h1>Cen<b>to</b></h1>
+      <div class="tag">one hundred small machines, each awake</div>
+    </header>
+
+    <div class="controls">
+      <button id="shuffleBtn">shuffle palettes</button>
+      <button id="waveBtn">send a wave</button>
+      <button id="soundBtn">sound: off</button>
+    </div>
+
+    <div class="wall" id="wall"></div>
+    <div class="hintline">hover to wake · click to enlarge · esc to return</div>
+  </div>
+
+  <div class="lb" id="lb">
+    <div class="big"><canvas id="bigC" width="480" height="480"></canvas></div>
+    <div class="cap">
+      <div class="n" id="lbN">№ 01</div>
+      <div class="t" id="lbT">—</div>
+      <div class="p" id="lbP">—</div>
+    </div>
+    <div class="esc">esc to return</div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const wall = $("wall");
+  const TILE = 120;
+  const tiles = [];
+
+  /* ---------- the 100 sketch engines ---------- */
+  /* each fn(ctx, w, h, t, palette) */
+  const ENGINES = [
+    /* 0: flowing gradient */
+    (c, w, h, t, p) => {
+      const g = c.createLinearGradient(0, 0, w, h);
+      const k = (Math.sin(t / 1400) + 1) / 2;
+      g.addColorStop(0, p[0]); g.addColorStop(k, p[1]); g.addColorStop(1, p[2]);
+      c.fillStyle = g; c.fillRect(0, 0, w, h);
+    },
+    /* 1: orbiting system */
+    (c, w, h, t, p) => {
+      c.fillStyle = p[3]; c.fillRect(0, 0, w, h);
+      const cx = w / 2, cy = h / 2;
+      c.fillStyle = p[0];
+      c.beginPath(); c.arc(cx, cy, 9, 0, 6.283); c.fill();
+      for (let i = 0; i < 3; i++) {
+        const a = t / 900 + i * 2.1, r = 18 + i * 12;
+        c.fillStyle = p[i % 3];
+        c.beginPath(); c.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.7, 4 - i, 0, 6.283); c.fill();
+      }
+    },
+    /* 2: breathing rings */
+    (c, w, h, t, p) => {
+      c.fillStyle = p[3]; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 4; i++) {
+        const r = ((t / 30 + i * 16) % 60);
+        c.strokeStyle = p[i % 3]; c.globalAlpha = 1 - r / 60;
+        c.lineWidth = 2;
+        c.beginPath(); c.arc(w / 2, h / 2, r, 0, 6.283); c.stroke();
+      }
+      c.globalAlpha = 1;
+    },
+    /* 3: marching dashes */
+    (c, w, h, t, p) => {
+      c.fillStyle = p[3]; c.fillRect(0, 0, w, h);
+      c.strokeStyle = p[0]; c.lineWidth = 3; c.lineCap = "round";
+      const off = t / 12;
+      for (let y = 14; y < h; y += 18) {
+        c.beginPath();
+        for (let x = -20; x < w + 20; x += 24) {
+          const xx = x + ((y * 13 + off) % 24);
+          c.moveTo(xx, y); c.lineTo(xx + 10, y);
+        }
+        c.stroke();
+      }
+    },
+    /* 4: pixel rain */
+    (c, w, h, t, p) => {
+      c.fillStyle = p[3]; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 10; i++) {
+        const x = (i * 13) % w;
+        const y = ((t / 14 + i * 37) % (h + 20)) - 10;
+        c.fillStyle = p[i % 3];
+        c.fillRect(x, y, 5, 9);
+      }
+    },
+    /* 5: mini waveform */
+    (c, w, h, t, p) => {
+      c.fillStyle = p[3]; c.fillRect(0, 0, w, h);
+      c.strokeStyle = p[0]; c.lineWidth = 2;
+      c.beginPath();
+      for (let x = 0; x < w; x++) {
+        const y = h / 2 + Math.sin(x * 0.14 + t / 300) * Math.sin(x * 0.03 + t / 900) * h * 0.3;
+        x ? c.lineTo(x, y) : c.moveTo(x, y);
+      }
+      c.stroke();
+    },
+    /* 6: bouncing ball */
+    (c, w, h, t, p) => {
+      c.fillStyle = p[3]; c.fillRect(0, 0, w, h);
+      const bx = (t / 10) % (w - 16), by = h / 2 + Math.abs(Math.sin(t / 400)) * -h * 0.3 + h * 0.22;
+      c.fillStyle = p[1];
+      c.beginPath(); c.arc(bx + 8, by, 6, 0, 6.283); c.fill();
+      c.fillStyle = p[2];
+      c.fillRect(0, h - 8, w, 3);
+    },
+    /* 7: rotating triangles */
+    (c, w, h, t, p) => {
+      c.fillStyle = p[3]; c.fillRect(0, 0, w, h);
+      c.save(); c.translate(w / 2, h / 2); c.rotate(t / 2400);
+      for (let i = 0; i < 3; i++) {
+        c.fillStyle = p[i % 3];
+        c.beginPath();
+        const a = (6.283 / 3) * i;
+        c.moveTo(Math.cos(a) * 26, Math.sin(a) * 26);
+        c.lineTo(Math.cos(a + 2.1) * 26, Math.sin(a + 2.1) * 26);
+        c.lineTo(Math.cos(a + 4.2) * 26, Math.sin(a + 4.2) * 26);
+        c.closePath(); c.fill();
+        c.scale(0.72, 0.72);
+      }
+      c.restore();
+    },
+    /* 8: sunrise bands */
+    (c, w, h, t, p) => {
+      const k = (Math.sin(t / 1800) + 1) / 2;
+      for (let i = 0; i < 5; i++) {
+        c.fillStyle = p[i % 4];
+        c.globalAlpha = 0.8 - i * 0.12;
+        c.fillRect(0, h * (0.2 + i * 0.14) + k * 6, w, h * 0.12);
+      }
+      c.globalAlpha = 1;
+    },
+    /* 9: star field */
+    (c, w, h, t, p) => {
+      c.fillStyle = p[3]; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 14; i++) {
+        const x = (i * 37 + t / 40) % w, y = (i * 53) % h;
+        const tw = 0.4 + 0.6 * Math.abs(Math.sin(t / 500 + i));
+        c.fillStyle = p[i % 3]; c.globalAlpha = tw;
+        c.fillRect(x, y, 2, 2);
+      }
+      c.globalAlpha = 1;
+    },
+  ];
+
+  /* ---------- palettes (color census of the gallery) ---------- */
+  const PALETTES = [
+    ["#7d6aff", "#3ce6a8", "#ffd98a", "#171a2b"],
+    ["#ff6a88", "#ffb347", "#ffe9c4", "#2a1015"],
+    ["#33e0ff", "#2a6ea4", "#dfeaf2", "#061019"],
+    ["#e8b84a", "#c9762e", "#f4e6c8", "#1c1208"],
+    ["#7dd87d", "#2a9d6e", "#d8f2d8", "#0c1a10"],
+    ["#ff8ad0", "#8a4a6e", "#ffe4f2", "#200a18"],
+    ["#d49a4a", "#8a5a2e", "#f0e0c8", "#1a1008"],
+    ["#9ab0d8", "#4a5a8a", "#e8eef8", "#0a0e1a"],
+  ];
+
+  /* titles & poems for tiles */
+  const NAMES = [
+    "Flow", "Orbit", "Breath", "March", "Rain", "Signal", "Bounce", "Trine", "Bands", "Stars",
+    "Drift", "Pulse", "Veil", "Glyph", "Comb", "Tide", "Spark", "Fold", "Arc", "Loom",
+    "Mist", "Node", "Wave", "Dune", "Flock", "Prism", "Echo", "Bloom", "Grid", "Comet",
+    "Shard", "Lace", "Reed", "Frost", "Ember", "Knit", "Vault", "Spiral", "Thread", "Mirror",
+    "Cinder", "Plume", "Cairn", "Rill", "Moth", "Slate", "Chord", "Fern", "Halo", "Ink",
+    "Jet", "Kite", "Lull", "Mill", "Nimbus", "Opal", "Pebble", "Quill", "Rune", "Silk",
+    "Thorn", "Umbra", "Vane", "Wick", "Xebec", "Yield", "Zephyr", "Ash", "Brass", "Cyan",
+    "Dusk", "Easel", "Flint", "Gilt", "Harbor", "Isle", "Jasper", "Kelp", "Lumen", "Moss",
+    "Night", "Ochre", "Pearl", "Quartz", "Reef", "Saffron", "Teal", "Umber", "Vellum", "Wisp",
+    "Yarrow", "Zinc", "Aurora", "Brine", "Clover", "Dahlia", "Eddy", "Fjord", "Groove", "Haze",
+  ];
+  const POEMS = [
+    "a small weather, thinking in color",
+    "it remembers a orbit it never flew",
+    "the circle inhales; so do you",
+    "order, marching politely left",
+    "the sky drips in square syllables",
+    "a heartbeat measured in light",
+    "gravity, rehearsed",
+    "three, turning into three",
+    "morning arrives in stripes",
+    "a constellation, quietly filing itself",
+  ];
+
+  /* ---------- build wall ---------- */
+  for (let i = 0; i < 100; i++) {
+    const cell = document.createElement("div");
+    cell.className = "tile";
+    const cv = document.createElement("canvas");
+    cv.width = TILE; cv.height = TILE;
+    cell.appendChild(cv);
+    const no = document.createElement("span");
+    no.className = "no";
+    no.textContent = String(i + 1).padStart(3, "0");
+    cell.appendChild(no);
+    wall.appendChild(cell);
+    tiles.push({
+      el: cell, cv, ctx: cv.getContext("2d"),
+      engine: ENGINES[i % ENGINES.length],
+      palette: PALETTES[i % PALETTES.length],
+      name: NAMES[i],
+      poem: POEMS[i % POEMS.length],
+      energy: 0.4, /* hover boosts */
+      wave: 0,
+    });
+    cell.addEventListener("mouseenter", () => { tiles[i].energy = 2.2; });
+    cell.addEventListener("click", () => openLB(i));
+  }
+
+  /* ---------- render loop with diagonal breathing ---------- */
+  let lastChime = 0;
+  function loop(t) {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+    tiles.forEach((tile, i) => {
+      tile.energy += (0.4 - tile.energy) * 0.03;
+      tile.wave *= 0.96;
+      /* diagonal breath: phase by row/col */
+      const col = i % 10, row = Math.floor(i / 10);
+      const phase = (col + row) * 0.4;
+      const breath = 0.5 + 0.5 * Math.sin(t / 1600 + phase);
+      const speed = t * (0.3 + tile.energy * 0.7 + tile.wave);
+      tile.engine(tile.ctx, TILE, TILE, speed, tile.palette);
+      /* breathing brightness */
+      tile.ctx.globalAlpha = 0.14 * breath;
+      tile.ctx.fillStyle = "#ffffff";
+      tile.ctx.fillRect(0, 0, TILE, TILE);
+      tile.ctx.globalAlpha = 1;
+    });
+  }
+  requestAnimationFrame(loop);
+
+  /* ---------- lightbox ---------- */
+  const lb = $("lb"), bigC = $("bigC"), bigX = bigC.getContext("2d");
+  let openIdx = -1;
+  function openLB(i) {
+    openIdx = i;
+    const tile = tiles[i];
+    $("lbN").textContent = "№ " + String(i + 1).padStart(3, "0");
+    $("lbT").textContent = tile.name;
+    $("lbP").textContent = i === 99
+      ? "the hundredth machine dreams of a wall of tiny machines — one of them is dreaming of you"
+      : tile.poem;
+    lb.classList.add("show");
+    chime(440 + i * 3);
+  }
+  function closeLB() { lb.classList.remove("show"); openIdx = -1; }
+  lb.addEventListener("click", (e) => { if (e.target === lb) closeLB(); });
+  addEventListener("keydown", (e) => { if (e.key === "Escape") closeLB(); });
+
+  function bigLoop(t) {
+    requestAnimationFrame(bigLoop);
+    if (openIdx < 0 || document.hidden) return;
+    const tile = tiles[openIdx];
+    tile.engine(bigX, 480, 480, t * 1.4, tile.palette);
+  }
+  requestAnimationFrame(bigLoop);
+
+  /* ---------- controls ---------- */
+  $("shuffleBtn").addEventListener("click", () => {
+    tiles.forEach(tile => {
+      tile.palette = PALETTES[Math.floor(Math.random() * PALETTES.length)];
+    });
+  });
+  let waving = false;
+  $("waveBtn").addEventListener("click", () => {
+    if (waving) return;
+    waving = true;
+    tiles.forEach((tile, i) => {
+      setTimeout(() => { tile.wave = 4; tile.energy = 2.4; }, i * 8);
+    });
+    chime(660);
+    setTimeout(() => { waving = false; }, 1400);
+  });
+
+  /* ---------- chime ---------- */
+  let AC = null, soundOn = false;
+  function chime(f) {
+    if (!soundOn) return;
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      const t0 = AC.currentTime;
+      [f, f * 1.5].forEach((ff, i) => {
+        const o = AC.createOscillator(), g = AC.createGain();
+        o.type = "sine"; o.frequency.value = ff;
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(0.05 / (i + 1), t0 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.4);
+        o.connect(g); g.connect(AC.destination);
+        o.start(t0); o.stop(t0 + 1.5);
+      });
+    } catch (e) {}
+  }
+  $("soundBtn").addEventListener("click", function () {
+    soundOn = !soundOn;
+    this.textContent = "sound: " + (soundOn ? "on" : "off");
+    if (soundOn) chime(523);
+  });
+})();
+</script>
+</body>
+</html>

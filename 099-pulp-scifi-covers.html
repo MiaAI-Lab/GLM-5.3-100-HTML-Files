@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PULP — amazing frontiers</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:
+      radial-gradient(ellipse at 50% 10%, rgba(160,110,50,.18), transparent 60%),
+      linear-gradient(180deg, #201810, #150f0a);
+    color:#e8dcc8; min-height:100vh; overflow-x:hidden;
+    display:flex; flex-direction:column; align-items:center; padding:30px 14px 60px;
+  }
+  header { text-align:center; margin-bottom:26px; }
+  header h1 { font-size:clamp(24px, 5vw, 44px); font-weight:400; letter-spacing:.3em; color:#ffd98a; text-transform:uppercase; }
+  header p { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.4em; color:#8a795c; text-transform:uppercase; margin-top:6px; }
+
+  /* spinner rack */
+  .rackwrap { perspective:1400px; margin-bottom:30px; }
+  .rack {
+    position:relative; width:min(620px, 92vw); height:300px;
+    transform-style:preserve-3d; transition:transform .8s cubic-bezier(.2,.8,.3,1);
+  }
+  .cover3d {
+    position:absolute; left:50%; top:0; width:190px; height:260px; margin-left:-95px;
+    transform-origin:center; backface-visibility:hidden; cursor:pointer;
+    transition:box-shadow .3s;
+  }
+  .cover3d:hover { box-shadow:0 0 0 3px #ffd98a; }
+  /* the covers themselves are 2D art rendered to canvas then placed */
+  .cover3d canvas { width:100%; height:100%; border-radius:3px; box-shadow:0 18px 40px rgba(0,0,0,.6); }
+
+  .controls { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-bottom:8px; }
+  .controls button {
+    background:rgba(255,217,138,.08); color:#ffd98a; border:1px solid rgba(255,217,138,.4);
+    font-family:system-ui, sans-serif; font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+    border-radius:8px; padding:10px 16px; cursor:pointer; transition:all .15s;
+  }
+  .controls button:hover { background:rgba(255,217,138,.22); }
+
+  /* lightbox reader */
+  .reader {
+    position:fixed; inset:0; z-index:60; background:rgba(12,9,6,.94);
+    display:flex; align-items:center; justify-content:center; gap:30px; padding:20px; flex-wrap:wrap;
+    opacity:0; pointer-events:none; transition:opacity .3s;
+  }
+  .reader.show { opacity:1; pointer-events:auto; }
+  .reader .plate { width:min(320px, 80vw); }
+  .reader .plate canvas { width:100%; border-radius:4px; box-shadow:0 30px 70px rgba(0,0,0,.7); }
+  .reader .notes { max-width:340px; }
+  .reader .notes h2 { font-size:22px; color:#ffd98a; letter-spacing:.06em; }
+  .reader .notes .ed { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.3em; color:#8a795c; text-transform:uppercase; margin:8px 0 14px; }
+  .reader .notes p { font-size:13.5px; line-height:1.8; color:#cbb890; font-style:italic; }
+  .reader .notes .close { margin-top:18px; background:transparent; border:1px solid #ffd98a; color:#ffd98a;
+    font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.24em; text-transform:uppercase;
+    padding:9px 16px; cursor:pointer; border-radius:99px; }
+
+  /* generator bench */
+  .bench {
+    width:min(680px, 94vw); margin-top:34px; border:1px solid rgba(255,217,138,.2); border-radius:14px;
+    padding:22px 24px; background:rgba(24,16,10,.7);
+  }
+  .bench h3 { font-family:system-ui, sans-serif; font-size:10px; letter-spacing:.34em; color:#8a795c; text-transform:uppercase; margin-bottom:14px; }
+  .bench .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  .bench input[type=text] {
+    flex:1; min-width:150px; background:#150f0a; border:1px solid #4a3a26; color:#ffe9c4;
+    font:inherit; font-size:15px; padding:9px 14px; border-radius:8px; outline:none; letter-spacing:.06em;
+  }
+  .bench input[type=text]:focus { border-color:#ffd98a; }
+  .bench select {
+    background:#150f0a; border:1px solid #4a3a26; color:#ffd98a; font:inherit; font-size:12px;
+    padding:9px 12px; border-radius:8px; outline:none; cursor:pointer;
+  }
+  .bench .sliderrow { display:flex; align-items:center; gap:10px; flex:1; min-width:200px; }
+  .bench .sliderrow label { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.18em; color:#8a795c; text-transform:uppercase; }
+  input[type=range] { -webkit-appearance:none; appearance:none; flex:1; height:3px; background:#4a3a26; border-radius:99px; outline:none; cursor:pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#ffd98a; cursor:grab; }
+  .bench .out { width:34px; font-family:"Courier New", monospace; font-size:11px; color:#ffd98a; text-align:right; }
+  .bench .actions { display:flex; gap:10px; flex-wrap:wrap; }
+  .bench .actions button {
+    background:#ffd98a; color:#201810; border:none; font-family:system-ui, sans-serif; font-weight:700;
+    font-size:10px; letter-spacing:.18em; text-transform:uppercase; padding:11px 18px; border-radius:8px; cursor:pointer;
+  }
+  .bench .actions button.ghost { background:transparent; color:#ffd98a; border:1px solid rgba(255,217,138,.5); font-weight:400; }
+  .preview { margin-top:16px; display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+  .preview canvas { width:170px; border-radius:3px; box-shadow:0 14px 30px rgba(0,0,0,.5); }
+  .preview .meta { font-family:system-ui, sans-serif; font-size:10px; color:#8a795c; letter-spacing:.14em; text-transform:uppercase; line-height:2; }
+
+  @media (max-width:560px) {
+    .rack { height:240px; }
+    .cover3d { width:150px; height:206px; margin-left:-75px; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Pulp</h1>
+    <p>amazing frontiers · spinner rack · five for a nickel</p>
+  </header>
+
+  <div class="controls">
+    <button id="spinL">⟲ spin left</button>
+    <button id="spinR">spin right ⟳</button>
+  </div>
+
+  <div class="rackwrap">
+    <div class="rack" id="rack"></div>
+  </div>
+  <p style="font-family:system-ui,sans-serif;font-size:9px;letter-spacing:.26em;color:#6a5c44;text-transform:uppercase;">click a cover to read its editor's note</p>
+
+  <div class="reader" id="reader">
+    <div class="plate"><canvas id="plateC" width="340" height="460"></canvas></div>
+    <div class="notes">
+      <h2 id="noteTitle">—</h2>
+      <div class="ed" id="noteEd">—</div>
+      <p id="noteBody">—</p>
+      <button class="close" id="noteClose">close</button>
+    </div>
+  </div>
+
+  <div class="bench">
+    <h3>the cover generator · mint your own issue</h3>
+    <div class="row">
+      <input type="text" id="genTitle" maxlength="18" value="VOID CORSAIRS" autocomplete="off" spellcheck="false">
+      <select id="genScene">
+        <option value="rocket">rocket scene</option>
+        <option value="tentacle">tentacle planet</option>
+        <option value="android">android</option>
+      </select>
+    </div>
+    <div class="row">
+      <div class="sliderrow">
+        <label>halftone</label>
+        <input type="range" id="genHalftone" min="0" max="100" value="65">
+        <span class="out" id="htOut">65</span>
+      </div>
+      <div class="sliderrow">
+        <label>misreg</label>
+        <input type="range" id="genMisreg" min="0" max="100" value="25">
+        <span class="out" id="mrOut">25</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="mintBtn">mint issue</button>
+      <button class="ghost" id="exportBtn">export cover</button>
+    </div>
+    <div class="preview">
+      <canvas id="genC" width="340" height="460"></canvas>
+      <div class="meta" id="genMeta">awaiting your issue…</div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const NS = 5; /* covers on the rack */
+
+  /* ---------- cover art renderer ---------- */
+  const SCENES = {
+    rocket(c, w, h, ink2) {
+      /* rocket over planet */
+      c.save();
+      /* planet */
+      const pg = c.createRadialGradient(w * 0.5, h * 0.78, 10, w * 0.5, h * 0.78, w * 0.42);
+      pg.addColorStop(0, ink2); pg.addColorStop(1, "rgba(10,6,4,0)");
+      c.fillStyle = pg;
+      c.beginPath(); c.arc(w * 0.5, h * 0.78, w * 0.4, 0, 6.283); c.fill();
+      /* rocket */
+      c.fillStyle = "#f4ede0";
+      c.beginPath();
+      c.moveTo(w * 0.5, h * 0.3);
+      c.quadraticCurveTo(w * 0.62, h * 0.48, w * 0.58, h * 0.62);
+      c.lineTo(w * 0.42, h * 0.62);
+      c.quadraticCurveTo(w * 0.38, h * 0.48, w * 0.5, h * 0.3);
+      c.fill();
+      /* fins */
+      c.fillStyle = "#c23b22";
+      c.beginPath(); c.moveTo(w * 0.42, h * 0.56); c.lineTo(w * 0.33, h * 0.68); c.lineTo(w * 0.42, h * 0.62); c.fill();
+      c.beginPath(); c.moveTo(w * 0.58, h * 0.56); c.lineTo(w * 0.67, h * 0.68); c.lineTo(w * 0.58, h * 0.62); c.fill();
+      /* flame */
+      c.fillStyle = "#ff8a2e";
+      c.beginPath(); c.moveTo(w * 0.44, h * 0.62); c.lineTo(w * 0.5, h * 0.74); c.lineTo(w * 0.56, h * 0.62); c.fill();
+      /* porthole */
+      c.fillStyle = "#2a6ea4";
+      c.beginPath(); c.arc(w * 0.5, h * 0.46, w * 0.045, 0, 6.283); c.fill();
+      c.restore();
+    },
+    tentacle(c, w, h, ink2) {
+      /* tentacle planet */
+      c.save();
+      c.fillStyle = ink2;
+      c.beginPath(); c.arc(w * 0.5, h * 0.66, w * 0.3, 0, 6.283); c.fill();
+      /* tentacles */
+      c.strokeStyle = ink2; c.lineWidth = w * 0.03; c.lineCap = "round";
+      for (let i = 0; i < 5; i++) {
+        const a = -0.9 + i * 0.45;
+        c.beginPath();
+        c.moveTo(w * 0.5, h * 0.62);
+        const ex = w * 0.5 + Math.cos(a - 1.57) * w * 0.42;
+        const ey = h * 0.62 + Math.sin(a - 1.57) * w * 0.42;
+        c.quadraticCurveTo(w * 0.5 + Math.cos(a - 1.57) * w * 0.2, h * 0.45, ex, ey);
+        c.stroke();
+      }
+      /* eye */
+      c.fillStyle = "#f4ede0";
+      c.beginPath(); c.ellipse(w * 0.5, h * 0.6, w * 0.06, w * 0.035, 0, 0, 6.283); c.fill();
+      c.fillStyle = "#111";
+      c.beginPath(); c.arc(w * 0.5, h * 0.6, w * 0.016, 0, 6.283); c.fill();
+      c.restore();
+    },
+    android(c, w, h, ink2) {
+      /* android figure */
+      c.save();
+      c.fillStyle = ink2;
+      /* head */
+      c.beginPath(); c.ellipse(w * 0.5, h * 0.42, w * 0.11, w * 0.12, 0, 0, 6.283); c.fill();
+      /* eyes */
+      c.fillStyle = "#f4ede0";
+      c.beginPath(); c.arc(w * 0.46, h * 0.41, w * 0.02, 0, 6.283); c.fill();
+      c.beginPath(); c.arc(w * 0.54, h * 0.41, w * 0.02, 0, 6.283); c.fill();
+      /* body */
+      c.fillStyle = ink2;
+      c.beginPath();
+      c.moveTo(w * 0.42, h * 0.52);
+      c.lineTo(w * 0.58, h * 0.52);
+      c.lineTo(w * 0.62, h * 0.72);
+      c.lineTo(w * 0.38, h * 0.72);
+      c.fill();
+      /* arms */
+      c.strokeStyle = ink2; c.lineWidth = w * 0.035; c.lineCap = "round";
+      c.beginPath(); c.moveTo(w * 0.42, h * 0.55); c.lineTo(w * 0.3, h * 0.64); c.stroke();
+      c.beginPath(); c.moveTo(w * 0.58, h * 0.55); c.lineTo(w * 0.72, h * 0.5); c.stroke();
+      /* rays behind */
+      c.strokeStyle = "rgba(255,138,46,.7)"; c.lineWidth = 2;
+      for (let i = 0; i < 8; i++) {
+        const a = (6.283 / 8) * i;
+        c.beginPath();
+        c.moveTo(w * 0.5 + Math.cos(a) * w * 0.24, h * 0.56 + Math.sin(a) * w * 0.24);
+        c.lineTo(w * 0.5 + Math.cos(a) * w * 0.32, h * 0.56 + Math.sin(a) * w * 0.32);
+        c.stroke();
+      }
+      c.restore();
+    },
+  };
+
+  function renderCover(cnv, opt) {
+    const c = cnv.getContext("2d");
+    const w = cnv.width, h = cnv.height;
+    const P = opt.palette;
+    c.clearRect(0, 0, w, h);
+    /* aged stock */
+    c.fillStyle = "#e8dcc0";
+    c.fillRect(0, 0, w, h);
+    /* sky bands in process colors with misregistration */
+    const mis = opt.misreg;
+    c.globalAlpha = 0.85;
+    c.fillStyle = P[0];
+    c.fillRect(-mis * 0.4, 0, w, h * 0.62);
+    c.fillStyle = P[1];
+    c.fillRect(mis * 0.4, h * 0.3 + mis * 0.2, w, h * 0.34);
+    c.globalAlpha = 1;
+    /* scene layer */
+    c.save();
+    c.translate(mis * 0.5, mis * 0.3);
+    SCENES[opt.scene](c, w, h, P[2]);
+    c.restore();
+    /* halftone pass */
+    const dot = opt.halftone / 100;
+    if (dot > 0.05) {
+      const step = 5;
+      c.fillStyle = "rgba(20,10,6," + (0.16 * dot) + ")";
+      for (let y = 0; y < h; y += step) {
+        for (let x = 0; x < w; x += step) {
+          c.beginPath();
+          c.arc(x, y, 1.1, 0, 6.283);
+          c.fill();
+        }
+      }
+    }
+    /* masthead */
+    c.save();
+    c.translate(w * 0.05, h * 0.06);
+    c.rotate(-0.03);
+    c.fillStyle = "#c23b22";
+    c.fillRect(0, 0, w * 0.9, h * 0.1);
+    c.fillStyle = "#ffe9c4";
+    c.font = "900 " + (w * 0.094) + "px Arial, sans-serif";
+    c.textAlign = "center";
+    c.fillText(opt.mast, w * 0.45, h * 0.075);
+    c.restore();
+    /* coverlines */
+    c.save();
+    c.translate(w * 0.07, h * 0.76);
+    c.rotate(-0.04);
+    c.fillStyle = "#1a1008";
+    c.font = "900 " + (w * 0.11) + "px 'Arial Black', Arial, sans-serif";
+    c.fillText(opt.title, 0, 0, w * 0.86);
+    c.fillStyle = "#c23b22";
+    c.font = "700 " + (w * 0.036) + "px Arial, sans-serif";
+    c.fillText("35¢ · issue no. " + opt.issue, 0, w * 0.06);
+    c.restore();
+    /* worn edges */
+    c.strokeStyle = "rgba(80,50,20,.35)";
+    c.lineWidth = 3;
+    c.strokeRect(1.5, 1.5, w - 3, h - 3);
+    /* spine shading */
+    const sg = c.createLinearGradient(0, 0, w * 0.08, 0);
+    sg.addColorStop(0, "rgba(40,20,8,.4)"); sg.addColorStop(1, "rgba(40,20,8,0)");
+    c.fillStyle = sg; c.fillRect(0, 0, w * 0.08, h);
+    /* price sticker */
+    c.save();
+    c.translate(w * 0.78, h * 0.6);
+    c.rotate(0.2);
+    c.fillStyle = "#f4ede0";
+    c.beginPath(); c.ellipse(0, 0, w * 0.09, w * 0.055, 0, 0, 6.283); c.fill();
+    c.strokeStyle = "#8a2e2e"; c.lineWidth = 1.4; c.stroke();
+    c.fillStyle = "#8a2e2e";
+    c.font = "700 " + (w * 0.032) + "px Arial";
+    c.textAlign = "center";
+    c.fillText("10¢", 0, w * 0.012);
+    c.restore();
+  }
+
+  /* ---------- rack data ---------- */
+  const ISSUES = [
+    { mast: "AMAZING FRONTIER", title: "VOID CORSAIRS", scene: "rocket", issue: 41, palette: ["#2a9dc9", "#e8b84a", "#c23b22"], note: "Editor Swanson swore the rocket physics were researched. Nobody believed him. We printed 400,000 copies anyway." },
+    { mast: "STELLAR SHIVERS", title: "TENTACLE MOON", scene: "tentacle", issue: 17, palette: ["#1a5a8a", "#d49a4a", "#2a4a3a"], note: "The cover artist never explained the eye. When asked, he would only smile and order another coffee." },
+    { mast: "ASTONISHING!", title: "THE BRASS ANDROID", scene: "android", issue: 88, palette: ["#c96a2e", "#e8d0a0", "#3a4a5a"], note: "Letters poured in for months: is she the hero or the menace? The editor's answer changed every issue." },
+    { mast: "FRONTIER FEAR", title: "RED STAR RISING", scene: "rocket", issue: 63, palette: ["#8a2e3c", "#e8b84a", "#2a2a3a"], note: "Pulled from shelves in three cities. Reprinted twice. The scandal sold itself." },
+    { mast: "VOID WHISPERS", title: "HUNGER OF THE DEEP SKY", scene: "tentacle", issue: 29, palette: ["#2a6e5a", "#c9a84a", "#1a1a2e"], note: "The least-read, most-remembered issue we ever printed. Somewhere, someone still has it under their mattress." },
+  ];
+
+  /* ---------- build rack ---------- */
+  const rack = $("rack");
+  const coverEls = [];
+  let rackAngle = 0;
+  ISSUES.forEach((iss, i) => {
+    const d = document.createElement("div");
+    d.className = "cover3d";
+    const cnv = document.createElement("canvas");
+    cnv.width = 340; cnv.height = 460;
+    renderCover(cnv, { ...iss, halftone: 60, misreg: 8 });
+    d.appendChild(cnv);
+    d.addEventListener("click", () => openReader(i));
+    rack.appendChild(d);
+    coverEls.push(d);
+  });
+  function layout() {
+    const N = coverEls.length;
+    coverEls.forEach((el, i) => {
+      const a = rackAngle + (i * 2 * Math.PI) / N;
+      const x = Math.sin(a) * 210;
+      const z = Math.cos(a) * 210;
+      const rot = (x / 210) * 34;
+      el.style.transform =
+        "translateX(" + x + "px) translateZ(" + z + "px) rotateY(" + (-rot) + "deg)" +
+        " scale(" + (0.82 + 0.18 * ((z + 210) / 420)) + ")";
+      el.style.zIndex = String(Math.round(z + 300));
+      el.style.opacity = z < -140 ? "0.25" : "1";
+      el.style.pointerEvents = z < -140 ? "none" : "auto";
+    });
+  }
+  layout();
+  $("spinL").addEventListener("click", () => { rackAngle -= (2 * Math.PI) / coverEls.length; layout(); clack(); });
+  $("spinR").addEventListener("click", () => { rackAngle += (2 * Math.PI) / coverEls.length; layout(); clack(); });
+  /* drag to spin */
+  let spinning = false, sx = 0, sa = 0;
+  rack.addEventListener("pointerdown", (e) => { spinning = true; sx = e.clientX; sa = rackAngle; });
+  addEventListener("pointermove", (e) => {
+    if (!spinning) return;
+    rackAngle = sa + (e.clientX - sx) * 0.006;
+    layout();
+  });
+  addEventListener("pointerup", () => { spinning = false; });
+
+  /* ---------- reader ---------- */
+  const reader = $("reader");
+  function openReader(i) {
+    const iss = ISSUES[i];
+    renderCover($("plateC"), { ...iss, halftone: 55, misreg: 6 });
+    $("noteTitle").textContent = iss.title;
+    $("noteEd").textContent = iss.mast + " · issue " + iss.issue + " · editor's note";
+    $("noteBody").textContent = iss.note;
+    reader.classList.add("show");
+  }
+  $("noteClose").addEventListener("click", () => reader.classList.remove("show"));
+  reader.addEventListener("click", (e) => { if (e.target === reader) reader.classList.remove("show"); });
+
+  /* ---------- generator ---------- */
+  const genC = $("genC");
+  function currentGenOpts() {
+    return {
+      mast: "AMAZING FRONTIER",
+      title: $("genTitle").value || "UNTITLED",
+      scene: $("genScene").value,
+      issue: Math.floor(Math.random() * 99) + 1,
+      palette: [
+        ["#2a9dc9", "#e8b84a", "#c23b22"],
+        ["#8a2e3c", "#d4a537", "#2a3a4a"],
+        ["#2a6e5a", "#c9a84a", "#1a1a2e"],
+      ][Math.floor(Math.random() * 3)],
+      halftone: parseInt($("genHalftone").value, 10),
+      misreg: parseInt($("genMisreg").value, 10) / 3,
+    };
+  }
+  function renderGen() {
+    const o = currentGenOpts();
+    renderCover(genC, o);
+    $("htOut").textContent = $("genHalftone").value;
+    $("mrOut").textContent = $("genMisreg").value;
+    $("genMeta").innerHTML = "issue no. " + o.issue + "<br>scene: " + o.scene + "<br>halftone " + o.halftone + "% · misreg " + o.misreg.toFixed(1) + "px";
+  }
+  ["genTitle", "genScene", "genHalftone", "genMisreg"].forEach(id => {
+    $(id).addEventListener("input", renderGen);
+    $(id).addEventListener("change", renderGen);
+  });
+  renderGen();
+  $("mintBtn").addEventListener("click", renderGen);
+  $("exportBtn").addEventListener("click", () => {
+    try {
+      const a = document.createElement("a");
+      a.download = "pulp-cover-" + Date.now() + ".png";
+      a.href = genC.toDataURL("image/png");
+      a.click();
+    } catch (e) {}
+  });
+
+  /* ---------- audio ---------- */
+  let AC = null;
+  function clack() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      const t0 = AC.currentTime;
+      const o = AC.createOscillator(), g = AC.createGain();
+      o.type = "square"; o.frequency.value = 240;
+      g.gain.setValueAtTime(0.03, t0);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.05);
+      o.connect(g); g.connect(AC.destination);
+      o.start(t0); o.stop(t0 + 0.06);
+    } catch (e) {}
+  }
+})();
+</script>
+</body>
+</html>

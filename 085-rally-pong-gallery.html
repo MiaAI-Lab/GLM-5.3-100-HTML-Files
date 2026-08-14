@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RALLY — pong, reconsidered</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    background:#f4f1ea; color:#191713;
+    font-family: Georgia, "Palatino Linotype", serif;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .stage { position:relative; width:min(92vw, 1000px); }
+  .frame {
+    position:relative; aspect-ratio:16/9; background:#fdfcf8;
+    border:1px solid #191713; overflow:hidden;
+    box-shadow:0 30px 70px rgba(25,23,19,.22);
+  }
+  canvas { width:100%; height:100%; display:block; cursor:none; }
+  .frame .corner { position:absolute; font-size:9px; letter-spacing:.3em; text-transform:uppercase; color:#a39d8f; z-index:3; font-family:system-ui, sans-serif; }
+  .frame .tl { top:10px; left:14px; } .frame .tr { top:10px; right:14px; }
+  .frame .bl { bottom:10px; left:14px; } .frame .br { bottom:10px; right:14px; }
+  .scores {
+    position:absolute; inset:0; display:flex; align-items:flex-start; justify-content:space-between;
+    padding:2% 6%; pointer-events:none; z-index:2;
+  }
+  .scores .s {
+    font-size:clamp(60px, 13vw, 150px); font-weight:400; line-height:1;
+    color:rgba(25,23,19,.08); font-variant-numeric:tabular-nums;
+  }
+  .title {
+    text-align:center; margin-top:26px;
+  }
+  .title h1 { font-size:clamp(22px, 4vw, 36px); font-weight: 400; letter-spacing:.5em; text-transform:uppercase; }
+  .title p { font-family:system-ui, sans-serif; font-size:10px; letter-spacing:.24em; color:#a39d8f; text-transform:uppercase; margin-top:8px; }
+  .controls {
+    margin-top:18px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;
+    font-family:system-ui, sans-serif;
+  }
+  .controls button {
+    background:transparent; border:1px solid #191713; color:#191713; font:inherit; font-size:10px;
+    letter-spacing:.2em; text-transform:uppercase; padding:10px 18px; cursor:pointer; transition:all .15s;
+  }
+  .controls button:hover { background:#191713; color:#f4f1ea; }
+  .controls button.on { background:#191713; color:#f4f1ea; }
+  .matchpoint {
+    position:absolute; inset:0; z-index:1; pointer-events:none; opacity:0; transition:opacity .6s;
+    box-shadow:inset 0 0 120px 30px rgba(194,59,34,.16);
+  }
+  .matchpoint.on { opacity:1; }
+  .endcard {
+    position:absolute; inset:0; z-index:5; background:rgba(244,241,234,.96);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    opacity:0; pointer-events:none; transition:opacity .5s;
+  }
+  .endcard.show { opacity:1; pointer-events:auto; }
+  .endcard .big { font-size:clamp(30px, 6vw, 60px); letter-spacing:.14em; }
+  .endcard .sub { font-family:system-ui, sans-serif; font-size:11px; letter-spacing:.26em; color:#a39d8f; text-transform:uppercase; }
+  .endcard button {
+    margin-top:10px; background:#191713; border:none; color:#f4f1ea; font-family:system-ui, sans-serif;
+    font-size:11px; letter-spacing:.22em; text-transform:uppercase; padding:13px 26px; cursor:pointer;
+  }
+  .signature {
+    position:absolute; right:3%; bottom:6%; z-index:6; font-style:italic; font-size:13px; color:#191713;
+    opacity:0; transition:opacity 1s; pointer-events:none;
+  }
+  .signature.show { opacity:.8; }
+  @media (max-width:640px) {
+    .frame { aspect-ratio:4/3; }
+    .scores .s { font-size:56px; }
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="frame" id="frame">
+      <canvas id="c" width="1200" height="675"></canvas>
+      <div class="scores">
+        <div class="s" id="s1">0</div>
+        <div class="s" id="s2">0</div>
+      </div>
+      <div class="matchpoint" id="mp"></div>
+      <span class="corner tl">fig. i — the rally</span>
+      <span class="corner tr">sumi on bone · 2026</span>
+      <span class="corner bl" id="hint">move: mouse / W·S · first to 7</span>
+      <span class="corner br">each match paints one artwork</span>
+      <div class="signature" id="sig">— RALLY, op. 1</div>
+      <div class="endcard" id="end">
+        <div class="big" id="endBig">MATCH</div>
+        <div class="sub" id="endSub">the canvas is signed</div>
+        <button id="exportBtn">export the painting</button>
+        <button id="againBtn" style="background:transparent;color:#191713;border:1px solid #191713;">play again</button>
+      </div>
+    </div>
+    <div class="title">
+      <h1>Rally</h1>
+      <p>pong, reconsidered as gallery sport</p>
+    </div>
+    <div class="controls">
+      <button id="mode1p" class="on">vs the machine</button>
+      <button id="mode2p">two players</button>
+      <button id="btnSound">sound: off</button>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const cv = $("c"), g = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  const PADW = 14, PADH = 96, BALL = 12;
+  let p1 = { y: H / 2 - PADH / 2 }, p2 = { y: H / 2 - PADH / 2 };
+  let ball = { x: W / 2, y: H / 2, vx: 6.4, vy: 2.4 };
+  let score1 = 0, score2 = 0, twoPlayer = false;
+  let ink = [];   /* the painting trail */
+  let playing = true, soundOn = false, AC = null;
+  const keys = {};
+
+  addEventListener("keydown", (e) => { keys[e.key.toLowerCase()] = true; });
+  addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
+  $("frame").addEventListener("pointermove", (e) => {
+    const r = cv.getBoundingClientRect();
+    const y = (e.clientY - r.top) / r.height * H;
+    p1.target = Math.max(0, Math.min(H - PADH, y - PADH / 2));
+  });
+
+  function ac() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+    return AC;
+  }
+  function tick(f, vol) {
+    if (!soundOn) return;
+    const c = ac(); if (!c) return;
+    try {
+      const t0 = c.currentTime;
+      const o = c.createOscillator(), gn = c.createGain();
+      o.type = "square"; o.frequency.value = f;
+      gn.gain.setValueAtTime(vol || 0.04, t0);
+      gn.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.07);
+      o.connect(gn); gn.connect(c.destination);
+      o.start(t0); o.stop(t0 + 0.08);
+    } catch (e) {}
+  }
+  function applause() {
+    if (!soundOn) return;
+    const c = ac(); if (!c) return;
+    try {
+      for (let i = 0; i < 14; i++) {
+        setTimeout(() => tick(300 + Math.random() * 900, 0.015), i * 90 + Math.random() * 60);
+      }
+    } catch (e) {}
+  }
+
+  function resetBall(dir) {
+    ball.x = W / 2; ball.y = H / 2;
+    ball.vx = 6.4 * dir;
+    ball.vy = (Math.random() * 2 - 1) * 3.4;
+  }
+
+  function point(who) {
+    if (who === 1) score1++; else score2++;
+    $("s1").textContent = score1;
+    $("s2").textContent = score2;
+    tick(who === 1 ? 660 : 330, 0.05);
+    /* match point vignette */
+    $("mp").classList.toggle("on", score1 === 6 || score2 === 6);
+    if (score1 >= 7 || score2 >= 7) return endMatch();
+    resetBall(who === 1 ? 1 : -1);
+  }
+
+  function endMatch() {
+    playing = false;
+    $("endBig").textContent = score1 > score2 ? "You, " + score1 + " – " + score2 : "The machine, " + score2 + " – " + score1;
+    $("endSub").textContent = twoPlayer ? (score1 > score2 ? "player one signs the canvas" : "player two signs the canvas") : "the canvas is signed";
+    $("sig").classList.add("show");
+    $("end").classList.add("show");
+    applause();
+  }
+
+  $("againBtn").addEventListener("click", () => {
+    score1 = 0; score2 = 0; ink = []; playing = true;
+    $("s1").textContent = "0"; $("s2").textContent = "0";
+    $("end").classList.remove("show"); $("sig").classList.remove("show");
+    $("mp").classList.remove("on");
+    p1.y = p2.y = H / 2 - PADH / 2;
+    resetBall(Math.random() < 0.5 ? 1 : -1);
+  });
+  $("exportBtn").addEventListener("click", () => {
+    /* export just the ink painting on bone */
+    try {
+      const out = document.createElement("canvas");
+      out.width = W; out.height = H;
+      const og = out.getContext("2d");
+      og.fillStyle = "#fdfcf8"; og.fillRect(0, 0, W, H);
+      ink.forEach((s, i) => {
+        og.strokeStyle = "rgba(25,23,19," + s.a + ")";
+        og.lineWidth = s.w;
+        og.lineCap = "round";
+        og.beginPath();
+        og.moveTo(s.x0, s.y0); og.lineTo(s.x1, s.y1);
+        og.stroke();
+      });
+      og.fillStyle = "#191713";
+      og.font = "italic 26px Georgia";
+      og.fillText("RALLY — " + score1 + " : " + score2, 40, H - 44);
+      og.font = "12px Georgia";
+      og.fillText("sumi on bone · " + new Date().toLocaleDateString(), 40, H - 22);
+      const a = document.createElement("a");
+      a.download = "rally-" + Date.now() + ".png";
+      a.href = out.toDataURL("image/png");
+      a.click();
+    } catch (e) {}
+  });
+
+  $("btnSound").addEventListener("click", function () {
+    soundOn = !soundOn;
+    this.textContent = "sound: " + (soundOn ? "on" : "off");
+    if (soundOn) ac();
+  });
+  $("mode2p").addEventListener("click", () => {
+    twoPlayer = true;
+    $("mode2p").classList.add("on"); $("mode1p").classList.remove("on");
+    $("hint").textContent = "p1: mouse or W·S · p2: arrows";
+  });
+  $("mode1p").addEventListener("click", () => {
+    twoPlayer = false;
+    $("mode1p").classList.add("on"); $("mode2p").classList.remove("on");
+    $("hint").textContent = "move: mouse / W·S · first to 7";
+  });
+
+  /* ---------- loop ---------- */
+  let prevX = ball.x, prevY = ball.y;
+  function step() {
+    requestAnimationFrame(step);
+    if (document.hidden) return;
+    if (playing) {
+      /* p1: pointer target or W/S */
+      if (keys.w) p1.target = Math.max(0, p1.y - 10);
+      if (keys.s) p1.target = Math.min(H - PADH, p1.y + 10);
+      if (p1.target !== undefined) p1.y += (p1.target - p1.y) * 0.34;
+      /* p2: keys or fallible AI */
+      if (twoPlayer) {
+        if (keys.arrowup) p2.y = Math.max(0, p2.y - 10);
+        if (keys.arrowdown) p2.y = Math.min(H - PADH, p2.y + 10);
+      } else {
+        const aim = ball.vx > 0 ? ball.y - PADH / 2 + (Math.random() - 0.5) * 34 : H / 2 - PADH / 2;
+        p2.y += (aim - p2.y) * 0.085;
+      }
+      prevX = ball.x; prevY = ball.y;
+      ball.x += ball.vx; ball.y += ball.vy;
+      /* walls */
+      if (ball.y < BALL / 2) { ball.y = BALL / 2; ball.vy *= -1; tick(520, 0.02); }
+      if (ball.y > H - BALL / 2) { ball.y = H - BALL / 2; ball.vy *= -1; tick(520, 0.02); }
+      /* paddles */
+      const hit = (px) => {
+        const dx = Math.abs(ball.x - (px === 1 ? PADW + 26 : W - PADW - 26));
+        const py = px === 1 ? p1.y : p2.y;
+        if (dx < BALL && ball.y > py - BALL && ball.y < py + PADH + BALL) {
+          const dir = px === 1 ? 1 : -1;
+          const rel = (ball.y - (py + PADH / 2)) / (PADH / 2);
+          const speed = Math.min(16, Math.hypot(ball.vx, ball.vy) * 1.045);
+          ball.vx = Math.abs(speed) * dir;
+          ball.vy = rel * 5.2;
+          ball.x = px === 1 ? PADW + 26 + BALL : W - PADW - 26 - BALL;
+          tick(px === 1 ? 740 : 620, 0.05);
+        }
+      };
+      hit(1); hit(2);
+      /* ink trail segment */
+      ink.push({ x0: prevX, y0: prevY, x1: ball.x, y1: ball.y, a: 0.5, w: BALL * 0.72 });
+      /* drip & fade */
+      ink.forEach(s => {
+        if (Math.random() < 0.008) s.y1 += 1.4;
+        s.a *= 0.9994;
+        if (s.a < 0.1) s.a = 0.1;
+      });
+      if (ink.length > 2600) ink.splice(0, ink.length - 2600);
+      /* scoring */
+      if (ball.x < -30) point(2);
+      if (ball.x > W + 30) point(1);
+    }
+    /* ---------- paint ---------- */
+    g.clearRect(0, 0, W, H);
+    /* court: center dashed line */
+    g.strokeStyle = "rgba(25,23,19,.2)";
+    g.lineWidth = 2; g.setLineDash([12, 14]);
+    g.beginPath(); g.moveTo(W / 2, 0); g.lineTo(W / 2, H); g.stroke();
+    g.setLineDash([]);
+    /* ink artwork */
+    ink.forEach(s => {
+      g.strokeStyle = "rgba(25,23,19," + s.a + ")";
+      g.lineWidth = s.w; g.lineCap = "round";
+      g.beginPath(); g.moveTo(s.x0, s.y0); g.lineTo(s.x1, s.y1); g.stroke();
+    });
+    /* paddles */
+    g.fillStyle = "#191713";
+    if (playing) {
+      g.fillRect(26, p1.y, PADW, PADH);
+      g.fillRect(W - 26 - PADW, p2.y, PADW, PADH);
+      /* ball with slight squash along velocity */
+      const ang = Math.atan2(ball.vy, ball.vx);
+      g.save();
+      g.translate(ball.x, ball.y);
+      g.rotate(ang);
+      g.beginPath();
+      g.ellipse(0, 0, BALL * 0.92, BALL * 0.62, 0, 0, 6.283);
+      g.fillStyle = "#c23b22";
+      g.fill();
+      g.restore();
+    }
+  }
+  requestAnimationFrame(step);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MIDNIGHT DINER — open all night</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:#0d1218; color:#e8e4d8; overflow-x:hidden;
+  }
+  /* rain-streaked window backdrop */
+  .window {
+    position:fixed; inset:0; z-index:0;
+    background:
+      radial-gradient(ellipse at 24% 30%, rgba(255,180,90,.13), transparent 42%),
+      radial-gradient(ellipse at 74% 24%, rgba(90,170,220,.10), transparent 40%),
+      linear-gradient(180deg, #0a0f16 0%, #101826 60%, #0a0e14 100%);
+  }
+  .window::after { /* streaks */
+    content:""; position:absolute; inset:0; opacity:.5;
+    background:repeating-linear-gradient(104deg,
+      transparent 0 26px, rgba(180,200,230,.05) 26px 27px,
+      transparent 27px 60px, rgba(180,200,230,.03) 60px 61px);
+  }
+  main { position:relative; z-index:5; max-width:900px; margin:0 auto; padding:7vh 24px 100px; }
+
+  /* neon sign */
+  .neonwrap { text-align:center; margin-bottom:60px; position:relative; }
+  .neon {
+    display:inline-block; font-family:system-ui, sans-serif; font-weight:800;
+    font-size:clamp(52px, 12vw, 120px); letter-spacing:.18em; color:#ff5d5d;
+    text-shadow:
+      0 0 6px #ff5d5d, 0 0 18px #ff3b3b, 0 0 42px #ff2020, 0 0 90px rgba(255,32,32,.55);
+    animation:buzz 4.5s infinite;
+  }
+  .neon .b { color:#4dd2ff; text-shadow:0 0 6px #4dd2ff, 0 0 18px #20b4ff, 0 0 42px #0a9dff, 0 0 80px rgba(10,157,255,.5); }
+  @keyframes buzz {
+    0%, 91%, 94%, 100% { opacity:1; }
+    92% { opacity:.4; }
+    93% { opacity:.85; }
+    96% { opacity:.55; }
+    97% { opacity:1; }
+  }
+  .pullchain {
+    position:absolute; right:min(8%, 90px); top:0; bottom:-40px; width:2px;
+    background:linear-gradient(180deg, rgba(200,210,220,.4), transparent); cursor:pointer;
+  }
+  .pullchain::after {
+    content:"⊚"; position:absolute; bottom:-14px; left:-7px; color:#c8d2dc;
+    font-size:16px; text-shadow:0 1px 3px #000;
+  }
+  .subline { margin-top:10px; font-family:system-ui, sans-serif; font-size:10px; letter-spacing:.5em; color:#7a8494; text-transform:uppercase; }
+
+  /* menu board */
+  .menu {
+    background:#141c26; border:1px solid #2a3648; border-radius:14px; overflow:hidden;
+    box-shadow:0 30px 70px rgba(0,0,0,.6);
+    margin-bottom:56px;
+  }
+  .menu .head {
+    padding:14px 22px; border-bottom:1px solid #2a3648; display:flex; align-items:center; gap:12px;
+    background:linear-gradient(180deg, #1a2432, #141c26);
+  }
+  .menu .head .chrome {
+    font-family:system-ui, sans-serif; font-weight:300; font-size:13px; letter-spacing:.34em; color:#c8d4e0; text-transform:uppercase;
+  }
+  .menu .head .bulb { margin-left:auto; display:flex; gap:5px; }
+  .menu .head .bulb i { width:5px; height:5px; border-radius:50%; background:#ffd9a0; box-shadow:0 0 6px #ffd9a0; animation:heat 1.8s infinite alternate; }
+  .menu .head .bulb i:nth-child(2n) { animation-delay:.6s; }
+  @keyframes heat { to { opacity:.45; } }
+  .menu ul { list-style:none; padding:10px 0; }
+  .menu li {
+    display:flex; align-items:baseline; gap:14px; padding:13px 24px;
+    font-size:17px; transition:background .15s; cursor:default;
+  }
+  .menu li:hover { background:rgba(255,217,160,.05); }
+  .menu li .dish { color:#e8e4d8; white-space:nowrap; }
+  .menu li .dots { flex:1; border-bottom:2px dotted rgba(200,210,220,.25); transform:translateY(-4px); transition:all .3s; }
+  .menu li:hover .dots { border-bottom-color:rgba(255,180,90,.7); border-bottom-style:solid; }
+  .menu li .price { font-family:"Courier New", monospace; color:#ffd9a0; }
+  .menu li .note { font-size:11px; color:#7a8494; font-style:italic; }
+
+  /* coffee + steam */
+  .counterrow { display:flex; gap:40px; align-items:flex-end; flex-wrap:wrap; margin-bottom:56px; }
+  .coffee { position:relative; width:110px; }
+  .cup {
+    width:110px; height:78px; border-radius:0 0 40px 40px / 0 0 28px 28px;
+    background:linear-gradient(180deg, #f4f0e6, #d8d2c2);
+    box-shadow:inset -8px -6px 14px rgba(120,110,90,.35), 0 10px 24px rgba(0,0,0,.5);
+    position:relative;
+  }
+  .cup::before { content:""; position:absolute; top:0; left:8px; right:8px; height:10px; border-radius:50%;
+    background:#3a2a1a; box-shadow:inset 0 2px 6px rgba(0,0,0,.8); }
+  .cup::after { content:""; position:absolute; right:-24px; top:14px; width:26px; height:36px;
+    border:7px solid #f4f0e6; border-left:none; border-radius:0 20px 20px 0; }
+  .saucer { width:140px; height:12px; border-radius:50%; background:linear-gradient(180deg,#e8e2d4,#b8b0a0); margin-top:6px; }
+  .steam { position:absolute; top:-70px; left:30px; width:50px; height:70px; pointer-events:none; }
+  .steam i {
+    position:absolute; bottom:0; width:8px; height:44px; border-radius:99px;
+    background:linear-gradient(180deg, rgba(240,240,240,0), rgba(240,240,240,.35));
+    filter:blur(3px); animation:rise 3.4s ease-in-out infinite;
+  }
+  .steam i:nth-child(1) { left:2px; animation-delay:0s; }
+  .steam i:nth-child(2) { left:20px; animation-delay:1.1s; }
+  .steam i:nth-child(3) { left:38px; animation-delay:2.2s; }
+  @keyframes rise {
+    0% { transform:translateY(10px) scaleY(.6); opacity:0; }
+    35% { opacity:.8; }
+    100% { transform:translateY(-26px) scaleY(1.3) translateX(6px); opacity:0; }
+  }
+
+  .fanshadow {
+    flex:1; min-width:240px; text-align:center; font-style:italic; color:#8a94a4; font-size:14.5px; line-height:1.9;
+    position:relative; padding:20px 10px;
+  }
+  .fanshadow::before {
+    content:""; position:absolute; left:50%; top:-40px; width:120px; height:120px; margin-left:-60px;
+    border-radius:50%;
+    background:repeating-conic-gradient(rgba(0,0,0,.22) 0 6deg, transparent 6deg 60deg);
+    animation:spinfans var(--spd, 5s) linear infinite; opacity:.5;
+  }
+  @keyframes spinfans { to { transform:rotate(360deg); } }
+
+  /* jukebox */
+  .juke {
+    display:flex; align-items:center; gap:18px; padding:18px 22px;
+    background:linear-gradient(165deg, #2a1a2e, #1c1220);
+    border:1px solid #4a2a44; border-radius:16px; margin-bottom:56px;
+    box-shadow:0 20px 50px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,150,220,.14);
+    flex-wrap:wrap;
+  }
+  .juke .arch {
+    width:74px; height:74px; border-radius:38px 38px 8px 8px;
+    background:radial-gradient(circle at 50% 120%, rgba(255,120,200,.5), transparent 60%), linear-gradient(180deg, #3a2240, #241428);
+    border:2px solid #6a3a5a; position:relative; flex-shrink:0;
+  }
+  .juke .arch::after {
+    content:"♪"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:#ff9dd8; font-size:26px; text-shadow:0 0 12px #ff70c8;
+  }
+  .juke .info { flex:1; min-width:160px; }
+  .juke .now { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.3em; color:#a06a94; text-transform:uppercase; }
+  .juke .title { font-size:19px; color:#ffd9ec; font-style:italic; }
+  .juke button {
+    background:#4a2444; color:#ff9dd8; border:1px solid #7a3a6a; border-radius:99px;
+    font-family:system-ui, sans-serif; font-size:9.5px; letter-spacing:.2em; text-transform:uppercase;
+    padding:10px 20px; cursor:pointer; transition:all .15s;
+  }
+  .juke button:hover { background:#6a3460; }
+
+  .signoff { text-align:center; color:#6a7484; font-style:italic; font-size:13px; line-height:2; }
+  .signoff b { color:#c8d4e0; font-style:normal; }
+
+  @media (max-width:640px) {
+    .pullchain { right:4%; }
+    .menu li { font-size:15px; padding:11px 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .neon, .steam i, .menu .head .bulb i, .fanshadow::before { animation:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="window"></div>
+  <main>
+    <div class="neonwrap">
+      <div class="neon" id="neonSign">O<span class="b">P</span>EN</div>
+      <div class="pullchain" id="chain" title="pull to close"></div>
+      <div class="subline" id="subline">diner · open all night · est. 1954</div>
+    </div>
+
+    <div class="menu">
+      <div class="head">
+        <span class="chrome">tonight's board</span>
+        <span class="bulb"><i></i><i></i><i></i><i></i><i></i></span>
+      </div>
+      <ul id="menuList">
+        <li><span class="dish">Pancakes</span><span class="dots"></span><span class="price">$4</span><span class="note">always</span></li>
+        <li><span class="dish">Chili bowl</span><span class="dots"></span><span class="price">$6</span><span class="note">ask first</span></li>
+        <li><span class="dish">Meatloaf plate</span><span class="dots"></span><span class="price">$9</span><span class="note">thursdays</span></li>
+        <li><span class="dish">Pie of the day</span><span class="dots"></span><span class="price">$3.50</span><span class="note">cherry. always cherry.</span></li>
+        <li><span class="dish">Bottomless coffee</span><span class="dots"></span><span class="price">$1.50</span><span class="note">the real reason you came</span></li>
+      </ul>
+    </div>
+
+    <div class="counterrow">
+      <div class="coffee">
+        <div class="steam"><i></i><i></i><i></i></div>
+        <div class="cup"></div>
+        <div class="saucer"></div>
+      </div>
+      <div class="fanshadow" id="fanzone">
+        The ceiling fan turns at the speed of the hour before dawn.
+        <div style="margin-top:10px;">
+          <button id="fanHi" style="background:none;border:1px solid #3a4a5c;color:#8a94a4;border-radius:99px;padding:7px 14px;cursor:pointer;font-family:system-ui;font-size:9px;letter-spacing:.18em;">fan: high</button>
+          <button id="fanLo" style="background:none;border:1px solid #3a4a5c;color:#8a94a4;border-radius:99px;padding:7px 14px;cursor:pointer;font-family:system-ui;font-size:9px;letter-spacing:.18em;">fan: low</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="juke">
+      <div class="arch"></div>
+      <div class="info">
+        <div class="now">now playing · slot b-7</div>
+        <div class="title" id="jTitle">“3 A.M. Neon Blues” — the pre-heats</div>
+      </div>
+      <button id="jPlay">▶ play it again</button>
+    </div>
+
+    <p class="signoff">
+      No wifi. Ask the counter. <b>Pancakes. Always.</b><br>
+      — the management, such as it is
+    </p>
+  </main>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------- the pull chain: open/closed ---------- */
+  let open = true;
+  const neon = $("neonSign");
+  $("chain").addEventListener("click", () => {
+    open = !open;
+    if (open) {
+      neon.innerHTML = 'O<span class="b">P</span>EN';
+      neon.style.animation = "";
+      document.querySelector(".window").style.filter = "";
+      document.body.style.background = "#0d1218";
+      $("subline").textContent = "diner · open all night · est. 1954";
+      flicker();
+    } else {
+      neon.textContent = "CLOSED";
+      neon.style.color = "#5a6474";
+      neon.style.textShadow = "0 0 10px rgba(120,140,170,.35)";
+      neon.style.animation = "none";
+      document.querySelector(".window").style.filter = "brightness(.45) saturate(.6)";
+      document.body.style.background = "#090d12";
+      $("subline").textContent = "sorry — we're closed · come back at 6";
+      clunk();
+    }
+  });
+  function flicker() {
+    neon.style.opacity = "0";
+    let n = 0;
+    const iv = setInterval(() => {
+      neon.style.opacity = Math.random() < 0.5 ? "0.3" : "1";
+      if (++n > 8) { clearInterval(iv); neon.style.opacity = "1"; }
+    }, 60);
+    clunk();
+  }
+
+  /* ---------- fan speed ---------- */
+  $("fanHi").addEventListener("click", () => $("fanzone").style.setProperty("--spd", "2.2s"));
+  $("fanLo").addEventListener("click", () => $("fanzone").style.setProperty("--spd", "9s"));
+
+  /* ---------- jukebox: lazy synth loop ---------- */
+  let AC = null, playing = false, loopTimer = null, noteIdx = 0;
+  const BASS = [110, 110, 146.83, 130.81];
+  const MEL = [329.63, 392, 440, 392, 329.63, 293.66, 329.63, 0];
+  function ac() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+    return AC;
+  }
+  function note(f, dur, type, vol) {
+    const c = ac(); if (!c || !f) return;
+    try {
+      const t0 = c.currentTime;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(c.destination);
+      o.start(t0); o.stop(t0 + dur + 0.05);
+    } catch (e) {}
+  }
+  const TITLES = [
+    "“3 A.M. Neon Blues” — the pre-heats",
+    "“Coffee Ring Waltz” — eddie griddle",
+    "“One More Pancake” — the bus boys",
+  ];
+  $("jPlay").addEventListener("click", function () {
+    playing = !playing;
+    this.textContent = playing ? "❙❙ enough" : "▶ play it again";
+    if (playing) {
+      ac();
+      $("jTitle").textContent = TITLES[Math.floor(Math.random() * TITLES.length)];
+      /* two-bar loop */
+      let step = 0;
+      loopTimer = setInterval(() => {
+        if (step % 4 === 0) note(BASS[(step / 4) % 4], 0.5, "triangle", 0.05);
+        note(MEL[step % 8], 0.34, "sine", 0.035);
+        if (step % 8 === 4) note(220, 0.2, "triangle", 0.03);
+        step++;
+      }, 240);
+    } else {
+      clearInterval(loopTimer);
+    }
+  });
+
+  /* ---------- ambient: menu items wink on hover (css), chain clunk audio ---------- */
+  function clunk() {
+    const c = ac(); if (!c) return;
+    try {
+      const t0 = c.currentTime;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = "square"; o.frequency.setValueAtTime(120, t0);
+      o.frequency.exponentialRampToValueAtTime(60, t0 + 0.08);
+      g.gain.setValueAtTime(0.05, t0);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.12);
+      o.connect(g); g.connect(c.destination);
+      o.start(t0); o.stop(t0 + 0.13);
+    } catch (e) {}
+  }
+
+  /* occasional neon flicker while open */
+  setInterval(() => {
+    if (open && Math.random() < 0.4) {
+      const old = neon.style.animation;
+      neon.style.animation = "none";
+      neon.style.opacity = "0.5";
+      setTimeout(() => { neon.style.opacity = "1"; neon.style.animation = old; }, 90);
+    }
+  }, 6000);
+})();
+</script>
+</body>
+</html>

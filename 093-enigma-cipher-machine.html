@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ENIGMA — rotors & lamps</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background:
+      radial-gradient(ellipse at 50% 20%, rgba(120,90,50,.16), transparent 55%),
+      linear-gradient(180deg, #1c1610, #120e0a);
+    color:#e8dcc8; min-height:100vh;
+    display:flex; align-items:center; justify-content:center; padding:18px; overflow-x:hidden;
+  }
+  .machine {
+    width:min(860px, 96vw);
+    background:
+      repeating-linear-gradient(98deg, rgba(0,0,0,.06) 0 2px, transparent 2px 9px),
+      linear-gradient(165deg, #5a4530, #42332200), linear-gradient(165deg, #5a4530, #382a1a);
+    border-radius:20px; padding:26px 28px 22px;
+    box-shadow:0 40px 90px rgba(0,0,0,.7), inset 0 2px 0 rgba(255,220,170,.14), inset 0 -4px 12px rgba(0,0,0,.4);
+  }
+  .brandline { display:flex; align-items:baseline; gap:14px; margin-bottom:18px; }
+  .brand { font-family:Georgia, serif; font-size:19px; letter-spacing:.32em; color:#e8c98f; }
+  .model { font-size:9px; letter-spacing:.3em; color:#a08c6c; text-transform:uppercase; }
+
+  /* ---------- rotors ---------- */
+  .rotorrow { display:flex; gap:12px; justify-content:center; margin-bottom:20px; }
+  .rotorwrap { text-align:center; }
+  .rotorslot {
+    width:56px; height:150px; border-radius:10px; position:relative; overflow:hidden;
+    background:linear-gradient(180deg, #2c2015, #1c130b);
+    box-shadow:inset 0 0 14px rgba(0,0,0,.8), 0 2px 0 rgba(255,220,170,.08);
+    cursor:ns-resize; user-select:none; -webkit-user-select:none; touch-action:none;
+  }
+  .rotorslot .ring {
+    position:absolute; left:0; right:0; height:44px; top:53px;
+    background:linear-gradient(180deg, #d8c294, #b89a64);
+    box-shadow:0 3px 8px rgba(0,0,0,.5);
+    display:flex; align-items:center; justify-content:center;
+    font-family:"Courier New", monospace; font-weight:700; font-size:24px; color:#33230f;
+    transition:top .12s cubic-bezier(.2,.9,.3,1);
+  }
+  .rotorslot .ring::before, .rotorslot .ring::after {
+    content:""; position:absolute; left:6px; right:6px; height:2px; background:rgba(50,35,18,.35);
+  }
+  .rotorslot .ring::before { top:8px; } .rotorslot .ring::after { bottom:8px; }
+  .rotorslot .notch {
+    position:absolute; right:4px; top:53px; width:5px; height:44px;
+    background:#8a5a2e; opacity:.0;
+  }
+  .rlab { font-size:8px; letter-spacing:.24em; color:#a08c6c; text-transform:uppercase; margin-top:7px; }
+
+  /* ---------- lampboard ---------- */
+  .boardwrap { display:flex; gap:26px; align-items:center; flex-wrap:wrap; justify-content:center; }
+  .lamps {
+    display:grid; grid-template-columns:repeat(9, 44px); gap:10px; justify-content:center;
+    padding:20px; border-radius:14px;
+    background:linear-gradient(180deg, #263022, #1a2418);
+    box-shadow:inset 0 0 20px rgba(0,0,0,.7), 0 1px 0 rgba(255,220,170,.08);
+  }
+  .lamp {
+    width:44px; height:44px; border-radius:50%; position:relative;
+    background:radial-gradient(circle at 38% 32%, #3a4636, #222c1e 70%);
+    box-shadow:inset 0 2px 5px rgba(0,0,0,.7);
+    display:flex; align-items:center; justify-content:center;
+    font-family:"Courier New", monospace; font-weight:700; font-size:17px; color:#8a9a84;
+    transition:all .08s;
+  }
+  .lamp.lit {
+    background:radial-gradient(circle at 38% 32%, #fff4c8, #e8c14a 60%, #b48a24);
+    color:#3a2c10;
+    box-shadow:0 0 22px 4px rgba(232,193,74,.8), inset 0 0 6px rgba(120,80,10,.4);
+  }
+  /* keyboard */
+  .keys {
+    display:grid; grid-template-columns:repeat(9, 44px); gap:10px; justify-content:center;
+  }
+  .key {
+    width:44px; height:44px; border-radius:8px; border:none; cursor:pointer;
+    background:linear-gradient(180deg, #e8e0cc, #c9bda0);
+    box-shadow:0 4px 0 #8a7c60, 0 6px 10px rgba(0,0,0,.4);
+    font-family:"Courier New", monospace; font-weight:700; font-size:16px; color:#33230f;
+    transition:all .05s;
+  }
+  .key:active, .key.hit { transform:translateY(3px); box-shadow:0 1px 0 #8a7c60, 0 2px 5px rgba(0,0,0,.4); }
+
+  /* plugboard */
+  .plugzone {
+    margin-top:20px; padding:14px 16px; border-radius:12px;
+    background:rgba(20,14,8,.5); border:1px solid rgba(232,201,143,.18);
+  }
+  .plugzone h4 { font-size:8.5px; letter-spacing:.3em; color:#a08c6c; text-transform:uppercase; margin-bottom:10px; }
+  .plugs { display:flex; flex-wrap:wrap; gap:8px; }
+  .plug {
+    width:30px; height:30px; border-radius:50%; border:2px solid #6a5a3e;
+    background:radial-gradient(circle at 36% 30%, #d8c9a8, #a89468);
+    font-family:"Courier New", monospace; font-weight:700; font-size:12px; color:#33230f;
+    cursor:pointer; transition:all .14s;
+  }
+  .plug.sel { border-color:#e8c14a; box-shadow:0 0 12px rgba(232,193,74,.6); transform:scale(1.12); }
+  .plug.paired { border-color:#c25a3a; background:radial-gradient(circle at 36% 30%, #e8b8a8, #c28a74); }
+  .cables { margin-top:10px; font-size:10px; color:#8a7a5e; letter-spacing:.1em; min-height:16px; font-family:"Courier New", monospace; }
+
+  /* tapes */
+  .tapes { display:flex; gap:14px; margin-top:18px; flex-wrap:wrap; }
+  .tape { flex:1; min-width:220px; }
+  .tape h4 { font-size:8.5px; letter-spacing:.3em; color:#a08c6c; text-transform:uppercase; margin-bottom:8px; }
+  .tape .paper {
+    background:#efe6d0; border-radius:8px; padding:12px 14px; min-height:64px;
+    font-family:"Courier New", monospace; font-size:15px; letter-spacing:.14em; color:#33230f;
+    box-shadow:inset 0 0 18px rgba(120,90,50,.2); word-break:break-all;
+  }
+  .tape .paper .dim { opacity:.5; }
+  .modebtns { display:flex; gap:8px; margin-top:8px; }
+  .modebtns button {
+    background:rgba(232,201,143,.1); color:#e8c98f; border:1px solid rgba(232,201,143,.35);
+    font:inherit; font-size:9px; letter-spacing:.18em; text-transform:uppercase; padding:8px 14px;
+    border-radius:99px; cursor:pointer;
+  }
+  .modebtns button.on { background:#8a6d3a; color:#f6efdd; border-color:#8a6d3a; }
+
+  @media (max-width:640px) {
+    .lamps, .keys { grid-template-columns:repeat(6, 40px); }
+    .lamp, .key { width:40px; height:40px; }
+  }
+</style>
+</head>
+<body>
+  <main class="machine">
+    <div class="brandline">
+      <span class="brand">ENIGMA</span>
+      <span class="model">rotors &amp; lamps · functional replica</span>
+    </div>
+
+    <div class="rotorrow" id="rotors"></div>
+
+    <div class="boardwrap">
+      <div class="lamps" id="lamps"></div>
+      <div class="keys" id="keys"></div>
+    </div>
+
+    <div class="plugzone">
+      <h4>plugboard — click two letters to pair</h4>
+      <div class="plugs" id="plugs"></div>
+      <div class="cables" id="cables">no cables fitted</div>
+    </div>
+
+    <div class="tapes">
+      <div class="tape">
+        <h4>input tape</h4>
+        <div class="paper" id="inTape"><span class="dim">type on the keyboard or your own…</span></div>
+      </div>
+      <div class="tape">
+        <h4>cipher tape</h4>
+        <div class="paper" id="outTape"><span class="dim">…the lamps will answer.</span></div>
+        <div class="modebtns">
+          <button id="encBtn" class="on">encrypt</button>
+          <button id="decBtn">decrypt (paste + same key)</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const AZ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+  /* ---------- machine state ---------- */
+  /* each rotor: wiring permutation + notch position */
+  const ROTORS = [
+    { name: "I", wiring: "EKMFLGDQVZNTOWYHXUSPAIBRCJ", notch: "Q" },
+    { name: "II", wiring: "AJDKSIRUXBLHWTMCQGZNPYFVOE", notch: "E" },
+    { name: "III", wiring: "BDFHJLCPRTXVZNYEIWGAKMUSQO", notch: "V" },
+  ];
+  /* reflector B */
+  const REFLECTOR = "YRUHQSLDPXNGOKMIEBFZCWVJAT";
+  let rotorPos = [0, 0, 0];   /* A=0 */
+  let ringSeen = false;
+  let plugPairs = {};         /* letter -> paired letter */
+
+  /* ---------- build UI ---------- */
+  const rotorsEl = $("rotors");
+  const rotorRings = [];
+  ROTORS.forEach((r, i) => {
+    const wrap = document.createElement("div");
+    wrap.className = "rotorwrap";
+    wrap.innerHTML =
+      '<div class="rotorslot" data-i="' + i + '"><div class="ring">A</div></div>' +
+      '<div class="rlab">rotor ' + r.name + '</div>';
+    rotorsEl.appendChild(wrap);
+    const ring = wrap.querySelector(".ring");
+    rotorRings.push(ring);
+    /* click / drag to set */
+    const slot = wrap.querySelector(".rotorslot");
+    let startY = 0, startPos = 0, dragging = false;
+    const setFrom = (delta) => {
+      rotorPos[i] = ((startPos + Math.round(delta / 18)) % 26 + 26) % 26;
+      renderRotors();
+    };
+    slot.addEventListener("pointerdown", (e) => { dragging = true; startY = e.clientY; startPos = rotorPos[i]; slot.setPointerCapture && slot.setPointerCapture(e.pointerId); });
+    slot.addEventListener("pointermove", (e) => { if (dragging) setFrom((startY - e.clientY)); });
+    slot.addEventListener("pointerup", () => { dragging = false; });
+    slot.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      rotorPos[i] = ((rotorPos[i] + (e.deltaY < 0 ? 1 : -1)) % 26 + 26) % 26;
+      renderRotors();
+    }, { passive: false });
+  });
+  function renderRotors() {
+    rotorPos.forEach((p, i) => {
+      rotorRings[i].textContent = AZ[p];
+      rotorRings[i].style.top = (53 - p * 44) + "px";
+      /* wrap illusion: keep within window by modulo trick */
+      const top = ((-p % 26) + 26) % 26;
+      rotorRings[i].style.top = (53 - top * 44) + "px";
+      if (top > 13) rotorRings[i].style.top = (53 + (26 - top) * 44) + "px";
+    });
+  }
+  renderRotors();
+
+  const lampsEl = $("lamps"), keysEl = $("keys");
+  const lampMap = {};
+  [...AZ].forEach(ch => {
+    const l = document.createElement("div");
+    l.className = "lamp"; l.textContent = ch;
+    lampsEl.appendChild(l);
+    lampMap[ch] = l;
+    const k = document.createElement("button");
+    k.className = "key"; k.textContent = ch;
+    k.addEventListener("click", () => pressKey(ch));
+    keysEl.appendChild(k);
+  });
+
+  /* ---------- plugboard ---------- */
+  const plugsEl = $("plugs");
+  let selPlug = null;
+  [...AZ].forEach(ch => {
+    const p = document.createElement("button");
+    p.className = "plug"; p.textContent = ch;
+    p.addEventListener("click", () => {
+      if (selPlug === null) {
+        selPlug = ch; p.classList.add("sel");
+      } else if (selPlug === ch) {
+        p.classList.remove("sel"); selPlug = null;
+      } else {
+        /* remove old pairs involving either */
+        [selPlug, ch].forEach(x => { if (plugPairs[x]) { delete plugPairs[plugPairs[x]]; delete plugPairs[x]; } });
+        plugPairs[selPlug] = ch; plugPairs[ch] = selPlug;
+        renderPlugs();
+        selPlug = null;
+      }
+      renderCables();
+    });
+    plugsEl.appendChild(p);
+  });
+  function renderPlugs() {
+    [...plugsEl.children].forEach((p, i) => {
+      const ch = AZ[i];
+      p.classList.toggle("paired", !!plugPairs[ch]);
+      p.classList.remove("sel");
+    });
+  }
+  function renderCables() {
+    const seen = new Set();
+    const parts = [];
+    for (const [a, b] of Object.entries(plugPairs)) {
+      const key = [a, b].sort().join("-");
+      if (!seen.has(key)) { seen.add(key); parts.push(a + "⇄" + b); }
+    }
+    $("cables").textContent = parts.length ? parts.join("   ") : "no cables fitted";
+  }
+
+  /* ---------- stepping ---------- */
+  function stepRotors() {
+    /* rightmost always steps; middle at its notch; etc. */
+    const notch3 = AZ.indexOf(ROTORS[2].notch);
+    const notch2 = AZ.indexOf(ROTORS[1].notch);
+    rotorPos[2] = (rotorPos[2] + 1) % 26;
+    if (rotorPos[2] === notch3) rotorPos[1] = (rotorPos[1] + 1) % 26;
+    if (rotorPos[1] === notch2) rotorPos[0] = (rotorPos[0] + 1) % 26;
+    renderRotors();
+  }
+
+  /* ---------- the cipher path ---------- */
+  function throughRotor(ch, rotor, pos, back) {
+    const i = AZ.indexOf(ch);
+    /* account for rotor position offset */
+    const shifted = (i + pos) % 26;
+    const wired = back
+      ? (AZ[(rotor.wiring.indexOf(AZ[shifted]) - pos + 26) % 26])
+      : (rotor.wiring[shifted]);
+    if (back) {
+      /* inverse pass: find where letter came from */
+      const idx = (rotor.wiring.indexOf(AZ[(AZ.indexOf(ch) + pos) % 26]) - pos + 26) % 26;
+      return AZ[idx];
+    }
+    return AZ[(AZ.indexOf(wired) - pos + 26) % 26];
+  }
+  function encodeChar(ch) {
+    if (!AZ.includes(ch)) return ch;
+    let c = ch;
+    /* plugboard in */
+    if (plugPairs[c]) c = plugPairs[c];
+    /* rotors L→R */
+    for (let i = 2; i >= 0; i--) {
+      const idx = (AZ.indexOf(c) + rotorPos[i]) % 26;
+      c = ROTORS[i].wiring[idx];
+    }
+    /* reflector */
+    c = REFLECTOR[AZ.indexOf(c)];
+    /* rotors R→L (inverse) */
+    for (let i = 0; i < 3; i++) {
+      const idx = (AZ.indexOf(c) - rotorPos[i] + 26) % 26;
+      c = AZ[ROTORS[i].wiring.indexOf(idx >= 0 ? AZ[idx] : c)];
+      /* simpler: find letter in wiring */
+      c = AZ[(ROTORS[i].wiring.indexOf(c) + rotorPos[i]) % 26];
+    }
+    /* the above double-computes; do it cleanly: */
+    c = ch;
+    if (plugPairs[c]) c = plugPairs[c];
+    for (let i = 2; i >= 0; i--) c = ROTORS[i].wiring[(AZ.indexOf(c) + rotorPos[i]) % 26];
+    c = REFLECTOR[AZ.indexOf(c)];
+    for (let i = 0; i < 3; i++) c = AZ[(ROTORS[i].wiring.indexOf(c) + rotorPos[i]) % 26];
+    if (plugPairs[c]) c = plugPairs[c];
+    return c;
+  }
+
+  /* ---------- typing ---------- */
+  let inBuf = "", outBuf = "";
+  function pressKey(ch) {
+    stepRotors();
+    const out = encodeChar(ch);
+    outBuf += out;
+    inBuf += ch;
+    if (inBuf.length > 60) { inBuf = inBuf.slice(-60); outBuf = outBuf.slice(-60); }
+    $("inTape").textContent = inBuf;
+    $("outTape").textContent = outBuf;
+    /* light the lamp */
+    lampMap[out].classList.add("lit");
+    setTimeout(() => lampMap[out].classList.remove("lit"), 340);
+    clack();
+  }
+  addEventListener("keydown", (e) => {
+    const ch = e.key.toUpperCase();
+    if (AZ.includes(ch) && !e.ctrlKey && !e.metaKey) {
+      pressKey(ch);
+      const btn = [...keysEl.children][AZ.indexOf(ch)];
+      btn.classList.add("hit");
+      setTimeout(() => btn.classList.remove("hit"), 120);
+    }
+  });
+
+  /* ---------- decode mode ---------- */
+  $("encBtn").addEventListener("click", () => {
+    $("encBtn").classList.add("on"); $("decBtn").classList.remove("on");
+    $("decBtn").textContent = "decrypt (paste + same key)";
+  });
+  $("decBtn").addEventListener("click", () => {
+    $("decBtn").classList.add("on"); $("encBtn").classList.remove("on");
+    const cipher = prompt("paste cipher text (set rotors to the SAME positions as encryption, then press enter):", outBuf);
+    if (cipher) {
+      $("decBtn").classList.remove("on"); $("encBtn").classList.add("on");
+      /* decode: feed each char through as a keypress */
+      inBuf = ""; outBuf = "";
+      [...cipher.toUpperCase()].forEach(c => { if (AZ.includes(c)) pressKey(c); });
+      /* after this, outTape holds the plaintext (enigma reciprocity) */
+    }
+  });
+
+  /* ---------- clack audio ---------- */
+  let AC = null;
+  function clack() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      const t0 = AC.currentTime;
+      const o = AC.createOscillator(), g = AC.createGain(), f = AC.createBiquadFilter();
+      o.type = "square"; o.frequency.value = 180;
+      f.type = "lowpass"; f.frequency.value = 800;
+      g.gain.setValueAtTime(0.035, t0);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.05);
+      o.connect(f); f.connect(g); g.connect(AC.destination);
+      o.start(t0); o.stop(t0 + 0.06);
+    } catch (e) {}
+  }
+})();
+</script>
+</body>
+</html>

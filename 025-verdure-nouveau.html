@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VERDURE — a garden at dusk</title>
+<style>
+  :root {
+    --parch:#f3ecd9; --sage:#7d9273; --moss:#55673f; --gold:#b08d3e;
+    --rose:#c98d8d; --ink:#4a4436;
+    --vine:#7d9273; --leaf:#8aa478; --bloom:#d8a0b8; --accent:#b08d3e;
+  }
+  body.spring { --vine:#8fa988; --leaf:#a4bd93; --bloom:#e6b7c8; --accent:#c2955c; }
+  body.summer { --vine:#6f8f66; --leaf:#7fa06f; --bloom:#e0a4a4; --accent:#a8a13c; }
+  body.autumn { --vine:#9c7e4e; --leaf:#b3925a; --bloom:#d8a070; --accent:#a2682e; }
+  body.winter { --vine:#8d949c; --leaf:#a8b0b8; --bloom:#c5cdd8; --accent:#7e8aa0; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    background: var(--parch);
+    color:var(--ink);
+    font-family: Georgia, "Palatino Linotype", Palatino, serif;
+    overflow-x:hidden;
+    transition: background 1.2s ease;
+  }
+  /* parchment grain */
+  body::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:40; opacity:.5;
+    background-image:
+      radial-gradient(rgba(74,68,54,.05) 1px, transparent 1.5px),
+      radial-gradient(rgba(74,68,54,.04) 1px, transparent 1.5px);
+    background-size: 7px 7px, 11px 11px;
+    background-position: 0 0, 3px 5px;
+  }
+  /* corner ornaments */
+  .corner-orn { position:fixed; width:190px; height:190px; z-index:30; pointer-events:none; opacity:.9; }
+  .co-tl { top:0; left:0; }
+  .co-tr { top:0; right:0; transform:scaleX(-1); }
+  .co-bl { bottom:0; left:0; transform:scaleY(-1); }
+  .co-br { bottom:0; right:0; transform:scale(-1,-1); }
+
+  .wrap { max-width:880px; margin:0 auto; padding:0 24px; position:relative; z-index:5; }
+
+  /* ---------- masthead ---------- */
+  header { padding:110px 0 40px; text-align:center; position:relative; }
+  .orn-rule { display:flex; align-items:center; justify-content:center; gap:14px; color:var(--gold); margin-bottom:26px; }
+  .orn-rule::before, .orn-rule::after { content:""; height:1px; width:min(180px,26vw); background:linear-gradient(90deg, transparent, var(--gold)); }
+  .orn-rule::after { background:linear-gradient(270deg, transparent, var(--gold)); }
+  .orn-rule svg { width:26px; height:26px; }
+  h1 {
+    font-size:clamp(52px, 11vw, 108px); font-weight:400; letter-spacing:.14em;
+    color:var(--moss); line-height:1;
+  }
+  h1 span { color:var(--gold); }
+  .subtitle {
+    margin-top:18px; font-style:italic; font-size:clamp(15px,2.4vw,20px); color:var(--sage);
+  }
+  .subtitle::first-letter { color:var(--rose); }
+
+  /* ---------- seasons ring ---------- */
+  .seasons {
+    position:fixed; right:26px; top:50%; transform:translateY(-50%); z-index:35;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .seasons button {
+    width:46px; height:46px; border-radius:50%; border:1.5px solid var(--gold); cursor:pointer;
+    background:transparent; color:var(--ink); font-family:inherit; font-size:15px; font-style:italic;
+    transition:all .4s; position:relative;
+  }
+  .seasons button.on { background:var(--gold); color:var(--parch); box-shadow:0 0 18px rgba(176,141,62,.5); }
+  .seasons button:hover { transform:scale(1.12); }
+  .seasons .tip {
+    position:absolute; right:56px; top:50%; transform:translateY(-50%); white-space:nowrap;
+    font-size:11px; letter-spacing:.2em; color:var(--gold); text-transform:uppercase; opacity:0; transition:opacity .3s;
+    font-family: system-ui, sans-serif;
+  }
+  .seasons button:hover .tip { opacity:1; }
+
+  /* ---------- drop cap section ---------- */
+  section { padding:60px 0; position:relative; }
+  .ode { column-count:2; column-gap:54px; column-rule:1px solid rgba(176,141,62,.35); }
+  .ode p { font-size:15.5px; line-height:1.9; margin-bottom:1.2em; text-align:justify; hyphens:auto; }
+  .ode p:first-child::first-letter {
+    float:left; font-size:78px; line-height:.82; padding:10px 12px 0 0; color:var(--gold); font-weight:700;
+  }
+  .ode p:first-child::first-letter { animation:glint 3.5s ease 1.5s; }
+  @keyframes glint { 0%,100% { text-shadow:none; } 50% { text-shadow:0 0 22px rgba(214,183,96,.95); } }
+  @media (max-width:700px) { .ode { column-count:1; } }
+
+  .pull {
+    margin:70px auto; max-width:640px; text-align:center; font-style:italic;
+    font-size:clamp(20px,3.6vw,30px); line-height:1.5; color:var(--sage);
+  }
+  .pull::before, .pull::after { display:block; color:var(--gold); font-size:22px; margin:18px 0; }
+  .pull::before { content:"❧"; }
+  .pull::after { content:"❧"; transform:scaleX(-1); }
+
+  /* vines */
+  .vine-hold { position:absolute; pointer-events:none; }
+  .vh-left { left:-40px; top:30px; width:180px; height:420px; }
+  .vh-right { right:-40px; top:60px; width:180px; height:420px; transform:scaleX(-1); }
+  .vh-bottom { left:50%; transform:translateX(-50%); bottom:-30px; width:420px; height:150px; }
+  .vine path { fill:none; stroke:var(--vine); stroke-width:2.4; stroke-linecap:round; }
+  .vine .lf { fill:var(--leaf); stroke:var(--vine); stroke-width:1.4; }
+  .vine .bloom { fill:var(--bloom); stroke:var(--vine); stroke-width:1; opacity:0; transform-origin:center; transform:scale(.2); transition:all .7s cubic-bezier(.2,1.4,.4,1); }
+  .vine:hover .bloom, .vine.bloomed .bloom { opacity:1; transform:scale(1); }
+  .draw path.stem { stroke-dasharray:1400; stroke-dashoffset:1400; }
+  .draw.inview path.stem { animation:drawstem 4s ease forwards; }
+  @keyframes drawstem { to { stroke-dashoffset:0; } }
+  .draw .lf { opacity:0; transform:scale(.2); transform-origin:center; transform-box:fill-box; }
+  .draw.inview .lf { animation:leafout .9s ease forwards; }
+  .draw.inview .lf:nth-of-type(2) { animation-delay:.5s } .draw.inview .lf:nth-of-type(3) { animation-delay:.9s }
+  .draw.inview .lf:nth-of-type(4) { animation-delay:1.3s } .draw.inview .lf:nth-of-type(5) { animation-delay:1.7s }
+  .draw.inview .lf:nth-of-type(6) { animation-delay:2.1s } .draw.inview .lf:nth-of-type(7) { animation-delay:2.5s }
+  @keyframes leafout { to { opacity:1; transform:scale(1); } }
+
+  /* pollen */
+  .pollen { position:fixed; inset:0; pointer-events:none; z-index:20; }
+  .pollen i {
+    position:absolute; width:5px; height:5px; border-radius:50%;
+    background:radial-gradient(circle, rgba(214,183,96,.9), rgba(214,183,96,0) 70%);
+    animation:drift linear infinite;
+  }
+  @keyframes drift {
+    0% { transform:translate(0,0); opacity:0; }
+    12% { opacity:.85; }
+    100% { transform:translate(var(--dx), var(--dy)); opacity:0; }
+  }
+
+  footer { padding:80px 0 60px; text-align:center; }
+  footer .fin { font-size:12px; letter-spacing:.34em; text-transform:uppercase; color:var(--gold); font-family:system-ui, sans-serif; }
+  footer .quote { margin-top:14px; font-style:italic; color:var(--sage); font-size:14px; }
+
+  @media (max-width:760px) {
+    .corner-orn { width:110px; height:110px; }
+    .seasons { right:10px; }
+    .seasons button { width:38px; height:38px; font-size:12px; }
+    .vh-left, .vh-right { display:none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .draw.inview path.stem { animation:none; stroke-dashoffset:0; }
+    .draw.inview .lf { animation:none; opacity:1; transform:scale(1); }
+    .pollen i { display:none; }
+  }
+</style>
+</head>
+<body class="">
+  <!-- corner ornaments -->
+  <svg class="corner-orn co-tl" viewBox="0 0 190 190" aria-hidden="true">
+    <path d="M8 182 C 30 150, 20 110, 52 96 C 84 82, 96 52, 90 24" fill="none" stroke="var(--gold)" stroke-width="1.6"/>
+    <path d="M8 182 C 40 168, 78 168, 96 140" fill="none" stroke="var(--gold)" stroke-width="1.2" opacity=".7"/>
+    <circle cx="90" cy="24" r="4" fill="var(--rose)"/>
+    <circle cx="96" cy="140" r="3" fill="var(--sage)"/>
+    <path d="M20 138 q14 -18 28 -6 q-10 16 -28 6z" fill="var(--leaf)" opacity=".7"/>
+  </svg>
+  <svg class="corner-orn co-tr" viewBox="0 0 190 190" aria-hidden="true">
+    <path d="M8 182 C 30 150, 20 110, 52 96 C 84 82, 96 52, 90 24" fill="none" stroke="var(--gold)" stroke-width="1.6"/>
+    <path d="M8 182 C 40 168, 78 168, 96 140" fill="none" stroke="var(--gold)" stroke-width="1.2" opacity=".7"/>
+    <circle cx="90" cy="24" r="4" fill="var(--rose)"/>
+    <path d="M20 138 q14 -18 28 -6 q-10 16 -28 6z" fill="var(--leaf)" opacity=".7"/>
+  </svg>
+  <svg class="corner-orn co-bl" viewBox="0 0 190 190" aria-hidden="true">
+    <path d="M8 182 C 30 150, 20 110, 52 96 C 84 82, 96 52, 90 24" fill="none" stroke="var(--gold)" stroke-width="1.6"/>
+    <circle cx="90" cy="24" r="4" fill="var(--rose)"/>
+    <path d="M20 138 q14 -18 28 -6 q-10 16 -28 6z" fill="var(--leaf)" opacity=".7"/>
+  </svg>
+  <svg class="corner-orn co-br" viewBox="0 0 190 190" aria-hidden="true">
+    <path d="M8 182 C 30 150, 20 110, 52 96 C 84 82, 96 52, 90 24" fill="none" stroke="var(--gold)" stroke-width="1.6"/>
+    <path d="M20 138 q14 -18 28 -6 q-10 16 -28 6z" fill="var(--leaf)" opacity=".7"/>
+  </svg>
+
+  <!-- seasons ring -->
+  <div class="seasons" role="group" aria-label="seasons">
+    <button class="on" data-season=""><span class="tip">dusk (default)</span>✦</button>
+    <button data-season="spring"><span class="tip">spring cherry</span>❀</button>
+    <button data-season="summer"><span class="tip">summer sage</span>❖</button>
+    <button data-season="autumn"><span class="tip">autumn amber</span>🍂</button>
+    <button data-season="winter"><span class="tip">winter silver</span>❄</button>
+  </div>
+
+  <div class="wrap">
+    <header>
+      <div class="orn-rule"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c2 4 6 5 6 10a6 6 0 1 1-12 0c0-5 4-6 6-10z"/></svg></div>
+      <h1>VERD<span>U</span>RE</h1>
+      <p class="subtitle">an ode to a garden at dusk — where the light forgives everything</p>
+    </header>
+
+    <section>
+      <div class="vine-hold vh-left">
+        <svg class="vine draw" viewBox="0 0 180 420" width="100%" height="100%" aria-hidden="true">
+          <path class="stem" d="M90 420 C 60 340, 130 300, 96 230 C 70 180, 120 140, 88 80 C 76 52, 92 28, 100 8"/>
+          <path class="lf" d="M96 230 q -30 -8 -34 -34 q 30 4 34 34z"/>
+          <path class="lf" d="M96 230 q 30 -8 34 -34 q -30 4 -34 34z"/>
+          <path class="lf" d="M88 80 q -28 -6 -32 -30 q 28 4 32 30z"/>
+          <path class="lf" d="M88 80 q 28 -6 32 -30 q -28 4 -32 30z"/>
+          <path class="lf" d="M100 8 q -20 -4 -24 -22 q 20 2 24 22z"/>
+          <circle class="bloom" cx="100" cy="8" r="9"/>
+          <circle class="bloom" cx="88" cy="80" r="7"/>
+          <circle class="bloom" cx="96" cy="230" r="6"/>
+        </svg>
+      </div>
+      <div class="vine-hold vh-right">
+        <svg class="vine draw" viewBox="0 0 180 420" width="100%" height="100%" aria-hidden="true">
+          <path class="stem" d="M90 420 C 120 340, 50 300, 84 230 C 110 180, 60 140, 92 80 C 104 52, 88 28, 80 8"/>
+          <path class="bloom" cx="80" cy="8" r="8" style="fill:var(--bloom)"/>
+          <path class="lf" d="M84 230 q -30 -8 -34 -34 q 30 4 34 34z"/>
+          <path class="lf" d="M84 230 q 30 -8 34 -34 q -30 4 -34 34z"/>
+          <path class="lf" d="M92 80 q -28 -6 -32 -30 q 28 4 32 30z"/>
+          <circle class="bloom" cx="92" cy="80" r="6"/>
+          <circle class="bloom" cx="84" cy="230" r="7"/>
+        </svg>
+      </div>
+
+      <div class="ode">
+        <p>There is an hour — barely forty minutes, if the weather is generous — when the garden stops performing. The roses let their heads fall. The light comes in low and gold across the lawn, and every leaf seems to remember the sun it ate at noon. This is the garden's true face, and it does not perform for anyone. It simply exhales.</p>
+        <p>Stand very still and you can watch the shift of color: green upon green upon gold, sage into shadow, the first blue arriving at the edges of things like a rumor. The bees have gone home. Something else rustles — a blackbird turning over leaf litter, deciding about tomorrow.</p>
+        <p>We built this page the way one tends such a garden: patiently, by hand, with more care than efficiency. Let the vines grow. Let the season turn. There is no hurry here, and nothing to buy.</p>
+      </div>
+    </section>
+
+    <div class="pull">The dusk does not ask the garden to be beautiful.<br>It only asks it to be still.</div>
+
+    <section>
+      <div class="vine-hold vh-bottom">
+        <svg class="vine draw" viewBox="0 0 420 150" width="100%" height="100%" aria-hidden="true">
+          <path class="stem" d="M10 140 C 90 120, 120 60, 210 70 C 300 80, 320 130, 410 110"/>
+          <path class="lf" d="M210 70 q -8 -30 -32 -34 q 4 30 32 34z"/>
+          <path class="lf" d="M210 70 q 8 -30 32 -34 q -4 30 -32 34z"/>
+          <circle class="bloom" cx="210" cy="70" r="10"/>
+          <path class="lf" d="M120 84 q -26 -2 -34 -26 q 28 2 34 26z"/>
+          <circle class="bloom" cx="120" cy="84" r="7"/>
+          <path class="lf" d="M300 96 q 26 -2 34 -26 q -28 2 -34 26z"/>
+          <circle class="bloom" cx="300" cy="96" r="7"/>
+        </svg>
+      </div>
+      <div class="ode" style="column-count:1; max-width:560px; margin:0 auto;">
+        <p style="text-align:center;">Come back when the light changes. The garden will be here, and so will we —
+        tending the vowels, pruning the consonants, letting the sentences run a little wild at the edges,
+        the way they prefer.</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="pollen" id="pollen" aria-hidden="true"></div>
+
+  <footer>
+    <div class="fin">Verdure · set in Georgia &amp; garden serif · mmxxvi</div>
+    <p class="quote">"Every garden is a argument with winter." — old note, undated</p>
+  </footer>
+
+<script>
+(() => {
+  "use strict";
+  /* seasons */
+  document.querySelectorAll(".seasons button").forEach(b => {
+    b.addEventListener("click", () => {
+      document.querySelectorAll(".seasons button").forEach(x => x.classList.remove("on"));
+      b.classList.add("on");
+      document.body.className = b.dataset.season || "";
+      /* re-bloom on season change */
+      document.querySelectorAll(".vine").forEach(v => {
+        v.classList.add("bloomed");
+        setTimeout(() => v.classList.remove("bloomed"), 2600);
+      });
+    });
+  });
+
+  /* draw-on scroll */
+  const io = new IntersectionObserver((ents) => {
+    ents.forEach(en => { if (en.isIntersecting) en.target.classList.add("inview"); });
+  }, { threshold: 0.3 });
+  document.querySelectorAll(".vine").forEach(v => io.observe(v));
+
+  /* hover blooms (CSS :hover on .vine covers it; also bloom all once at load) */
+  setTimeout(() => {
+    document.querySelectorAll(".vine").forEach(v => {
+      v.classList.add("bloomed");
+      setTimeout(() => v.classList.remove("bloomed"), 3000);
+    });
+  }, 3400);
+
+  /* drifting pollen */
+  const box = document.getElementById("pollen");
+  function spawnPollen() {
+    if (document.hidden) return;
+    const i = document.createElement("i");
+    i.style.left = Math.random() * 100 + "vw";
+    i.style.top = (30 + Math.random() * 60) + "vh";
+    const dx = (Math.random() * 240 - 120), dy = -(80 + Math.random() * 200);
+    i.style.setProperty("--dx", dx + "px");
+    i.style.setProperty("--dy", dy + "px");
+    const dur = 9 + Math.random() * 10;
+    i.style.animationDuration = dur + "s";
+    box.appendChild(i);
+    setTimeout(() => i.remove(), dur * 1000 + 100);
+  }
+  for (let k = 0; k < 8; k++) setTimeout(spawnPollen, k * 900);
+  setInterval(spawnPollen, 2600);
+})();
+</script>
+</body>
+</html>

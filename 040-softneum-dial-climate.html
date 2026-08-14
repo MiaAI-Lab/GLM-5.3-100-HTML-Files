@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AER — climate dial</title>
+<style>
+  :root {
+    --bg:#E8EEF2; --shade:#c3ccd4; --hi:#ffffff;
+    --led:#4db8e8; --ink:#4a5a66; --ink2:#8a99a5;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background:radial-gradient(ellipse at 50% 20%, #eef4f8, #E8EEF2 70%);
+    color:var(--ink);
+    display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px;
+    overflow-x:hidden;
+  }
+  body.heat { --led:#e8924d; }
+  body.eco { --led:#7db86a; }
+  .panel {
+    width:min(520px, 96vw); padding:34px 32px 30px; border-radius:40px;
+    background:var(--bg);
+    box-shadow: 12px 12px 30px var(--shade), -12px -12px 30px var(--hi);
+  }
+  .label { font-size:10px; letter-spacing:.34em; color:var(--ink2); text-transform:uppercase; text-align:center; }
+
+  /* ---------- dial ---------- */
+  .dialwrap { display:flex; justify-content:center; margin:28px 0 6px; position:relative; }
+  .dial {
+    width:250px; height:250px; border-radius:50%; position:relative; cursor:grab;
+    background:var(--bg);
+    box-shadow: 10px 10px 24px var(--shade), -10px -10px 24px var(--hi),
+                inset 0 0 0 1px rgba(255,255,255,.4);
+    touch-action:none; user-select:none;
+  }
+  .dial:active { cursor:grabbing; }
+  .dial::before {
+    content:""; position:absolute; inset:18px; border-radius:50%;
+    box-shadow: inset 6px 6px 14px var(--shade), inset -6px -6px 14px var(--hi);
+  }
+  /* LED arc via conic gradient mask */
+  .arc {
+    position:absolute; inset:8px; border-radius:50%;
+    background:conic-gradient(from 225deg, var(--led) 0deg, var(--led) var(--p, 90deg), transparent var(--p, 90deg), transparent 270deg, rgba(0,0,0,0) 360deg);
+    -webkit-mask:radial-gradient(circle, transparent 62%, #000 63%);
+    mask:radial-gradient(circle, transparent 62%, #000 63%);
+    filter:drop-shadow(0 0 6px var(--led));
+    transition:background .3s;
+    pointer-events:none;
+  }
+  .dial .ticks { position:absolute; inset:0; border-radius:50%; pointer-events:none; }
+  .dial .ticks i {
+    position:absolute; left:50%; top:50%; width:2px; height:10px; background:var(--ink2); opacity:.4;
+    transform-origin:0 0;
+  }
+  .readouts {
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    pointer-events:none;
+  }
+  .readouts .tgt { font-size:56px; font-weight:200; color:var(--ink); line-height:1; font-variant-numeric:tabular-nums; }
+  .readouts .tgt small { font-size:18px; color:var(--ink2); }
+  .readouts .cur { margin-top:8px; font-size:11px; color:var(--ink2); letter-spacing:.14em; }
+  .readouts .cur b { color:var(--led); font-weight:600; }
+
+  /* ---------- mode chips ---------- */
+  .modes { display:flex; gap:14px; justify-content:center; margin-top:22px; }
+  .chip {
+    border:none; cursor:pointer; background:var(--bg); border-radius:16px;
+    width:76px; padding:12px 0 10px; font:inherit; color:var(--ink2);
+    box-shadow: 6px 6px 14px var(--shade), -6px -6px 14px var(--hi);
+    transition:all .15s; display:flex; flex-direction:column; align-items:center; gap:6px;
+  }
+  .chip svg { width:22px; height:22px; fill:currentColor; }
+  .chip span { font-size:9px; letter-spacing:.2em; text-transform:uppercase; }
+  .chip:active, .chip.on {
+    box-shadow: inset 5px 5px 12px var(--shade), inset -5px -5px 12px var(--hi);
+    color:var(--led);
+  }
+  /* fan icon spin */
+  .chip .fan { transition:transform .2s; transform-origin:50% 50%; }
+
+  /* ---------- airflow slider ---------- */
+  .flow { margin-top:26px; }
+  .flow label { display:flex; justify-content:space-between; font-size:9px; letter-spacing:.26em; text-transform:uppercase; color:var(--ink2); margin-bottom:10px; }
+  .flow label output { color:var(--ink); }
+  .groove {
+    height:16px; border-radius:99px; position:relative; cursor:pointer;
+    box-shadow: inset 4px 4px 9px var(--shade), inset -4px -4px 9px var(--hi);
+  }
+  .groove i {
+    position:absolute; top:3px; bottom:3px; left:3px; border-radius:99px; width:40%;
+    background:linear-gradient(90deg, #dbe4ea, var(--led));
+    max-width:calc(100% - 6px); transition:width .2s;
+  }
+  .groove .thumb {
+    position:absolute; top:50%; width:26px; height:26px; border-radius:50%; left:40%;
+    transform:translate(-50%,-50%); background:var(--bg);
+    box-shadow: 4px 4px 9px var(--shade), -4px -4px 9px var(--hi);
+  }
+
+  /* ---------- schedule strip ---------- */
+  .sched { margin-top:24px; }
+  .sched .lab { font-size:9px; letter-spacing:.26em; text-transform:uppercase; color:var(--ink2); margin-bottom:10px; text-align:left; }
+  .slots { display:flex; gap:8px; }
+  .slot {
+    flex:1; border:none; cursor:pointer; background:var(--bg); border-radius:12px; padding:10px 4px;
+    font:inherit; color:var(--ink2); box-shadow: 5px 5px 11px var(--shade), -5px -5px 11px var(--hi);
+    transition:all .15s; font-size:10px; letter-spacing:.06em; line-height:1.5;
+  }
+  .slot b { display:block; font-size:13px; color:var(--ink); font-weight:600; }
+  .slot.on { box-shadow: inset 4px 4px 9px var(--shade), inset -4px -4px 9px var(--hi); }
+  .slot.on b { color:var(--led); }
+
+  .foot { margin-top:24px; display:flex; justify-content:space-between; align-items:center; }
+  .foot .pwr {
+    border:none; cursor:pointer; background:var(--bg); border-radius:99px; padding:10px 20px;
+    font:inherit; font-size:9px; letter-spacing:.22em; text-transform:uppercase; color:var(--ink2);
+    box-shadow: 5px 5px 11px var(--shade), -5px -5px 11px var(--hi); transition:all .15s;
+  }
+  .foot .pwr.on { color:var(--led); box-shadow: inset 4px 4px 9px var(--shade), inset -4px -4px 9px var(--hi); }
+  .foot .hum { font-size:10px; color:var(--ink2); letter-spacing:.12em; font-variant-numeric:tabular-nums; }
+
+  @media (max-width:420px) {
+    .panel { padding:26px 18px 22px; }
+    .dial { width:200px; height:200px; }
+    .readouts .tgt { font-size:44px; }
+    .modes { gap:8px; }
+    .chip { width:64px; }
+  }
+</style>
+</head>
+<body>
+  <main class="panel" aria-label="AER climate control">
+    <div class="label">aer · climate</div>
+
+    <div class="dialwrap">
+      <div class="dial" id="dial" role="slider" aria-label="target temperature" aria-valuemin="12" aria-valuemax="30" aria-valuenow="21">
+        <div class="arc" id="arc"></div>
+        <div class="ticks" id="ticks"></div>
+        <div class="readouts">
+          <div class="tgt"><span id="tgtV">21</span><small>°</small></div>
+          <div class="cur">now <b id="curV">19.5°</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modes">
+      <button class="chip on" data-mode="cool" aria-label="cool mode">
+        <svg viewBox="0 0 24 24"><path d="M12 2v20M4 6l16 12M20 6L4 18M12 2l-2 3h4zM12 22l-2-3h4zM2 12l3-2v4zM22 12l-3-2v4z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
+        <span>cool</span>
+      </button>
+      <button class="chip" data-mode="heat" aria-label="heat mode">
+        <svg viewBox="0 0 24 24"><path d="M12 3c1.8 3 4 4.5 4 8a4 4 0 1 1-8 0c0-3.5 2.2-5 4-8z" stroke="currentColor" stroke-width="1.6" fill="none"/></svg>
+        <span>heat</span>
+      </button>
+      <button class="chip" data-mode="eco" aria-label="eco mode">
+        <svg viewBox="0 0 24 24"><path d="M20 4c-9 0-15 4-15 11a5 5 0 0 0 5 5c7 0 10-6 10-16zM6 19c2-5 6-8 10-10" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
+        <span>eco</span>
+      </button>
+      <button class="chip" data-mode="fan" aria-label="fan mode">
+        <svg viewBox="0 0 24 24" class="fan" id="fanIcon"><path d="M12 12c0-4 1-7 4-7s4 3 2 5-4 2-6 2zm0 0c4 0 7 1 7 4s-3 4-5 2-2-4-2-6zm0 0c-4 0-7-1-7-4s3-4 5-2 2 4 2 6zm0 0c0 4-1 7-4 7s-4-3-2-5 4-2 6-2z"/></svg>
+        <span>fan</span>
+      </button>
+    </div>
+
+    <div class="flow">
+      <label>airflow <output id="flowOut">40%</output></label>
+      <div class="groove" id="flow" role="slider" aria-label="airflow" aria-valuemin="0" aria-valuemax="100" aria-valuenow="40">
+        <i id="flowFill"></i><div class="thumb" id="flowThumb"></div>
+      </div>
+    </div>
+
+    <div class="sched">
+      <div class="lab">today's schedule · tap to set</div>
+      <div class="slots" id="slots">
+        <button class="slot" data-h="6"><b>06:00</b>wake</button>
+        <button class="slot" data-h="9"><b>09:00</b>away</button>
+        <button class="slot" data-h="18"><b>18:00</b>home</button>
+        <button class="slot" data-h="22"><b>22:00</b>night</button>
+      </div>
+    </div>
+
+    <div class="foot">
+      <button class="pwr on" id="pwr">● running</button>
+      <span class="hum">humidity <b id="humV">44%</b> · <span id="modeName">cooling</span></span>
+    </div>
+  </main>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const dial = $("dial"), arc = $("arc");
+  const TMIN = 12, TMAX = 30;
+  let target = 21, current = 19.5, flow = 0.4, power = true, mode = "cool";
+
+  /* ticks */
+  const ticks = $("ticks");
+  for (let i = 0; i <= 24; i++) {
+    const a = (225 + (i / 24) * 270) * Math.PI / 180;
+    const t = document.createElement("i");
+    const r1 = 104, len = i % 3 === 0 ? 11 : 6;
+    t.style.transform = "translate(-50%,-50%) rotate(" + (a * 180 / Math.PI + 90) + "deg)";
+    t.style.left = "calc(50% + " + Math.cos(a) * r1 + "px)";
+    t.style.top = "calc(50% + " + Math.sin(a) * r1 + "px)";
+    t.style.height = len + "px";
+    ticks.appendChild(t);
+  }
+
+  function render() {
+    const p = (target - TMIN) / (TMAX - TMIN);
+    arc.style.setProperty("--p", (p * 270) + "deg");
+    $("tgtV").textContent = target;
+    $("curV").textContent = current.toFixed(1) + "°";
+    dial.setAttribute("aria-valuenow", target);
+    document.body.className = mode === "heat" ? "heat" : mode === "eco" ? "eco" : "";
+    $("modeName").textContent = power ? (mode === "cool" ? "cooling" : mode === "heat" ? "heating" : mode === "eco" ? "eco hold" : "fan only") : "idle";
+    $("humV").textContent = Math.round(38 + Math.sin(Date.now() / 9000) * 6) + "%";
+  }
+
+  /* ---------- dial drag ---------- */
+  let dragging = false;
+  function setFromPointer(e) {
+    const r = dial.getBoundingClientRect();
+    const dx = e.clientX - (r.left + r.width / 2);
+    const dy = e.clientY - (r.top + r.height / 2);
+    let a = Math.atan2(dy, dx) * 180 / Math.PI - 135;
+    while (a < 0) a += 360;
+    const p = Math.max(0, Math.min(1, a / 270));
+    /* detents at .5° */
+    const t = TMIN + p * (TMAX - TMIN);
+    target = Math.round(t * 2) / 2;
+    render();
+  }
+  dial.addEventListener("pointerdown", (e) => {
+    dragging = true; setFromPointer(e);
+    dial.setPointerCapture && dial.setPointerCapture(e.pointerId);
+  });
+  dial.addEventListener("pointermove", (e) => { if (dragging) setFromPointer(e); });
+  dial.addEventListener("pointerup", () => { dragging = false; });
+  /* wheel & keys */
+  dial.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    target = Math.max(TMIN, Math.min(TMAX, target + (e.deltaY < 0 ? 0.5 : -0.5)));
+    render();
+  }, { passive:false });
+  dial.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowUp" || e.key === "ArrowRight") { target = Math.min(TMAX, target + 0.5); render(); }
+    if (e.key === "ArrowDown" || e.key === "ArrowLeft") { target = Math.max(TMIN, target - 0.5); render(); }
+  });
+  dial.setAttribute("tabindex", "0");
+
+  /* ---------- modes ---------- */
+  document.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => {
+    document.querySelectorAll(".chip").forEach(x => x.classList.remove("on"));
+    c.classList.add("on");
+    mode = c.dataset.mode;
+    render();
+  }));
+
+  /* ---------- airflow ---------- */
+  const groove = $("flow");
+  let fdrag = false;
+  function setFlow(e) {
+    const r = groove.getBoundingClientRect();
+    const p = Math.max(0.04, Math.min(1, (e.clientX - r.left) / r.width));
+    flow = p;
+    $("flowFill").style.width = (p * 100) + "%";
+    $("flowThumb").style.left = (p * 100) + "%";
+    $("flowOut").textContent = Math.round(p * 100) + "%";
+    groove.setAttribute("aria-valuenow", Math.round(p * 100));
+    spinFan();
+  }
+  groove.addEventListener("pointerdown", (e) => { fdrag = true; setFlow(e); groove.setPointerCapture && groove.setPointerCapture(e.pointerId); });
+  groove.addEventListener("pointermove", (e) => { if (fdrag) setFlow(e); });
+  groove.addEventListener("pointerup", () => { fdrag = false; });
+
+  /* fan spin speed follows airflow */
+  let fanAngle = 0;
+  function spinFan() { /* handled in loop */ }
+  function loop() {
+    if (!document.hidden) {
+      fanAngle += flow * 9 * (power ? 1 : 0.15);
+      const fan = $("fanIcon");
+      if (fan) fan.style.transform = "rotate(" + fanAngle + "deg)";
+      /* current temp eases toward target */
+      const pull = power ? (mode === "eco" ? 0.0008 : 0.002) * (0.3 + flow) : 0.0004;
+      current += (target - current) * pull + (Math.random() - 0.5) * 0.004;
+      render();
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  /* ---------- schedule ---------- */
+  document.querySelectorAll(".slot").forEach(s => s.addEventListener("click", function () {
+    const h = parseInt(this.dataset.h, 10);
+    /* cycle: wake 22, away 17, home 21.5, night 19 */
+    const presets = { 6: 22, 9: 17, 18: 21.5, 22: 19 };
+    this.classList.toggle("on");
+    if (this.classList.contains("on")) {
+      document.querySelectorAll(".slot").forEach(x => { if (x !== this) x.classList.remove("on"); });
+      target = presets[h];
+      render();
+    }
+  }));
+
+  /* ---------- power ---------- */
+  $("pwr").addEventListener("click", function () {
+    power = !power;
+    this.classList.toggle("on", power);
+    this.textContent = power ? "● running" : "○ standby";
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

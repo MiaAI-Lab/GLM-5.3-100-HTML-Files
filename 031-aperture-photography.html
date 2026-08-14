@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>f/1.4 — street photography</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:#141416; color:#d8d8dc; overflow-x:hidden;
+  }
+  /* ---------- masthead with working aperture ---------- */
+  .mast { min-height:88vh; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; }
+  .aperture-wrap { position:relative; width:200px; height:200px; margin-bottom:34px; }
+  .aperture { width:100%; height:100%; transition:transform .8s cubic-bezier(.2,.9,.3,1); }
+  .mast:hover .aperture { transform:scale(1.06); }
+  .wordmark {
+    font-size:clamp(64px, 17vw, 210px); font-weight:400; letter-spacing:-.02em; line-height:.9;
+    color:#ececee;
+  }
+  .wordmark i { font-style:italic; color:#c23b22; }
+  .tagline { font-family:system-ui, sans-serif; font-size:10px; letter-spacing:.5em; color:#7a7a84; text-transform:uppercase; margin-top:20px; }
+  .scrollcue { position:absolute; bottom:26px; font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.4em; color:#5a5a64; text-transform:uppercase; }
+
+  /* sprocket edges */
+  .film {
+    position:relative; padding:34px 0;
+    background:#0c0c0e;
+  }
+  .film::before, .film::after {
+    content:""; position:absolute; top:0; bottom:0; width:26px; z-index:5;
+    background:
+      repeating-linear-gradient(180deg, transparent 0 9px, #1e1e22 9px 21px);
+  }
+  .film::before { left:0; }
+  .film::after { right:0; }
+  .gallery {
+    display:flex; gap:2.5vw; padding:0 5vw; overflow-x:auto; scroll-snap-type:x mandatory;
+    align-items:stretch; padding-left:6vw; padding-right:6vw;
+  }
+  .plate {
+    flex:0 0 auto; width:min(420px, 74vw); scroll-snap-align:center; position:relative;
+    transition:transform .5s cubic-bezier(.2,.9,.3,1);
+  }
+  .plate:hover { transform:translateY(-8px); }
+  .photo {
+    position:relative; aspect-ratio:3/2; overflow:hidden; border-radius:2px;
+    background:#1a1a1e; cursor:pointer;
+    filter:saturate(.92) contrast(1.06);
+  }
+  .photo canvas { width:100%; height:100%; display:block; transition:filter .8s, transform .8s; }
+  .plate:hover .photo canvas { filter:saturate(1.18) contrast(1.1) brightness(1.06); transform:scale(1.03); }
+  .exif {
+    display:flex; justify-content:space-between; margin-top:12px;
+    font-family:"Courier New", monospace; font-size:10.5px; color:#8a8a94; letter-spacing:.08em;
+  }
+  .exif b { color:#c9c9cf; font-weight:400; }
+  .cap { font-style:italic; font-size:13px; color:#9a9aa4; margin-top:6px; }
+
+  /* golden ratio overlay */
+  .gr-overlay {
+    position:fixed; inset:0; z-index:60; pointer-events:none; opacity:0; transition:opacity .3s;
+  }
+  .gr-overlay.on { opacity:1; }
+  .gr-overlay::before, .gr-overlay::after {
+    content:""; position:absolute; background:rgba(194,59,34,.4);
+  }
+  .gr-overlay::before { left:38.2%; top:0; bottom:0; width:1px; }
+  .gr-overlay::after { left:0; right:0; top:38.2%; height:1px; }
+
+  /* darkroom mode */
+  body.darkroom { background:#1c0e0a; }
+  body.darkroom .photo { filter:sepia(.5) brightness(.85) contrast(1.2); }
+  body.darkroom::after {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:70;
+    background:radial-gradient(ellipse at 50% 40%, rgba(255,80,40,.1), rgba(120,20,5,.22) 90%);
+  }
+
+  .toolbar {
+    position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:65;
+    display:flex; gap:10px; padding:10px 14px; border-radius:99px;
+    background:rgba(16,16,18,.85); border:1px solid #26262c;
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  }
+  .toolbar button {
+    background:none; border:1px solid #3a3a42; color:#c9c9cf; font-family:system-ui, sans-serif;
+    font-size:9px; letter-spacing:.2em; text-transform:uppercase; padding:9px 16px; border-radius:99px; cursor:pointer;
+    transition:all .15s;
+  }
+  .toolbar button:hover { border-color:#c9c9cf; }
+  .toolbar button.on { background:#c23b22; border-color:#c23b22; color:#fff; }
+
+  footer { padding:60px 8vw 40px; text-align:center; }
+  footer p { font-style:italic; color:#7a7a84; font-size:14px; }
+  @media (max-width:640px) {
+    .film::before, .film::after { width:14px; }
+    .gallery { padding-left:8vw; padding-right:8vw; }
+  }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto; } }
+</style>
+</head>
+<body>
+  <!-- masthead with SVG aperture -->
+  <section class="mast">
+    <div class="aperture-wrap">
+      <svg class="aperture" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="48" fill="none" stroke="#3a3a42" stroke-width="2"/>
+        <g id="blades"></g>
+        <circle cx="50" cy="50" r="10" fill="#0c0c0e"/>
+      </svg>
+    </div>
+    <div class="wordmark">f/<i>1.4</i></div>
+    <div class="tagline">street photographs · shot wide open · zone focused</div>
+    <div class="scrollcue">scroll ↓</div>
+  </section>
+
+  <section class="film">
+    <div class="gallery" id="gallery"></div>
+  </section>
+
+  <footer>
+    <p>"Photography is the story I fail to put into words." — from the contact sheet, undated</p>
+  </footer>
+
+  <div class="gr-overlay" id="gr"></div>
+  <div class="toolbar">
+    <button id="apBtn">aperture</button>
+    <button id="grBtn">golden ratio</button>
+    <button id="drBtn">darkroom</button>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  /* ---------- working aperture ---------- */
+  const bladesG = document.getElementById("blades");
+  const NS = "http://www.w3.org/2000/svg";
+  const NB = 9;
+  function buildAperture(openK) {
+    bladesG.innerHTML = "";
+    for (let i = 0; i < NB; i++) {
+      const a = (6.283 / NB) * i;
+      /* blade polygon sweeping in as it closes */
+      const r1 = 46, r2 = 46;
+      const inX = 50 + Math.cos(a) * (10 + openK * 34);
+      const inY = 50 + Math.sin(a) * (10 + openK * 34);
+      const tipX = 50 + Math.cos(a + 0.5) * r1;
+      const tipY = 50 + Math.sin(a + 0.5) * r2;
+      const outX = 50 + Math.cos(a + 1.1) * r1;
+      const outY = 50 + Math.sin(a + 1.1) * r2;
+      const p = document.createElementNS(NS, "polygon");
+      p.setAttribute("points", inX + "," + inY + " " + tipX + "," + tipY + " " + outX + "," + outY);
+      p.setAttribute("fill", "rgba(60,60,68,.9)");
+      p.setAttribute("stroke", "#1e1e24");
+      p.setAttribute("stroke-width", "1");
+      bladesG.appendChild(p);
+    }
+  }
+  let open = 0.75;
+  buildAperture(open);
+  addEventListener("scroll", () => {
+    const p = Math.min(1, scrollY / (innerHeight * 0.8));
+    open = 0.75 - p * 0.62;
+    buildAperture(open);
+  }, { passive: true });
+
+  /* ---------- photos: generative street scenes ---------- */
+  const SCENES = [
+    { cap: "crossing, 11:40pm", tones: ["#2a2a30", "#4a443c", "#c9884a"], street: true, rain: true },
+    { cap: "the fishmonger opens at four", tones: ["#20242c", "#3a4450", "#8a9ab0"], awning: true },
+    { cap: "last train, platform 2", tones: ["#242028", "#483a44", "#d8a86a"], platform: true },
+    { cap: "sodium and steam", tones: ["#1e1c1a", "#3c342a", "#e0a45a"], steam: true },
+    { cap: "he waits anyway", tones: ["#1c1e24", "#343a46", "#7a8aa4"], figure: true },
+  ];
+  const EXIFS = [
+    "35mm · f/1.4 · 1/60 · iso 1600",
+    "35mm · f/1.4 · 1/125 · iso 800",
+    "50mm · f/1.8 · 1/30 · iso 3200",
+    "35mm · f/1.4 · 1/90 · iso 1600",
+    "50mm · f/2 · 1/45 · iso 6400",
+  ];
+  function paintPhoto(cnv, sc) {
+    const c = cnv.getContext("2d");
+    const w = cnv.width = 600, h = cnv.height = 400;
+    /* base night wash */
+    const bg = c.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, sc.tones[0]);
+    bg.addColorStop(1, sc.tones[1]);
+    c.fillStyle = bg; c.fillRect(0, 0, w, h);
+    /* sodium glow */
+    const gx = w * (0.3 + Math.random() * 0.4);
+    const rg = c.createRadialGradient(gx, h * 0.3, 8, gx, h * 0.3, w * 0.5);
+    rg.addColorStop(0, sc.tones[2] + "cc");
+    rg.addColorStop(1, "transparent");
+    c.fillStyle = rg; c.fillRect(0, 0, w, h);
+    /* building blocks */
+    let bx = 0;
+    while (bx < w) {
+      const bw = 50 + Math.random() * 90;
+      const bh = 90 + Math.random() * 160;
+      c.fillStyle = "rgba(10,10,14,.8)";
+      c.fillRect(bx, h - bh - 60, bw, bh);
+      /* lit windows */
+      c.fillStyle = sc.tones[2];
+      for (let wy = h - bh - 50; wy < h - 70; wy += 22) {
+        for (let wx = bx + 8; wx < bx + bw - 10; wx += 18) {
+          if (Math.random() < 0.24) {
+            c.globalAlpha = 0.5 + Math.random() * 0.5;
+            c.fillRect(wx, wy, 7, 10);
+          }
+        }
+      }
+      c.globalAlpha = 1;
+      bx += bw + 6;
+    }
+    /* wet street reflection */
+    const st = c.createLinearGradient(0, h - 60, 0, h);
+    st.addColorStop(0, sc.tones[1]);
+    st.addColorStop(1, "#0c0c10");
+    c.fillStyle = st; c.fillRect(0, h - 60, w, 60);
+    c.fillStyle = sc.tones[2];
+    for (let i = 0; i < 14; i++) {
+      c.globalAlpha = 0.08 + Math.random() * 0.12;
+      const rx = Math.random() * w;
+      c.fillRect(rx, h - 58 + Math.random() * 50, 3 + Math.random() * 5, 20);
+    }
+    c.globalAlpha = 1;
+    /* optional elements */
+    if (sc.rain) {
+      c.strokeStyle = "rgba(200,210,230,.25)";
+      c.lineWidth = 1;
+      for (let i = 0; i < 90; i++) {
+        const x = Math.random() * w, y = Math.random() * h;
+        c.beginPath(); c.moveTo(x, y); c.lineTo(x - 3, y + 14); c.stroke();
+      }
+    }
+    if (sc.figure) {
+      c.fillStyle = "rgba(6,6,10,.92)";
+      const fx = w * 0.62, fy = h - 60;
+      c.beginPath(); c.arc(fx, fy - 52, 7, 0, 6.283); c.fill();
+      c.fillRect(fx - 9, fy - 46, 18, 32);
+      c.fillRect(fx - 8, fy - 14, 6, 14);
+      c.fillRect(fx + 2, fy - 14, 6, 14);
+    }
+    if (sc.steam) {
+      for (let i = 0; i < 5; i++) {
+        const sx = w * (0.2 + Math.random() * 0.6);
+        const gr = c.createRadialGradient(sx, h - 80, 2, sx, h - 80, 40);
+        gr.addColorStop(0, "rgba(230,230,240,.16)");
+        gr.addColorStop(1, "transparent");
+        c.fillStyle = gr;
+        c.beginPath(); c.arc(sx, h - 80, 40, 0, 6.283); c.fill();
+      }
+    }
+    /* grain */
+    for (let i = 0; i < 900; i++) {
+      c.fillStyle = Math.random() < 0.5 ? "rgba(255,255,255,.03)" : "rgba(0,0,0,.05)";
+      c.fillRect(Math.random() * w, Math.random() * h, 1, 1);
+    }
+    /* vignette */
+    const vg = c.createRadialGradient(w / 2, h / 2, h * 0.4, w / 2, h / 2, h * 0.85);
+    vg.addColorStop(0, "transparent");
+    vg.addColorStop(1, "rgba(0,0,0,.5)");
+    c.fillStyle = vg; c.fillRect(0, 0, w, h);
+  }
+
+  /* build gallery */
+  const gal = $("gallery");
+  SCENES.forEach((sc, i) => {
+    const plate = document.createElement("figure");
+    plate.className = "plate";
+    const ph = document.createElement("div");
+    ph.className = "photo";
+    const cnv = document.createElement("canvas");
+    paintPhoto(cnv, sc);
+    ph.appendChild(cnv);
+    plate.appendChild(ph);
+    const exif = document.createElement("div");
+    exif.className = "exif";
+    exif.innerHTML = "<span>№ " + String(i + 1).padStart(2, "0") + "</span><b>" + EXIFS[i] + "</b>";
+    plate.appendChild(exif);
+    const cap = document.createElement("div");
+    cap.className = "cap";
+    cap.textContent = sc.cap;
+    plate.appendChild(cap);
+    /* click = focus shift */
+    ph.addEventListener("click", () => {
+      cnv.style.filter = "blur(6px) brightness(1.1)";
+      setTimeout(() => { cnv.style.filter = ""; }, 900);
+    });
+    gal.appendChild(plate);
+  });
+
+  /* ---------- toolbar ---------- */
+  $("apBtn").addEventListener("click", function () {
+    this.classList.toggle("on");
+    scrollTo({ top: 0, behavior: "smooth" });
+  });
+  $("grBtn").addEventListener("click", function () {
+    $("gr").classList.toggle("on");
+    this.classList.toggle("on");
+  });
+  addEventListener("keydown", (e) => {
+    if (e.key.toLowerCase() === "g") $("grBtn").click();
+  });
+  let dr = false;
+  $("drBtn").addEventListener("click", function () {
+    dr = !dr;
+    document.body.classList.toggle("darkroom", dr);
+    this.classList.toggle("on", dr);
+  });
+})();
+</script>
+</body>
+</html>

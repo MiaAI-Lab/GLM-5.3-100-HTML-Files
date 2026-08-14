@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HOROLOGÉ — Time, considered.</title>
+<style>
+  :root{
+    --ink:#0B0B0D;
+    --ink2:#131316;
+    --gold:#C9A96A;
+    --gold-soft:rgba(201,169,106,.32);
+    --gold-faint:rgba(201,169,106,.14);
+    --porcelain:#EDE8E0;
+    --porcelain-dim:#9B968E;
+    --serif:Georgia,'Palatino Linotype','Times New Roman',serif;
+    --tracking:.34em;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--ink);
+    color:var(--porcelain);
+    font-family:var(--serif);
+    line-height:1.6;
+    overflow-x:hidden;
+  }
+  body::before{
+    /* faint brushed texture */
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:40;
+    background:repeating-linear-gradient(115deg, rgba(255,255,255,.012) 0 2px, transparent 2px 5px);
+  }
+  ::selection{background:var(--gold);color:var(--ink)}
+
+  .frame{
+    max-width:1160px;margin:0 auto;
+    padding:0 clamp(18px,4vw,54px);
+  }
+
+  /* ————— top bar ————— */
+  nav.bar{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:26px 0 22px;
+    border-bottom:1px solid var(--gold-faint);
+  }
+  nav.bar .wordmark{
+    font-size:clamp(19px,2.4vw,26px);
+    letter-spacing:.42em;
+    color:var(--porcelain);
+  }
+  nav.bar .wordmark span{color:var(--gold)}
+  nav.bar ul{display:flex;gap:clamp(14px,3vw,38px);list-style:none}
+  nav.bar a{
+    color:var(--porcelain-dim);text-decoration:none;
+    font-family:system-ui,sans-serif;font-size:11px;letter-spacing:.26em;text-transform:uppercase;
+    transition:color .3s;
+  }
+  nav.bar a:hover{color:var(--gold)}
+  @media(max-width:680px){nav.bar ul{display:none}}
+
+  /* ————— hero ————— */
+  .hero{
+    display:grid;
+    grid-template-columns:minmax(300px,1fr) minmax(280px,.9fr);
+    gap:clamp(28px,5vw,80px);
+    align-items:center;
+    padding:clamp(44px,7vw,96px) 0 clamp(50px,7vw,90px);
+  }
+  @media(max-width:900px){.hero{grid-template-columns:1fr;text-align:center}}
+
+  .hero-copy h1{
+    font-weight:400;
+    font-size:clamp(34px,5.4vw,72px);
+    line-height:1.08;
+    letter-spacing:.01em;
+  }
+  .hero-copy h1 em{
+    font-style:italic;
+    color:var(--gold);
+    display:block;
+  }
+  .hero-copy .rule{
+    width:72px;height:1px;background:var(--gold);
+    margin:clamp(18px,3vw,30px) 0;
+  }
+  @media(max-width:900px){.hero-copy .rule{margin-left:auto;margin-right:auto}}
+  .hero-copy p{
+    color:var(--porcelain-dim);
+    font-size:clamp(15px,1.5vw,17.5px);
+    max-width:46ch;
+  }
+  @media(max-width:900px){.hero-copy p{margin:0 auto}}
+  .hero-copy .est{
+    margin-top:26px;
+    font-family:system-ui,sans-serif;font-size:10px;
+    letter-spacing:.3em;text-transform:uppercase;color:var(--gold);
+  }
+
+  /* ————— THE WATCH ————— */
+  .watch-stage{
+    position:relative;
+    display:flex;justify-content:center;align-items:center;
+    perspective:1200px;
+    min-height:420px;
+  }
+  .watch-glow{
+    position:absolute;width:70%;aspect-ratio:1;border-radius:50%;
+    background:radial-gradient(circle,rgba(201,169,106,.16),transparent 65%);
+    filter:blur(10px);
+    animation:glowBreathe 6s ease-in-out infinite alternate;
+  }
+  @keyframes glowBreathe{from{opacity:.55}to{opacity:1}}
+
+  .watch{
+    position:relative;
+    width:min(340px,78vw);
+    aspect-ratio:1;
+    transition:transform .7s cubic-bezier(.2,.7,.2,1);
+  }
+  /* exploded layers */
+  .layer{
+    position:absolute;inset:0;border-radius:50%;
+    transition:transform .8s cubic-bezier(.2,.7,.2,1);
+    will-change:transform;
+  }
+  .l-glass{
+    z-index:6;
+    background:
+      conic-gradient(from 200deg, transparent 0deg, rgba(255,255,255,.14) 18deg, transparent 60deg, transparent 178deg, rgba(255,255,255,.1) 196deg, transparent 240deg),
+      radial-gradient(circle at 32% 26%, rgba(255,255,255,.16), transparent 42%);
+    overflow:hidden;
+    pointer-events:none;
+  }
+  .l-glass::after{
+    content:"";position:absolute;top:-140%;left:-60%;
+    width:55%;height:380%;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.34),transparent);
+    transform:rotate(18deg);
+    animation:reflectSweep 7s ease-in-out infinite;
+  }
+  @keyframes reflectSweep{
+    0%,64%{transform:translateX(-30%) rotate(18deg)}
+    86%,100%{transform:translateX(360%) rotate(18deg)}
+  }
+  .l-bezel{
+    z-index:5;
+    background:
+      conic-gradient(from 45deg,
+        #3E3B36 0deg, #6E6553 40deg, #2E2B27 90deg, #55503F 150deg,
+        #26241F 200deg, #6E6553 250deg, #2E2B27 300deg, #4A4438 360deg);
+    box-shadow:
+      0 30px 60px -18px rgba(0,0,0,.85),
+      inset 0 0 0 2px rgba(201,169,106,.25);
+    padding:7%;
+  }
+  .l-case{
+    z-index:4;
+    background:radial-gradient(circle at 36% 30%, #1E1D1A, #0F0E0D 68%, #191713);
+    box-shadow:inset 0 0 26px rgba(0,0,0,.9), inset 0 0 0 1px rgba(201,169,106,.18);
+    padding:4.5%;
+  }
+  .l-dial{
+    z-index:3;
+    background:
+      radial-gradient(circle at 40% 34%, #232220, #0D0D0C 72%),
+      var(--ink);
+    position:relative;
+    box-shadow:inset 0 4px 18px rgba(0,0,0,.8);
+  }
+  .l-movement{
+    z-index:2;
+    background:
+      repeating-radial-gradient(circle at 50% 50%, rgba(201,169,106,.11) 0 1px, transparent 1px 9px),
+      radial-gradient(circle, #16150F, #0A0A09 74%);
+    opacity:0;
+    transition:opacity .8s ease, transform .8s cubic-bezier(.2,.7,.2,1);
+  }
+  .l-strap-top,.l-strap-bottom{
+    position:absolute;left:50%;width:34%;height:26%;
+    transform:translateX(-50%);
+    background:linear-gradient(90deg,#151312, #2E2620 22%, #3A2F26 50%, #2E2620 78%, #151312);
+    border-radius:14px;
+    z-index:1;
+    transition:background .5s, transform .8s cubic-bezier(.2,.7,.2,1);
+    box-shadow:0 14px 30px -12px rgba(0,0,0,.8);
+  }
+  .l-strap-top{top:-21%}
+  .l-strap-bottom{bottom:-21%}
+
+  /* indices */
+  .indices{position:absolute;inset:0;transition:filter .5s}
+  .watch-stage:hover .indices{filter:drop-shadow(0 0 6px rgba(201,169,106,.9))}
+  .idx{
+    position:absolute;left:50%;top:50%;
+    width:2.5%;height:9%;
+    background:linear-gradient(180deg,#E8E2D8,#B7AE9E);
+    transform-origin:50% 0%;
+    box-shadow:0 0 2px rgba(0,0,0,.8);
+  }
+  .idx.minor{height:5.5%;width:1.4%;background:#8D857A}
+  .idx::after{
+    content:"";position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);
+    width:3px;height:3px;border-radius:50%;background:var(--gold);opacity:0;
+    transition:opacity .5s;
+  }
+  .watch-stage:hover .idx::after{opacity:1}
+  /* hands */
+  .hand{
+    position:absolute;left:50%;top:50%;
+    transform-origin:50% 100%;
+    border-radius:3px;
+  }
+  .h-hour{
+    width:1.9%;height:26%;
+    margin-left:-0.95%;margin-top:-26%;
+    background:linear-gradient(180deg,#F2EDE4,#C9C1B2);
+    box-shadow:0 0 4px rgba(0,0,0,.9);
+  }
+  .h-min{
+    width:1.4%;height:38%;
+    margin-left:-0.7%;margin-top:-38%;
+    background:linear-gradient(180deg,#F7F3EB,#CFC8B8);
+    box-shadow:0 0 4px rgba(0,0,0,.9);
+  }
+  .h-sec{
+    width:.7%;height:44%;
+    margin-left:-0.35%;margin-top:-44%;
+    background:var(--gold);
+    box-shadow:0 0 8px rgba(201,169,106,.55);
+    transition:transform .12s cubic-bezier(.4,2.2,.4,1);
+  }
+  .h-sec::before{
+    content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);
+    width:200%;height:14%;background:var(--gold);
+  }
+  .pin{
+    position:absolute;left:50%;top:50%;width:3.4%;aspect-ratio:1;
+    transform:translate(-50%,-50%);border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#E9E2D2,#7E7666);
+    box-shadow:0 0 0 1.5px var(--gold);
+  }
+  .dial-text{
+    position:absolute;left:50%;top:64%;transform:translateX(-50%);
+    font-size:clamp(8px,1.2vw,11px);
+    letter-spacing:.34em;text-indent:.34em;
+    color:#C6BFB2;text-transform:uppercase;
+    white-space:nowrap;
+  }
+  .dial-num{
+    position:absolute;left:50%;top:34%;transform:translateX(-50%);
+    font-size:clamp(12px,2vw,18px);
+    font-style:italic;color:var(--gold);
+  }
+  .date-window{
+    position:absolute;left:71%;top:47.5%;transform:translateY(-50%);
+    width:11%;height:10%;
+    background:#1A1916;
+    border:1px solid rgba(201,169,106,.4);
+    display:flex;align-items:center;justify-content:center;
+    font-family:system-ui,sans-serif;font-size:clamp(8px,1.3vw,12px);
+    color:var(--porcelain);
+  }
+  .crown{
+    position:absolute;right:-4.5%;top:48.5%;
+    width:5%;height:9%;border-radius:3px;
+    background:linear-gradient(90deg,#4A4438,#7A6E58 45%,#3B362C);
+    box-shadow:2px 2px 6px rgba(0,0,0,.7);
+    z-index:4;
+  }
+
+  /* exploded state */
+  .watch.exploded .l-glass{transform:translateZ(120px) translateY(-8%)}
+  .watch.exploded .l-bezel{transform:translateZ(80px) translateY(-3%)}
+  .watch.exploded .l-case{transform:translateZ(40px)}
+  .watch.exploded .l-movement{opacity:1;transform:translateZ(-46px) scale(1.02)}
+  .watch.exploded .l-strap-top{transform:translateX(-50%) translateY(-58%)}
+  .watch.exploded .l-strap-bottom{transform:translateX(-50%) translateY(58%)}
+  .layer-label{
+    position:absolute;
+    font-family:system-ui,sans-serif;font-size:9px;letter-spacing:.3em;
+    text-transform:uppercase;color:var(--gold);
+    opacity:0;transition:opacity .6s .3s;
+    white-space:nowrap;
+  }
+  .watch.exploded .layer-label{opacity:1}
+  .lbl-glass{top:2%;left:calc(50% + 190px)}
+  .lbl-bezel{top:26%;left:calc(50% + 190px)}
+  .lbl-case{top:48%;left:calc(50% + 190px)}
+  .lbl-movement{top:70%;left:calc(50% + 190px)}
+  @media(max-width:1400px){.layer-label{display:none}}
+
+  .watch-caption{
+    margin-top:8px;text-align:center;
+    font-family:system-ui,sans-serif;font-size:10px;
+    letter-spacing:.28em;text-transform:uppercase;color:var(--porcelain-dim);
+  }
+  .watch-caption b{color:var(--gold)}
+
+  /* ————— sections ————— */
+  section.block{
+    border-top:1px solid var(--gold-faint);
+    padding:clamp(44px,6vw,80px) 0;
+    display:grid;
+    grid-template-columns:minmax(200px,.8fr) 1.2fr;
+    gap:clamp(24px,4vw,70px);
+  }
+  @media(max-width:820px){
+    section.block{grid-template-columns:1fr}
+  }
+  .block-head h2{
+    font-weight:400;font-style:italic;
+    font-size:clamp(24px,3.4vw,40px);
+    line-height:1.15;
+  }
+  .block-head h2 span{color:var(--gold)}
+  .block-head .no{
+    font-family:system-ui,sans-serif;font-size:10px;
+    letter-spacing:.3em;color:var(--gold);text-transform:uppercase;
+    display:block;margin-bottom:14px;
+  }
+
+  .story p{
+    color:var(--porcelain-dim);
+    font-size:clamp(15px,1.5vw,17px);
+    max-width:58ch;
+  }
+  .story p+p{margin-top:14px}
+  .story .lede{
+    color:var(--porcelain);
+    font-size:clamp(18px,2.2vw,24px);
+    font-style:italic;
+    line-height:1.5;
+  }
+
+  /* specs table */
+  table.specs{
+    width:100%;border-collapse:collapse;
+    font-family:system-ui,sans-serif;font-size:13px;
+  }
+  table.specs th,table.specs td{
+    text-align:left;padding:14px 12px;
+    border-bottom:1px solid var(--gold-faint);
+    vertical-align:top;
+  }
+  table.specs th{
+    color:var(--gold);font-weight:600;
+    font-size:10px;letter-spacing:.26em;text-transform:uppercase;
+    width:34%;
+  }
+  table.specs td{color:var(--porcelain-dim)}
+  table.specs tr:hover th{color:var(--porcelain)}
+  table.specs tr{transition:background .3s}
+  table.specs tr:hover{background:rgba(201,169,106,.05)}
+
+  /* strap chips */
+  .straps{display:flex;flex-wrap:wrap;gap:16px;margin-top:8px}
+  .strap-chip{
+    flex:1 1 140px;max-width:200px;
+    border:1px solid var(--gold-faint);
+    background:transparent;
+    padding:18px 16px;
+    cursor:pointer;text-align:left;
+    color:var(--porcelain-dim);
+    font-family:system-ui,sans-serif;font-size:12px;letter-spacing:.12em;
+    transition:border-color .35s, transform .35s, background .35s;
+    position:relative;overflow:hidden;
+  }
+  .strap-chip .swatch{
+    display:block;height:44px;border-radius:6px;margin-bottom:14px;
+    background:var(--sw);
+    box-shadow:inset 0 2px 8px rgba(0,0,0,.55), inset 0 -2px 6px rgba(255,255,255,.12);
+  }
+  .strap-chip b{
+    display:block;color:var(--porcelain);
+    font-size:12.5px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;
+    margin-bottom:4px;
+  }
+  .strap-chip:hover{transform:translateY(-3px);border-color:var(--gold-soft)}
+  .strap-chip[aria-pressed="true"]{border-color:var(--gold);background:rgba(201,169,106,.07)}
+  .strap-chip[aria-pressed="true"]::after{
+    content:"— chosen";position:absolute;top:10px;right:12px;
+    color:var(--gold);font-size:9px;letter-spacing:.2em;text-transform:uppercase;
+  }
+
+  .movement-btn{
+    margin-top:26px;
+    display:inline-flex;align-items:center;gap:12px;
+    background:transparent;color:var(--gold);
+    border:1px solid var(--gold-soft);
+    padding:13px 26px;
+    font-family:system-ui,sans-serif;font-size:11px;
+    letter-spacing:.3em;text-transform:uppercase;cursor:pointer;
+    transition:background .35s,color .35s,border-color .35s;
+  }
+  .movement-btn:hover{background:var(--gold);color:var(--ink);border-color:var(--gold)}
+  .movement-btn .tick{
+    width:8px;height:8px;border:1.5px solid currentColor;border-radius:50%;
+    transition:background .3s;
+  }
+  .movement-btn[aria-pressed="true"] .tick{background:currentColor}
+
+  footer{
+    border-top:1px solid var(--gold-faint);
+    padding:36px 0 60px;
+    display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;
+    font-family:system-ui,sans-serif;font-size:10px;
+    letter-spacing:.26em;text-transform:uppercase;color:var(--porcelain-dim);
+  }
+  footer b{color:var(--gold)}
+
+  .reveal{
+    opacity:0;transform:translateY(22px);
+    transition:opacity 1s cubic-bezier(.2,.7,.2,1),transform 1s cubic-bezier(.2,.7,.2,1);
+  }
+  .reveal.in{opacity:1;transform:none}
+
+  @media (prefers-reduced-motion: reduce){
+    .l-glass::after,.watch-glow{animation:none}
+    .h-sec{transition:none}
+    .reveal{opacity:1;transform:none;transition:none}
+    html{scroll-behavior:auto}
+    .layer{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <nav class="bar">
+    <div class="wordmark">HOROLOGÉ<span>.</span></div>
+    <ul>
+      <li><a href="#story">The house</a></li>
+      <li><a href="#specs">Specifications</a></li>
+      <li><a href="#straps">Straps</a></li>
+    </ul>
+  </nav>
+
+  <!-- ═════════ HERO ═════════ -->
+  <div class="hero">
+    <div class="hero-copy">
+      <h1>Time,<em>considered.</em></h1>
+      <div class="rule"></div>
+      <p>One watch, made slowly. Forty-one millimetres of restraint, a hand-finished caliber, and a dial that refuses to shout. It will outlast your enthusiasm for it, and then your indifference.</p>
+      <p class="est">Maison founded 1893 · Vallée de Joux</p>
+    </div>
+
+    <div>
+      <div class="watch-stage" id="stage">
+        <div class="watch-glow"></div>
+        <div class="watch" id="watch">
+          <div class="l-strap-top" id="strapTop"></div>
+          <div class="l-strap-bottom" id="strapBot"></div>
+          <div class="l-movement layer" id="lMovement">
+            <span class="layer-label lbl-movement">Calibre H-93 · 217 components</span>
+          </div>
+          <div class="l-case layer">
+            <span class="layer-label lbl-case">Case · 904L steel, 41mm</span>
+          </div>
+          <div class="l-bezel layer">
+            <span class="layer-label lbl-bezel">Bezel · hand-polished</span>
+          </div>
+          <div class="l-dial layer">
+            <div class="indices" id="indices"></div>
+            <span class="dial-num">XII</span>
+            <span class="dial-text">Horologé</span>
+            <div class="date-window" id="dateWin">—</div>
+            <div class="hand h-hour" id="hHour"></div>
+            <div class="hand h-min" id="hMin"></div>
+            <div class="hand h-sec" id="hSec"></div>
+            <div class="pin"></div>
+          </div>
+          <div class="l-glass layer">
+            <span class="layer-label lbl-glass">Sapphire · double AR</span>
+          </div>
+          <div class="crown"></div>
+        </div>
+      </div>
+      <p class="watch-caption" id="caption">Calibre H-93 · local time <b id="liveTime">—:—:—</b></p>
+      <div style="text-align:center">
+        <button class="movement-btn" id="explodeBtn" aria-pressed="false">
+          <span class="tick"></span>View the movement
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════ STORY ═════════ -->
+  <section class="block reveal" id="story">
+    <div class="block-head">
+      <span class="no">Chapter I</span>
+      <h2>Slow is a <span>specification.</span></h2>
+    </div>
+    <div class="story">
+      <p class="lede">A movement is finished for the person who will never see it, which is precisely why it is finished at all.</p>
+      <p>Each caliber passes through one watchmaker's bench from first bridge to final regulation — eleven weeks, no handoffs, no hurry. The bridges are chamfered by hand until the light travels them like a corridor.</p>
+      <p>We make two hundred and forty watches a year. We could make more. The queue is part of the object, the way waiting is part of music.</p>
+    </div>
+  </section>
+
+  <!-- ═════════ SPECS ═════════ -->
+  <section class="block reveal" id="specs">
+    <div class="block-head">
+      <span class="no">Chapter II</span>
+      <h2>Numbers, <span>quietly.</span></h2>
+    </div>
+    <table class="specs">
+      <tr><th>Reference</th><td>HG-2410 “Midi”</td></tr>
+      <tr><th>Caliber</th><td>H-93, in-house, hand-wound, 217 components, 29 jewels</td></tr>
+      <tr><th>Reserve</th><td>96 hours, twin barrels</td></tr>
+      <tr><th>Frequency</th><td>3 Hz (21,600 vph), free-sprung balance</td></tr>
+      <tr><th>Case</th><td>904L steel, 41mm × 9.8mm, hand-polished bezel</td></tr>
+      <tr><th>Dial</th><td>Hand-lacquered anthracite, applied indices, italics at twelve</td></tr>
+      <tr><th>Crystal</th><td>Sapphire, double anti-reflective, invisible from most angles</td></tr>
+      <tr><th>Water resistance</th><td>5 ATM — rain, regret, champagne</td></tr>
+      <tr><th>Finishing</th><td>Côtes brutes, black-polished screws, warranted for a lifetime of Tuesdays</td></tr>
+    </table>
+  </section>
+
+  <!-- ═════════ STRAPS ═════════ -->
+  <section class="block reveal" id="straps">
+    <div class="block-head">
+      <span class="no">Chapter III</span>
+      <h2>Worn <span>your way.</span></h2>
+    </div>
+    <div>
+      <div class="straps" id="straps-row">
+        <button class="strap-chip" data-grad="linear-gradient(90deg,#151312,#2E2620 22%,#3A2F26 50%,#2E2620 78%,#151312)" aria-pressed="true">
+          <span class="swatch" style="--sw:#3A2F26"></span><b>Calf, Espresso</b>Vegetable-tanned, matte
+        </button>
+        <button class="strap-chip" data-grad="linear-gradient(90deg,#101014,#23232B 22%,#2C2C36 50%,#23232B 78%,#101014)" aria-pressed="false">
+          <span class="swatch" style="--sw:#2C2C36"></span><b>Alligator, Midnight</b>Hand-scaled, soft sheen
+        </button>
+        <button class="strap-chip" data-grad="linear-gradient(90deg,#2A1E18,#5A4436 22%,#6E5342 50%,#5A4436 78%,#2A1E18)" aria-pressed="false">
+          <span class="swatch" style="--sw:#6E5342"></span><b>Suede, Cognac</b>Brushed nap, unlined
+        </button>
+        <button class="strap-chip" data-grad="linear-gradient(90deg,#20242A,#8A8F98 30%,#B9BEC7 50%,#8A8F98 70%,#20242A)" aria-pressed="false">
+          <span class="swatch" style="--sw:#B9BEC7"></span><b>Bracelet, Steel</b>Brushed, five-link
+        </button>
+      </div>
+      <p class="story" style="margin-top:22px">
+        <span style="color:var(--porcelain-dim);font-size:14px">Every strap is cut to length at the atelier and closed with a pin buckle engraved on the underside, where only you will know.</span>
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    <span>HOROLOGÉ<b>.</b> — Geneva · Vallée de Joux</span>
+    <span id="footerClock">—</span>
+    <span>Worn by the patient</span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ————— build the applied indices ————— */
+  var indices = document.getElementById('indices');
+  for (var i = 0; i < 60; i++) {
+    var el = document.createElement('i');
+    var major = i % 5 === 0;
+    el.className = 'idx' + (major ? '' : ' minor');
+    el.style.transform = 'translateX(-50%) rotate(' + (i * 6) + 'deg)';
+    indices.appendChild(el);
+  }
+
+  /* ————— real local time with smooth-sweep seconds ————— */
+  var hHour = document.getElementById('hHour');
+  var hMin  = document.getElementById('hMin');
+  var hSec  = document.getElementById('hSec');
+  var liveTime = document.getElementById('liveTime');
+  var footerClock = document.getElementById('footerClock');
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+
+  function tickTime(){
+    var d = new Date();
+    var s = d.getSeconds() + (reduce ? 0 : d.getMilliseconds() / 1000);
+    var m = d.getMinutes() + s / 60;
+    var h = (d.getHours() % 12) + m / 60;
+
+    var secDeg = s * 6;
+    var minDeg = m * 6;
+    var hourDeg = h * 30;
+
+    hSec.style.transform  = 'rotate(' + secDeg  + 'deg)';
+    hMin.style.transform  = 'rotate(' + minDeg  + 'deg)';
+    hHour.style.transform = 'rotate(' + hourDeg + 'deg)';
+
+    var label = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    liveTime.textContent = label;
+    footerClock.textContent = 'Local time ' + label;
+
+    document.getElementById('dateWin').textContent = String(d.getDate());
+  }
+  tickTime();
+  setInterval(tickTime, reduce ? 1000 : 66);
+
+  /* ————— straps ————— */
+  var chips = Array.prototype.slice.call(document.querySelectorAll('.strap-chip'));
+  var strapTop = document.getElementById('strapTop');
+  var strapBot = document.getElementById('strapBot');
+  chips.forEach(function(chip){
+    chip.addEventListener('click', function(){
+      strapTop.style.background = chip.dataset.grad;
+      strapBot.style.background = chip.dataset.grad;
+      chips.forEach(function(c){ c.setAttribute('aria-pressed', c === chip ? 'true' : 'false'); });
+      var caption = document.getElementById('caption');
+      caption.textContent = 'Calibre H-93 · local time ';
+      var b = document.createElement('b');
+      b.textContent = liveTime.textContent;
+      caption.appendChild(b);
+    });
+  });
+
+  /* ————— exploded view ————— */
+  var watch = document.getElementById('watch');
+  var btn = document.getElementById('explodeBtn');
+  var stage = document.getElementById('stage');
+  btn.addEventListener('click', function(){
+    var on = watch.classList.toggle('exploded');
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    var t = btn.firstChild;
+    btn.lastChild.textContent = on ? 'Return the watch' : 'View the movement';
+  });
+  // gentle 3D sway toward pointer when not exploded
+  stage.addEventListener('pointermove', function(e){
+    if (watch.classList.contains('exploded') || reduce) return;
+    var r = stage.getBoundingClientRect();
+    var dx = (e.clientX - (r.left + r.width/2)) / r.width;
+    var dy = (e.clientY - (r.top + r.height/2)) / r.height;
+    watch.style.transform =
+      'rotateY(' + (dx * 10).toFixed(2) + 'deg) rotateX(' + (-dy * 8).toFixed(2) + 'deg)';
+  });
+  stage.addEventListener('pointerleave', function(){
+    if (!watch.classList.contains('exploded')) watch.style.transform = '';
+  });
+
+  /* ————— reveals ————— */
+  var items = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); }
+      });
+    }, {threshold: 0.15});
+    items.forEach(function(el){ io.observe(el); });
+  } else {
+    items.forEach(function(el){ el.classList.add('in'); });
+  }
+})();
+</script>
+</body>
+</html>

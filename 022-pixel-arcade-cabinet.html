@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CABINET 07 — TILT</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:
+      radial-gradient(ellipse at 50% 30%, #2a2140 0%, #171226 55%, #0b0913 100%);
+    font-family: system-ui, -apple-system, sans-serif;
+    padding:18px; overflow-x:hidden;
+  }
+  .scene { display:flex; flex-direction:column; align-items:center; gap:0; }
+
+  /* ---------- marquee ---------- */
+  .marquee {
+    width:min(560px, 94vw); padding:14px 26px 10px; text-align:center; position:relative;
+    background:linear-gradient(180deg, #3a2b5e, #241a40);
+    border:4px solid #0d0a16; border-bottom:none;
+    border-radius:18px 18px 0 0;
+    box-shadow: inset 0 0 30px rgba(0,0,0,.5), 0 -6px 30px rgba(120,80,255,.25);
+  }
+  .marquee h1 {
+    font-weight:900; letter-spacing:.34em; font-size:clamp(26px, 6vw, 40px); color:#ffe95e;
+    text-shadow: 3px 3px 0 #b3005e, 0 0 22px rgba(255,233,94,.75);
+    text-transform:uppercase;
+  }
+  .marquee .sub { font-size:10px; letter-spacing:.5em; color:#9f8fd8; margin-top:2px; text-transform:uppercase; }
+  .bulbs { display:flex; justify-content:space-between; position:absolute; left:10px; right:10px; bottom:5px; }
+  .bulbs i { width:7px; height:7px; border-radius:50%; background:#ff5db1; box-shadow:0 0 8px #ff5db1; animation:chase 1.1s linear infinite; }
+  .bulbs i:nth-child(2n) { animation-delay:.55s; }
+  @keyframes chase { 0%,45% { opacity:1; } 55%,100% { opacity:.22; } }
+
+  /* ---------- cabinet body ---------- */
+  .cab {
+    width:min(560px, 94vw); position:relative;
+    background:linear-gradient(180deg, #241a40 0%, #1a1330 60%, #120d22 100%);
+    border:4px solid #0d0a16; border-top:none;
+    border-radius:0 0 22px 22px;
+    padding:20px 20px 16px;
+    box-shadow: 0 30px 60px rgba(0,0,0,.6), inset 0 0 40px rgba(0,0,0,.45);
+  }
+  /* side art */
+  .cab::before, .cab::after {
+    content:""; position:absolute; top:0; bottom:0; width:12px;
+    background:
+      linear-gradient(180deg, #ff2e88 0 12%, transparent 12% 25%, #22e0dd 25% 40%, transparent 40% 55%, #ffe95e 55% 68%, transparent 68% 85%, #ff2e88 85% 100%);
+    background-size:100% 34px; opacity:.55;
+  }
+  .cab::before { left:3px; } .cab::after { right:3px; }
+
+  /* ---------- screen bezel ---------- */
+  .bezel {
+    background:#08060d; border:3px solid #2c2148; border-radius:16px;
+    padding:16px; position:relative;
+    box-shadow: inset 0 0 24px #000;
+  }
+  .bezel .brand { position:absolute; top:6px; left:14px; font-size:8px; letter-spacing:.4em; color:#4a3f6e; text-transform:uppercase; }
+  .crt {
+    position:relative; width:100%; aspect-ratio: 4 / 3; background:#050308;
+    border-radius:10px; overflow:hidden;
+    box-shadow: inset 0 0 40px rgba(0,0,0,.9), 0 0 24px rgba(60,255,180,.12);
+  }
+  .crt canvas { width:100%; height:100%; display:block; image-rendering:pixelated; image-rendering:crisp-edges; }
+  .crt .scan { position:absolute; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,.25) 0 2px, transparent 2px 4px);
+    mix-blend-mode:multiply; }
+  .crt .glare { position:absolute; inset:0; pointer-events:none;
+    background: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,.09), transparent 55%); }
+  .crt .curv { position:absolute; inset:0; pointer-events:none; border-radius:10px;
+    box-shadow: inset 0 0 34px 8px rgba(0,0,0,.75); }
+
+  /* ---------- control deck ---------- */
+  .deck {
+    margin-top:16px; background:linear-gradient(180deg, #2c2148, #1d1535);
+    border:3px solid #0d0a16; border-radius:14px; padding:14px 16px;
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    box-shadow: inset 0 2px 0 rgba(255,255,255,.06);
+  }
+  .stick { position:relative; width:74px; height:74px; flex-shrink:0; }
+  .stick .ball {
+    position:absolute; left:50%; top:46%; width:30px; height:30px; margin-left:-15px; margin-top:-15px;
+    border-radius:50%; background:radial-gradient(circle at 34% 30%, #ff8ab5, #e01f7a 60%, #9d0b4e);
+    box-shadow: 0 5px 10px rgba(0,0,0,.6), inset -3px -4px 6px rgba(0,0,0,.35);
+    transition:transform .08s; z-index:2;
+  }
+  .stick .base { position:absolute; left:50%; top:58%; width:52px; height:22px; margin-left:-26px;
+    background:#0d0a16; border-radius:8px 8px 4px 4px; box-shadow:inset 0 -3px 5px #000; }
+  .stick .dir { position:absolute; width:26px; height:26px; border:none; cursor:pointer; z-index:3;
+    background:transparent; }
+  .stick .dir:active + .ball { transform:scale(.92); }
+  .stick .up { left:24px; top:0; } .stick .down { left:24px; bottom:0; }
+  .stick .left { left:0; top:24px; } .stick .right { right:0; top:24px; }
+  .stick .ball.move { transform:translate(var(--dx), var(--dy)) scale(.95); }
+
+  .btns { display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+  .abtn {
+    width:46px; height:46px; border-radius:50%; border:3px solid #0d0a16; cursor:pointer;
+    font:inherit; font-weight:900; color:#150812; font-size:12px; letter-spacing:.05em;
+    box-shadow: 0 5px 0 #06251d, 0 8px 12px rgba(0,0,0,.5);
+    transition:transform .06s, box-shadow .06s; text-transform:uppercase;
+  }
+  .abtn:active { transform:translateY(4px); box-shadow:0 1px 0 #06251d, 0 3px 6px rgba(0,0,0,.5); }
+  .abtn.a { background:radial-gradient(circle at 34% 30%, #7dffd2, #16c79a 60%, #0b8a68); }
+  .abtn.b { background:radial-gradient(circle at 34% 30%, #ffe95e, #f5b942 60%, #b97f16); }
+
+  /* coin door */
+  .coindoor {
+    margin-top:14px; display:flex; align-items:center; justify-content:space-between; gap:12px;
+    background:#0d0a16; border-radius:10px; padding:10px 16px;
+  }
+  .coindoor .slots { display:flex; gap:8px; }
+  .slot { width:34px; height:12px; background:#03020a; border:2px solid #241a40; border-radius:2px; position:relative; overflow:hidden; }
+  .slot::after { content:""; position:absolute; left:50%; top:1px; bottom:1px; width:3px; margin-left:-1.5px;
+    background:#ffe95e; box-shadow:0 0 8px #ffe95e; animation:slotblink 1.6s infinite; }
+  @keyframes slotblink { 0%,80% { opacity:1; } 90%,100% { opacity:.25; } }
+  .coinbtn {
+    border:none; cursor:pointer; font:inherit; font-size:10px; font-weight:800; letter-spacing:.2em;
+    text-transform:uppercase; color:#150812; padding:9px 18px; border-radius:8px;
+    background:linear-gradient(180deg,#ffe95e,#f5b942); box-shadow:0 4px 0 #b97f16, 0 7px 10px rgba(0,0,0,.5);
+    transition:transform .06s, box-shadow .06s;
+  }
+  .coinbtn:active { transform:translateY(3px); box-shadow:0 1px 0 #b97f16; }
+  .credits { font-size:10px; letter-spacing:.24em; color:#9f8fd8; text-transform:uppercase; }
+  .credits b { color:#ffe95e; }
+
+  .hintline { margin-top:12px; text-align:center; font-size:10px; letter-spacing:.2em; color:#6a5f96; text-transform:uppercase; }
+
+  /* coin drop animation */
+  .coin { position:fixed; z-index:99; width:22px; height:22px; border-radius:50%; pointer-events:none;
+    background:radial-gradient(circle at 34% 30%, #fff3b0, #f5b942 60%, #b97f16);
+    box-shadow:0 0 12px rgba(255,233,94,.8); animation:coindrop .5s ease-in forwards; }
+  @keyframes coindrop { to { transform:translateY(70vh) rotate(200deg); opacity:.4; } }
+
+  @media (max-width:480px) {
+    .deck { flex-direction:column; gap:10px; }
+    .btns { justify-content:center; }
+    .stick { align-self:flex-start; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bulbs i, .slot::after { animation:none; }
+  }
+</style>
+</head>
+<body>
+<div class="scene">
+  <div class="marquee">
+    <h1>Tilt</h1>
+    <div class="sub">cabinet 07 · block dodger · est. 1983</div>
+    <div class="bulbs" aria-hidden="true">
+      <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    </div>
+  </div>
+
+  <div class="cab">
+    <div class="bezel">
+      <span class="brand">phosphor&nbsp;co.</span>
+      <div class="crt">
+        <canvas id="game" width="320" height="240"></canvas>
+        <div class="scan"></div><div class="glare"></div><div class="curv"></div>
+      </div>
+    </div>
+
+    <div class="deck">
+      <div class="stick" aria-label="joystick">
+        <button class="dir up" data-k="ArrowUp" aria-label="up"></button>
+        <button class="dir down" data-k="ArrowDown" aria-label="down"></button>
+        <button class="dir left" data-k="ArrowLeft" aria-label="left"></button>
+        <button class="dir right" data-k="ArrowRight" aria-label="right"></button>
+        <div class="ball" id="ball"></div>
+        <div class="base"></div>
+      </div>
+      <div class="btns">
+        <button class="abtn a" id="btnA" aria-label="start or action">go</button>
+        <button class="abtn b" id="btnB" aria-label="coin or alt">alt</button>
+      </div>
+    </div>
+
+    <div class="coindoor">
+      <div class="slots" aria-hidden="true"><span class="slot"></span><span class="slot"></span></div>
+      <button class="coinbtn" id="coinBtn">insert coin · 25¢</button>
+      <div class="credits">credits <b id="credits">0</b></div>
+    </div>
+    <div class="hintline">arrows / joystick to move · c = coin · enter or go = start</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const cv = document.getElementById("game");
+  const g = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  const creditsEl = document.getElementById("credits");
+
+  /* ================= game states: attract | ready | play | over ================= */
+  let mode = "attract";
+  let credits = 0, score = 0, best = 0, t = 0;
+  let player, blocks, spawnT, timeLeft;
+
+  function reset() {
+    player = { x: W / 2 - 6, y: H - 34, w: 12, h: 12, speed: 2.6 };
+    blocks = []; spawnT = 0; score = 0; timeLeft = 30 * 60;
+  }
+
+  /* ---------------- pixel helpers ---------------- */
+  function px(x, y, w, h, c) { g.fillStyle = c; g.fillRect(x | 0, y | 0, w, h); }
+  function text(str, x, y, size, color, align) {
+    g.font = "bold " + size + "px 'Courier New', monospace";
+    g.textAlign = align || "left"; g.textBaseline = "top";
+    g.fillStyle = color; g.fillText(str, x, y);
+  }
+
+  /* ---------------- attract mode ---------------- */
+  const HS = [
+    ["ZAP", 9800], ["REX", 7650], ["AAA", 5100], ["KID", 3400], ["ORB", 2200], ["YOU", 0],
+  ];
+  let fw = [];
+  function spawnFirework() {
+    const cx = 40 + Math.random() * (W - 80), cy = 30 + Math.random() * 60;
+    const hue = Math.floor(Math.random() * 5);
+    const cols = ["#3cffb5", "#ffe95e", "#ff5db1", "#22e0dd", "#ff9d42"];
+    for (let i = 0; i < 26; i++) {
+      const a = (Math.PI * 2 / 26) * i, sp = 0.6 + Math.random() * 1.2;
+      fw.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1, c: cols[hue] });
+    }
+  }
+  function drawAttract() {
+    px(0, 0, W, H, "#050308");
+    /* starfield */
+    for (let i = 0; i < 26; i++) {
+      const sx = (i * 61 + t * 0.2) % W, sy = (i * 37) % 90;
+      px(sx, sy, 1, 1, i % 5 ? "#3cffb5" : "#1a7a58");
+    }
+    /* big title with bounce */
+    const bounce = Math.sin(t / 22) * 3;
+    text("T I L T", W / 2, 34 + bounce, 30, "#ffe95e", "center");
+    text("© 1983 PHOSPHOR CO.", W / 2, 68, 8, "#7f8fb0", "center");
+    /* high score table */
+    text("HIGH SCORES", W / 2, 92, 10, "#3cffb5", "center");
+    HS.forEach((row, i) => {
+      const y = 110 + i * 13;
+      text(row[0], 96, y, 9, row[1] === 0 ? "#9f8fd8" : "#ff5db1");
+      text(String(row[1]).padStart(5, "0"), 224, y, 9, row[1] === 0 ? "#9f8fd8" : "#ffe95e");
+    });
+    /* blinking prompt */
+    if (Math.floor(t / 30) % 2 === 0) {
+      text(credits > 0 ? "PRESS  GO  TO  START" : "INSERT  COIN", W / 2, 200, 10, "#fff", "center");
+    }
+    /* fireworks demo */
+    if (t % 90 === 0 && fw.length < 40) spawnFirework();
+    fw = fw.filter(p => p.life > 0);
+    fw.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.02; p.life -= 0.014;
+      if (p.life > 0) px(p.x, p.y, 2, 2, p.c);
+    });
+  }
+
+  /* ---------------- gameplay ---------------- */
+  const keys = {};
+  window.addEventListener("keydown", (e) => {
+    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)) e.preventDefault();
+    keys[e.key] = true;
+    if (e.key === "c" || e.key === "C") insertCoin();
+    if (e.key === "Enter") pressStart();
+  });
+  window.addEventListener("keyup", (e) => { keys[e.key] = false; });
+
+  document.querySelectorAll(".dir").forEach(b => {
+    const k = b.dataset.k;
+    const set = (v) => (e) => { e.preventDefault(); keys[k] = v; moveBall(); };
+    b.addEventListener("pointerdown", set(true));
+    b.addEventListener("pointerup", set(false));
+    b.addEventListener("pointerleave", set(false));
+  });
+  function moveBall() {
+    const ball = document.getElementById("ball");
+    const dx = (keys.ArrowLeft ? -8 : 0) + (keys.ArrowRight ? 8 : 0);
+    const dy = (keys.ArrowUp ? -8 : 0) + (keys.ArrowDown ? 8 : 0);
+    ball.style.setProperty("--dx", dx + "px");
+    ball.style.setProperty("--dy", dy + "px");
+    ball.classList.toggle("move", dx !== 0 || dy !== 0);
+  }
+
+  function drawPlay() {
+    px(0, 0, W, H, "#050308");
+    /* danger stripes top */
+    for (let x = 0; x < W; x += 8) px(x, 0, 4, 3, "#7a1030");
+    /* side rails */
+    px(0, 0, 2, H, "#1d1535"); px(W - 2, 0, 2, H, "#1d1535");
+    /* timer bar */
+    const pct = timeLeft / (30 * 60);
+    px(4, 6, (W - 8) * pct, 4, pct < 0.25 ? "#ff5555" : "#3cffb5");
+    /* score */
+    text("SC " + String(score).padStart(5, "0"), 6, 14, 9, "#ffe95e");
+    text(Math.ceil(timeLeft / 60) + "s", W - 6, 14, 9, "#3cffb5", "right");
+
+    /* spawn blocks */
+    spawnT--;
+    if (spawnT <= 0) {
+      const speedUp = 1 + (1 - timeLeft / (30 * 60)) * 1.6;
+      blocks.push({
+        x: 8 + Math.random() * (W - 28), y: -10, w: 10 + Math.random() * 14, h: 8 + Math.random() * 8,
+        vy: (0.9 + Math.random() * 1.1) * speedUp, wob: Math.random() * 6.28,
+        c: ["#ff5db1", "#22e0dd", "#ffe95e", "#ff9d42"][Math.floor(Math.random() * 4)],
+      });
+      spawnT = Math.max(14, 34 - (1 - timeLeft / (30 * 60)) * 18);
+    }
+    /* blocks update */
+    blocks = blocks.filter(b => b.y < H + 12);
+    blocks.forEach(b => {
+      b.y += b.vy; b.wob += 0.1;
+      b.x += Math.sin(b.wob) * 0.5;
+      px(b.x, b.y, b.w, b.h, b.c);
+      px(b.x + 2, b.y + 2, b.w - 4, 2, "rgba(255,255,255,.35)");
+    });
+    /* player: 4-dir movement */
+    if (keys.ArrowLeft) player.x -= player.speed;
+    if (keys.ArrowRight) player.x += player.speed;
+    if (keys.ArrowUp) player.y -= player.speed;
+    if (keys.ArrowDown) player.y += player.speed;
+    player.x = Math.max(4, Math.min(W - player.w - 4, player.x));
+    player.y = Math.max(22, Math.min(H - player.h - 6, player.y));
+    /* player sprite (little ship) */
+    px(player.x, player.y, player.w, player.h, "#3cffb5");
+    px(player.x + 3, player.y - 4, 6, 4, "#3cffb5");
+    px(player.x + 4, player.y + player.h, 4, 3, "#0b8a68");
+    /* collision */
+    for (const b of blocks) {
+      if (player.x < b.x + b.w && player.x + player.w > b.x &&
+          player.y < b.y + b.h && player.y + player.h > b.y) {
+        gameOver(); break;
+      }
+    }
+    /* survive scoring */
+    score += 1;
+    timeLeft--;
+    if (timeLeft <= 0) {
+      mode = "over"; overT = 0;
+      if (score > best) best = score;
+    }
+  }
+
+  let overT = 0;
+  function gameOver() {
+    mode = "over"; overT = 0;
+    if (score > best) best = score;
+    clunk();
+  }
+  function drawOver() {
+    px(0, 0, W, H, "#050308");
+    text("GAME OVER", W / 2, 70, 22, "#ff5db1", "center");
+    text("SCORE " + score, W / 2, 104, 12, "#ffe95e", "center");
+    text("BEST  " + best, W / 2, 122, 12, "#3cffb5", "center");
+    overT++;
+    if (overT > 70) {
+      if (credits > 0) text("PRESS GO — CREDIT READY", W / 2, 168, 9, "#fff", "center");
+      else if (Math.floor(t / 30) % 2 === 0) text("INSERT COIN", W / 2, 168, 10, "#fff", "center");
+    }
+  }
+
+  /* ---------------- audio (tiny synth, gesture-gated) ---------------- */
+  let AC = null;
+  function ac() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+    return AC;
+  }
+  function beep(f, dur, type, vol) {
+    const c = ac(); if (!c) return;
+    try {
+      const o = c.createOscillator(), gn = c.createGain();
+      o.type = type || "square"; o.frequency.value = f;
+      gn.gain.setValueAtTime(vol || 0.05, c.currentTime);
+      gn.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + (dur || 0.1));
+      o.connect(gn); gn.connect(c.destination);
+      o.start(); o.stop(c.currentTime + (dur || 0.1) + 0.02);
+    } catch (e) {}
+  }
+  function clunk() { beep(90, 0.22, "square", 0.06); }
+  function coinClink() { beep(988, 0.07, "square", 0.05); setTimeout(() => beep(1319, 0.18, "square", 0.05), 70); }
+
+  /* ---------------- coin / start ---------------- */
+  function insertCoin() {
+    credits++; creditsEl.textContent = credits;
+    coinClink();
+    const c = document.createElement("div");
+    c.className = "coin";
+    const r = document.getElementById("coinBtn").getBoundingClientRect();
+    c.style.left = (r.left + r.width / 2 - 11) + "px";
+    c.style.top = (r.top - 20) + "px";
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 520);
+  }
+  function pressStart() {
+    if (mode === "play") return;
+    if (credits <= 0) { beep(160, 0.12, "sawtooth", 0.04); return; }
+    credits--; creditsEl.textContent = credits;
+    reset(); mode = "play";
+    beep(660, 0.08, "square", 0.05); setTimeout(() => beep(880, 0.12, "square", 0.05), 100);
+  }
+  document.getElementById("coinBtn").addEventListener("click", insertCoin);
+  document.getElementById("btnA").addEventListener("click", pressStart);
+  document.getElementById("btnB").addEventListener("click", () => beep(440, 0.08, "triangle", 0.05));
+
+  /* ---------------- main loop ---------------- */
+  function frame() {
+    if (!document.hidden) {
+      t++;
+      if (mode === "attract") drawAttract();
+      else if (mode === "play") drawPlay();
+      else if (mode === "over") { drawOver(); if (overT === 1) clunk(); }
+    }
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+</script>
+</body>
+</html>

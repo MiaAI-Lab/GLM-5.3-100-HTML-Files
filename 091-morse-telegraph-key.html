@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KEY — a wire to nowhere</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow-x:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:
+      radial-gradient(ellipse at 50% 30%, rgba(120,90,50,.22), transparent 60%),
+      linear-gradient(180deg, #241a10, #170f08);
+    color:#e8dcc8; min-height:100vh;
+    display:flex; flex-direction:column; align-items:center;
+    padding:30px 16px 40px;
+  }
+  .lamp { position:fixed; left:50%; top:0; transform:translateX(-50%); width:52vw; height:30vh;
+    background:radial-gradient(ellipse at 50% 0%, rgba(255,220,160,.14), transparent 70%);
+    pointer-events:none; }
+  h1 { font-weight:400; font-size:26px; letter-spacing:.34em; text-transform:uppercase; color:#e8c98f; }
+  .sub { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.34em; color:#8a795c; text-transform:uppercase; margin:8px 0 30px; }
+
+  /* ---------- desk ---------- */
+  .desk {
+    width:min(680px, 94vw); border-radius:18px; padding:26px 26px 20px; position:relative;
+    background:
+      repeating-linear-gradient(98deg, rgba(0,0,0,.05) 0 2px, transparent 2px 9px),
+      linear-gradient(160deg, #4a3320, #38271562) , linear-gradient(160deg, #4a3320, #33230f);
+    box-shadow: 0 34px 80px rgba(0,0,0,.65), inset 0 2px 0 rgba(255,220,170,.14), inset 0 -4px 10px rgba(0,0,0,.4);
+  }
+  /* the wire */
+  .wire { position:absolute; left:0; right:0; top:64px; height:60px; pointer-events:none; overflow:visible; }
+  .wire svg { width:100%; height:100%; overflow:visible; }
+  .wire .line { fill:none; stroke:#2c2013; stroke-width:2.6; }
+  .wire .pulse { fill:none; stroke:#ffd98a; stroke-width:2.2; stroke-dasharray:6 90; filter:drop-shadow(0 0 4px #ffd98a); animation:hum 2.8s linear infinite; }
+  @keyframes hum { to { stroke-dashoffset:-96; } }
+
+  /* ---------- sounder ---------- */
+  .station { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-top:74px; }
+  .sounder {
+    width:150px; padding:14px 12px 12px; border-radius:12px; text-align:center;
+    background:linear-gradient(160deg, #33241575, transparent), linear-gradient(160deg, #2c2013, #1f150b);
+    box-shadow: inset 0 0 18px rgba(0,0,0,.5), 0 6px 16px rgba(0,0,0,.4);
+  }
+  .sounder .arm {
+    width:86px; height:12px; margin:0 auto 10px; border-radius:6px;
+    background:linear-gradient(180deg, #d8c294, #8a7440);
+    box-shadow:0 3px 6px rgba(0,0,0,.5);
+    transform-origin:50% 0; transition:transform .05s;
+  }
+  .sounder .arm.down { transform:rotateX(28deg) translateY(3px); }
+  .sounder .anvil { width:64px; height:8px; margin:0 auto; border-radius:3px; background:#5a4530; }
+  .sounder .glow {
+    width:10px; height:10px; border-radius:50%; margin:10px auto 4px;
+    background:#3a2c1c; transition:all .06s;
+  }
+  .sounder .glow.on { background:#ffd98a; box-shadow:0 0 14px #ffd98a; }
+  .sounder .cap { font-family:system-ui, sans-serif; font-size:8px; letter-spacing:.3em; color:#8a795c; text-transform:uppercase; }
+
+  /* ---------- the key ---------- */
+  .keybase {
+    width:200px; padding:16px 16px 14px; border-radius:14px; text-align:center;
+    background:linear-gradient(160deg, #3a2c1c, #241a10);
+    box-shadow: 0 10px 26px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,220,170,.12);
+    user-select:none; -webkit-user-select:none;
+  }
+  .keybase .knob {
+    width:64px; height:64px; border-radius:50%; margin:0 auto 12px; cursor:pointer;
+    background:radial-gradient(circle at 36% 30%, #f0dcae, #c9a45e 55%, #8a6e34);
+    box-shadow: 0 8px 18px rgba(0,0,0,.55), inset 0 -4px 8px rgba(90,60,10,.5), inset 0 3px 6px rgba(255,245,220,.6);
+    transition:transform .05s, box-shadow .05s;
+    position:relative; touch-action:none;
+  }
+  .keybase .knob::after {
+    content:""; position:absolute; left:50%; top:50%; width:14px; height:14px; margin:-7px 0 0 -7px;
+    border-radius:50%; background:radial-gradient(circle at 40% 35%, #fff4d0, #b8934a);
+  }
+  .keybase .knob.down { transform:translateY(3px); box-shadow:0 3px 8px rgba(0,0,0,.55), inset 0 4px 10px rgba(90,60,10,.6); }
+  .keybase .cap { font-family:system-ui, sans-serif; font-size:8px; letter-spacing:.26em; color:#8a795c; text-transform:uppercase; }
+
+  /* ---------- tape + decoder ---------- */
+  .lower { display:flex; gap:18px; margin-top:22px; align-items:stretch; flex-wrap:wrap; }
+  .pane {
+    flex:1; min-width:240px; border-radius:12px; padding:14px 16px;
+    background:rgba(20,14,8,.55); border:1px solid rgba(232,201,143,.18);
+  }
+  .pane h3 { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.3em; color:#8a795c; text-transform:uppercase; margin-bottom:10px; font-weight:500; }
+  .tape {
+    height:44px; background:#efe6d0; border-radius:6px; overflow:hidden; position:relative;
+    box-shadow:inset 0 2px 8px rgba(0,0,0,.4);
+  }
+  .tape .strip {
+    position:absolute; top:0; bottom:0; left:0; white-space:nowrap; display:flex; align-items:center; gap:0;
+    font-family:"Courier New", monospace; font-size:30px; color:#2c2013; letter-spacing:1px;
+    will-change:transform;
+  }
+  .tape .strip span { padding:0 1px; }
+  .decoded {
+    font-family:"Courier New", monospace; font-size:15px; color:#ffd98a; min-height:22px; letter-spacing:.14em;
+    word-break:break-all;
+  }
+  .decoded .cur { animation:cur .9s steps(1) infinite; }
+  @keyframes cur { 50% { opacity:0; } }
+  .slip {
+    font-family:Georgia, serif; font-style:italic; font-size:13px; color:#cbb890; line-height:1.8;
+    min-height:60px;
+  }
+  .farstation { font-size:11px; color:#8a795c; margin-top:8px; font-family:system-ui, sans-serif; letter-spacing:.08em; }
+
+  /* practice */
+  .practice { margin-top:16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .practice button {
+    background:rgba(232,201,143,.1); color:#e8c98f; border:1px solid rgba(232,201,143,.35);
+    border-radius:999px; font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.18em;
+    text-transform:uppercase; padding:8px 14px; cursor:pointer; transition:all .15s;
+  }
+  .practice button:hover { background:rgba(232,201,143,.22); }
+  .practice .phrase { font-family:"Courier New", monospace; font-size:13px; color:#cbb890; letter-spacing:.2em; }
+  .tip { margin-top:16px; font-family:system-ui, sans-serif; font-size:9.5px; letter-spacing:.14em; color:#6a5c44; text-transform:uppercase; }
+  @media (max-width:560px) {
+    .station { flex-direction:column; }
+    .wire { display:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="lamp"></div>
+  <h1>Key</h1>
+  <div class="sub">a wire to nowhere · duplex circuit · est. 1912</div>
+
+  <div class="desk">
+    <div class="wire" aria-hidden="true">
+      <svg viewBox="0 0 680 60" preserveAspectRatio="none">
+        <path class="line" d="M0 8 Q 170 52 340 22 T 680 10"/>
+        <path class="pulse" d="M0 8 Q 170 52 340 22 T 680 10"/>
+      </svg>
+    </div>
+
+    <div class="station">
+      <div class="sounder">
+        <div class="arm" id="arm"></div>
+        <div class="anvil"></div>
+        <div class="glow" id="glow"></div>
+        <div class="cap">sounder</div>
+      </div>
+      <div class="keybase">
+        <div class="knob" id="knob" role="button" tabindex="0" aria-label="telegraph key — hold to transmit"></div>
+        <div class="cap">brass key · tap or space</div>
+      </div>
+    </div>
+
+    <div class="lower">
+      <div class="pane">
+        <h3>paper tape</h3>
+        <div class="tape"><div class="strip" id="strip"></div></div>
+      </div>
+      <div class="pane">
+        <h3>decoder</h3>
+        <div class="decoded" id="decoded"><span class="cur">_</span></div>
+        <div class="slip" id="slip">The line is open. Somewhere down the wire, an old operator is listening for your fist.</div>
+        <div class="farstation" id="far">distant station: idle</div>
+      </div>
+    </div>
+
+    <div class="practice">
+      <button id="trainBtn">practice: sos</button>
+      <span class="phrase" id="phrase">···&nbsp;&nbsp;— — —&nbsp;&nbsp;···</span>
+      <span class="tip" style="margin-left:auto">short tap = dit · hold = dah</span>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const knob = $("knob"), arm = $("arm"), glow = $("glow");
+  let downAt = 0, keyed = false;
+  let tapeSymbols = [];
+  const strip = $("strip");
+  let stripOff = 0;
+  let decodeBuf = "";
+  let lastKeyUp = 0;
+
+  /* ---------- morse tables ---------- */
+  const M = { ".-":"A","-...":"B","-.-.":"C","-..":"D",".":"E","..-.":"F","--.":"G","....":"H","..":"I",".---":"J","-.-":"K",".-..":"L","--":"M","-.":"N","---":"O",".--.":"P","--.-":"Q",".-.":"R","...":"S","-":"T","..-":"U","...-":"V",".--":"W","-..-":"X","-.--":"Y","--..":"Z" };
+  const MORSE = { A:".-",B:"-...",C:"-.-.",D:"-..",E:".",F:"..-.",G:"--.",H:"....",I:"..",J:".---",K:"-.-",L:".-..",M:"--",N:"-.",O:"---",P:".--.",Q:"--.-",R:".-.",S:"...",T:"-",U:"..-",V:"...-",W:".--",X:"-..-",Y:"-.--",Z:"--.." };
+
+  /* ---------- audio ---------- */
+  let AC = null;
+  function ac() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+    return AC;
+  }
+  let osc = null, oscGain = null;
+  function startTone() {
+    const c = ac(); if (!c || osc) return;
+    try {
+      osc = c.createOscillator(); oscGain = c.createGain();
+      osc.type = "square"; osc.frequency.value = 620;
+      oscGain.gain.value = 0;
+      const f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 1200;
+      osc.connect(f); f.connect(oscGain); oscGain.connect(c.destination);
+      osc.start();
+      oscGain.gain.setTargetAtTime(0.045, c.currentTime, 0.004);
+    } catch (e) { osc = null; }
+  }
+  function stopTone() {
+    if (!osc || !AC) return;
+    try {
+      oscGain.gain.setTargetAtTime(0, AC.currentTime, 0.006);
+      const o = osc; osc = null;
+      setTimeout(() => { try { o.stop(); } catch (e) {} }, 60);
+    } catch (e) { osc = null; }
+  }
+
+  /* ---------- keying ---------- */
+  function keyDown() {
+    if (keyed) return;
+    keyed = true;
+    downAt = performance.now();
+    knob.classList.add("down");
+    arm.classList.add("down");
+    glow.classList.add("on");
+    startTone();
+  }
+  function keyUp() {
+    if (!keyed) return;
+    keyed = false;
+    const dur = performance.now() - downAt;
+    knob.classList.remove("down");
+    arm.classList.remove("down");
+    glow.classList.remove("on");
+    stopTone();
+    /* dit < 140ms, dah >= 140ms (forgiving) */
+    const sym = dur < 140 ? "·" : "—";
+    tapeSymbols.push(sym);
+    decodeBuf += dur < 140 ? "." : "-";
+    appendStrip(sym);
+    lastKeyUp = performance.now();
+  }
+  knob.addEventListener("pointerdown", (e) => { e.preventDefault(); keyDown(); });
+  addEventListener("pointerup", keyUp);
+  knob.addEventListener("keydown", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); keyDown(); } });
+  knob.addEventListener("keyup", (e) => { if (e.key === " " || e.key === "Enter") keyUp(); });
+  addEventListener("keydown", (e) => {
+    if (e.code === "Space" && !e.repeat && e.target === document.body) { e.preventDefault(); keyDown(); }
+  });
+  addEventListener("keyup", (e) => {
+    if (e.code === "Space" && e.target === document.body) keyUp();
+  });
+
+  /* ---------- tape ---------- */
+  function appendStrip(sym) {
+    const s = document.createElement("span");
+    s.textContent = sym;
+    strip.appendChild(s);
+    /* auto-scroll */
+    requestAnimationFrame(() => {
+      const tape = strip.parentElement;
+      const over = strip.scrollWidth - tape.clientWidth;
+      if (over > 0) strip.style.transform = "translateX(" + (-over) + "px)";
+    });
+    if (tapeSymbols.length > 90) {
+      strip.removeChild(strip.firstChild);
+      tapeSymbols.shift();
+    }
+  }
+
+  /* ---------- decoder (gap timing) ---------- */
+  setInterval(() => {
+    if (!decodeBuf) {
+      /* letter gap: nothing keyed for > 1.4s and buffer empty → word space */
+      return;
+    }
+    const idle = performance.now() - lastKeyUp;
+    if (idle > 700) {
+      /* letter gap → decode letter */
+      const ch = M[decodeBuf];
+      const d = $("decoded");
+      if (ch) {
+        d.insertBefore(document.createTextNode(ch), d.querySelector(".cur"));
+      } else {
+        d.insertBefore(document.createTextNode("?"), d.querySelector(".cur"));
+      }
+      decodeBuf = "";
+      tapeSymbols = [];
+      appendStrip(" ");
+    }
+  }, 100);
+
+  /* ---------- far station replies ---------- */
+  const FAR_LINES = [
+    "GN OM — GOOD NIGHT, OLD MAN. WX COLD HERE TONIGHT.",
+    "R R — ROGER ROGER. YOUR FIST IS GETTING BETTER.",
+    "HW COPY? — HOW DO YOU COPY? THE WIRE HUMS.",
+    "73 — BEST REGARDS. KEEP THE KEY WARM.",
+    "CQ CQ — CALLING ANYONE. ALWAYS ANYONE.",
+  ];
+  function farStationReply() {
+    const pick = FAR_LINES[Math.floor(Math.random() * FAR_LINES.length)];
+    $("far").textContent = "distant station: sending…";
+    /* punch their message onto the tape with human-imperfect rhythm */
+    let morse = "";
+    [...pick.split(" — ")[0]].forEach(ch => {
+      if (MORSE[ch]) morse += MORSE[ch] + " ";
+      else morse += "  ";
+    });
+    let i = 0;
+    const iv = setInterval(() => {
+      if (i >= morse.length) {
+        clearInterval(iv);
+        $("far").textContent = "distant station: " + pick.split(" — ")[1].toLowerCase();
+        $("slip").textContent = "«" + pick.split(" — ")[0] + "» — " + pick.split(" — ")[1].toLowerCase();
+        return;
+      }
+      const ch = morse[i++];
+      if (ch === "." || ch === "-") appendStrip(ch === "." ? "·" : "—");
+      else if (ch === " ") appendStrip(" ");
+      /* sounder clacks along */
+      if (ch === "." || ch === "-") {
+        arm.classList.add("down"); glow.classList.add("on");
+        setTimeout(() => { arm.classList.remove("down"); glow.classList.remove("on"); }, ch === "." ? 60 : 140);
+      }
+    }, 90 + Math.random() * 70);
+  }
+  /* the far station answers your activity */
+  let keyCount = 0;
+  const origKeyDown = keyDown;
+  keyDown = function () {
+    origKeyDown();
+    keyCount++;
+    if (keyCount === 14) {
+      setTimeout(farStationReply, 2600);
+      keyCount = 0;
+    }
+  };
+
+  /* ---------- practice: sos ---------- */
+  $("trainBtn").addEventListener("click", () => {
+    $("phrase").textContent = "listen…";
+    const SOS = "... --- ...";
+    let i = 0;
+    let wait = 300;
+    const seq = [];
+    [...SOS].forEach(ch => {
+      if (ch === ".") seq.push([80, 120]);
+      else if (ch === "-") seq.push([220, 120]);
+      else seq.push([0, 260]);
+    });
+    function play() {
+      if (i >= seq.length) { $("phrase").textContent = "···  — — —  ···"; return; }
+      const [dur, gap] = seq[i++];
+      if (dur > 0) {
+        arm.classList.add("down"); glow.classList.add("on");
+        /* faint audible copy of the far lesson */
+        setTimeout(() => { arm.classList.remove("down"); glow.classList.remove("on"); }, dur);
+      }
+      setTimeout(play, dur + gap);
+    }
+    play();
+  });
+})();
+</script>
+</body>
+</html>

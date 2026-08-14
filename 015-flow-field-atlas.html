@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DRIFT — a flow field atlas</title>
+<style>
+  :root{
+    --paper:#101014; --paper-2:#17171d;
+    --text:#E9E4D8; --dim:#9A948A;
+    --hair:rgba(233,228,216,.16);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    background:var(--paper); color:var(--text);
+    overflow:hidden;
+  }
+  #field{
+    position:fixed; inset:0; display:block;
+    cursor:crosshair; touch-action:none;
+  }
+  /* ---------- gallery plaque ---------- */
+  .plaque{
+    position:fixed; z-index:5; left:1.4rem; bottom:1.4rem;
+    max-width:min(21rem, 72vw);
+    background:rgba(16,16,20,.82); backdrop-filter:blur(8px);
+    border:1px solid var(--hair); border-radius:2px;
+    padding:.85rem 1rem .8rem;
+    box-shadow:0 10px 40px rgba(0,0,0,.5);
+    transition:opacity .4s, transform .4s;
+  }
+  .plaque .no{
+    font-family:Georgia,"Times New Roman",serif; font-style:italic;
+    font-size:.72rem; letter-spacing:.08em; color:var(--dim);
+  }
+  .plaque h1{
+    font-family:Georgia,serif; font-weight:400;
+    font-size:1.55rem; letter-spacing:.24em; margin:.2rem 0 .45rem;
+  }
+  .plaque .meta{
+    font-family:"Courier New",monospace; font-size:.62rem;
+    letter-spacing:.14em; color:var(--dim); line-height:1.8;
+  }
+  .plaque .meta b{color:var(--text); font-weight:400}
+  /* ---------- right-side console ---------- */
+  .console{
+    position:fixed; z-index:5; right:1.4rem; top:1.4rem;
+    display:flex; flex-direction:column; gap:.55rem; align-items:flex-end;
+    font-family:"Courier New",monospace;
+  }
+  .chips{display:flex; gap:.35rem; flex-wrap:wrap; justify-content:flex-end}
+  .chip{
+    font-family:inherit; font-size:.6rem; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--text);
+    background:rgba(23,23,29,.8); border:1px solid var(--hair);
+    border-radius:2px; padding:.34rem .7rem; cursor:pointer;
+    transition:border-color .15s, background .15s, color .15s;
+  }
+  .chip:hover{border-color:rgba(233,228,216,.5)}
+  .chip:focus-visible{outline:2px solid #fff; outline-offset:2px}
+  .chip[aria-pressed="true"]{background:var(--text); color:#101014; border-color:var(--text)}
+  .chip.reseed{color:#FFB27A}
+  .chip.reseed:hover{border-color:#FFB27A}
+  .chip.reseed[aria-pressed="true"]{background:#FFB27A; border-color:#FFB27A; color:#101014}
+  .stat{
+    font-size:.6rem; letter-spacing:.16em; color:var(--dim);
+    text-align:right; line-height:1.75;
+  }
+  .stat b{color:var(--text); font-weight:400}
+  .hint{
+    position:fixed; z-index:5; left:50%; bottom:1.5rem; transform:translateX(-50%);
+    font-family:"Courier New",monospace; font-size:.6rem; letter-spacing:.22em;
+    color:var(--dim); text-transform:uppercase; white-space:nowrap;
+    transition:opacity 1s; pointer-events:none;
+  }
+  .hint.gone{opacity:0}
+  .edge-marks{
+    position:fixed; z-index:4; inset:1.4rem; pointer-events:none;
+    border:1px solid rgba(233,228,216,.07);
+  }
+  .edge-marks::before,.edge-marks::after{
+    content:""; position:absolute; background:rgba(233,228,216,.18);
+  }
+  .edge-marks::before{left:50%; top:-1px; width:1px; height:14px}
+  .edge-marks::after{left:50%; bottom:-1px; width:1px; height:14px}
+  .corner{
+    position:fixed; z-index:4; font-family:"Courier New",monospace;
+    font-size:.56rem; letter-spacing:.2em; color:rgba(233,228,216,.35);
+    text-transform:uppercase; pointer-events:none;
+  }
+  .corner.tl{top:1.55rem; left:1.6rem}
+  .corner.tr{top:1.55rem; right:1.6rem; display:none}
+  @media (max-width:640px){
+    .plaque{left:.8rem; bottom:.8rem; padding:.65rem .8rem .6rem; max-width:62vw}
+    .plaque h1{font-size:1.15rem}
+    .console{right:.8rem; top:.8rem; gap:.4rem}
+    .hint{display:none}
+    .corner.tl{top:.95rem; left:.95rem}
+    .edge-marks{inset:.8rem}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .plaque{transition:none}
+  }
+</style>
+</head>
+<body>
+  <canvas id="field" aria-label="Flow field particle atlas. Move the pointer to stir turbulence, press R for a new plate."></canvas>
+  <div class="edge-marks" aria-hidden="true"></div>
+  <span class="corner tl" id="cornerTL">DRIFT · atlas of flow · N° <span id="plateNo">17</span></span>
+
+  <div class="console">
+    <div class="chips" role="group" aria-label="Palette and plate controls">
+      <button class="chip pal" data-pal="deep"  aria-pressed="true">Deep-sea</button>
+      <button class="chip pal" data-pal="ember" aria-pressed="false">Ember</button>
+      <button class="chip pal" data-pal="glacier" aria-pressed="false">Glacier</button>
+      <button class="chip pal" data-pal="orchid" aria-pressed="false">Orchid</button>
+      <button class="chip reseed" id="btnSeed" aria-pressed="false" title="Reseed (R)">↻ New plate</button>
+      <button class="chip" id="btnPause" aria-pressed="false" title="Pause (space)">❚❚ Pause</button>
+    </div>
+    <div class="stat">
+      <b id="stPart">0</b> particles · <b id="stFps">60</b> fps<br>
+      seed <b id="stSeed">000000</b> · drift <b id="stDrift">0.00</b>
+    </div>
+  </div>
+
+  <aside class="plaque" id="plaque">
+    <p class="no">Plate <span id="plNo">No. 17</span> — unnumbered edition</p>
+    <h1>DRIFT</h1>
+    <p class="meta">
+      a flow field atlas<br>
+      value-noise advection · <span id="plPal">deep-sea</span><br>
+      stirred by hand · <b id="plDate">—</b>
+    </p>
+  </aside>
+
+  <p class="hint" id="hint">move to stir · press R for a new plate · click a palette to restain</p>
+<script>
+"use strict";
+(function(){
+  const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const cvs = document.getElementById("field");
+  const ctx = cvs.getContext("2d", {alpha:false});
+  const $ = id=>document.getElementById(id);
+  const el = {
+    part:$("stPart"), fps:$("stFps"), seed:$("stSeed"), drift:$("stDrift"),
+    plateNo:$("plateNo"), plNo:$("plNo"), plPal:$("plPal"), plDate:$("plDate"),
+    hint:$("hint")
+  };
+
+  /* ---------- palettes ---------- */
+  const PALETTES={
+    deep:   {name:"deep-sea", bg:"#05070E", stops:[
+      [0,[64,120,170]],[0.35,[36,80,140]],[0.7,[22,44,96]],[1,[130,180,220]]]},
+    ember:  {name:"ember", bg:"#0E0503", stops:[
+      [0,[96,26,10]],[0.4,[178,58,16]],[0.75,[232,120,40]],[1,[255,196,120]]]},
+    glacier:{name:"glacier", bg:"#060A0C", stops:[
+      [0,[30,64,74]],[0.4,[74,134,148]],[0.75,[150,196,205]],[1,[230,248,252]]]},
+    orchid: {name:"orchid", bg:"#0B0612", stops:[
+      [0,[64,28,104]],[0.4,[124,52,158]],[0.75,[196,108,196]],[1,[240,190,250]]]}
+  };
+  let palKey="deep";
+  function stain(u){
+    // u∈[0,1] through palette gradient with slight per-plate hue wobble
+    const st=PALETTES[palKey].stops;
+    const w=Math.sin(plateSeed*0.7)*0.06;
+    u=clamp(u+w*0.5,0,1);
+    for(let i=0;i<st.length-1;i++){
+      const a=st[i], b=st[i+1];
+      if(u>=a[0] && u<=b[0]){
+        const f=(u-a[0])/Math.max(1e-6,(b[0]-a[0]));
+        return [ a[1][0]+(b[1][0]-a[1][0])*f | 0,
+                 a[1][1]+(b[1][1]-a[1][1])*f | 0,
+                 a[1][2]+(b[1][2]-a[1][2])*f | 0 ];
+      }
+    }
+    return st[st.length-1][1];
+  }
+  const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+
+  /* ---------- hand-rolled value noise ---------- */
+  let P=new Uint8Array(512);
+  function reseedPerm(seed){
+    let s=seed>>>0;
+    const rnd=()=>{ s^=s<<13; s>>>=0; s^=s>>17; s^=s<<5; s>>>=0; return s/4294967296; };
+    const perm=new Uint8Array(256);
+    for(let i=0;i<256;i++) perm[i]=i;
+    for(let i=255;i>0;i--){
+      const j=(rnd()*(i+1))|0;
+      const t=perm[i]; perm[i]=perm[j]; perm[j]=t;
+    }
+    for(let i=0;i<512;i++) P[i]=perm[i&255];
+  }
+  const fade=t=>t*t*(3-2*t);
+  function vnoise(x,y){
+    const xi=Math.floor(x)&255, yi=Math.floor(y)&255;
+    const xf=x-Math.floor(x), yf=y-Math.floor(y);
+    const u=fade(xf), v=fade(yf);
+    const aa=P[P[xi]+yi], ab=P[P[xi]+yi+1];
+    const ba=P[P[xi+1]+yi], bb=P[P[xi+1]+yi+1];
+    const lerp=(a,b,t)=>a+(b-a)*t;
+    const h=(n)=>n/255;
+    return lerp( lerp(h(aa),h(ba),u), lerp(h(ab),h(bb),u), v ); // 0..1
+  }
+  // curl-ish flow angle from two noise probes: divergence-free feel
+  function flowAngle(x,y,z){
+    const e=0.35;
+    const n1=vnoise(x*0.9, y*0.9+z);
+    const n2=vnoise(x*0.9+e, y*0.9+e*0.7+z*1.3);
+    const n3=vnoise(x*0.45+7.3, y*0.45+z*0.6);
+    return (n1*4.2 + n2*2.4 + n3*3.6)*Math.PI*2;
+  }
+
+  /* ---------- particles ---------- */
+  let W=0,H=0,DPR=1;
+  let particles=[];
+  let targetCount=2600;
+  let plateNo=17, plateSeed=1337;
+  let zDrift=0;
+  let paused=false, running=true;
+  let pointer={x:-1e4,y:-1e4,vx:0,vy:0,active:false};
+
+  function spawn(p){
+    p=p||{};
+    p.x=Math.random()*W; p.y=Math.random()*H;
+    p.age=0; p.life=90+Math.random()*240;
+    p.px=p.x; p.py=p.y;
+    p.speed=0.5+Math.random()*1.1;
+    p.u=Math.random();               // colour position
+    p.w=Math.random()<0.85?1:1.6;    // rare thick bristles
+    return p;
+  }
+  function fitParticles(){
+    const px=Math.round(W*DPR), py=Math.round(H*DPR);
+    const densityBudget=(px*py)/900;   // scale with real pixels
+    targetCount=clamp(Math.round(densityBudget*0.32),700,5200);
+    while(particles.length<targetCount) particles.push(spawn());
+    particles.length=Math.min(particles.length,targetCount);
+    el.part.textContent=particles.length;
+  }
+  function resize(){
+    const r=cvs.getBoundingClientRect();
+    DPR=Math.min(window.devicePixelRatio||1,2);
+    W=r.width; H=r.height;
+    cvs.width=Math.round(W*DPR); cvs.height=Math.round(H*DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    ctx.fillStyle=PALETTES[palKey].bg;
+    ctx.fillRect(0,0,W,H);
+    fitParticles();
+  }
+  window.addEventListener("resize",resize);
+
+  /* ---------- new plate ---------- */
+  function newPlate(keepNo){
+    if(!keepNo){ plateNo++; }
+    plateSeed=(Math.random()*4294967295)>>>0;
+    reseedPerm(plateSeed);
+    zDrift=0;
+    particles.length=0;
+    fitParticles();
+    ctx.fillStyle=PALETTES[palKey].bg;
+    ctx.fillRect(0,0,W,H);
+    el.plateNo.textContent=plateNo;
+    el.plNo.textContent="No. "+plateNo;
+    el.seed.textContent=String(plateSeed%1000000).padStart(6,"0");
+    el.plPal.textContent=PALETTES[palKey].name;
+  }
+  function setPalette(k){
+    if(!PALETTES[k]) return;
+    palKey=k;
+    document.querySelectorAll(".chip.pal").forEach(b=>
+      b.setAttribute("aria-pressed",String(b.dataset.pal===k)));
+    // restain: tint existing canvas toward new bg, keep the painting
+    ctx.fillStyle=PALETTES[k].bg;
+    ctx.globalAlpha=0.55; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1;
+    el.plPal.textContent=PALETTES[k].name;
+    for(const p of particles) p.u=Math.random();
+  }
+
+  /* ---------- controls ---------- */
+  document.querySelectorAll(".chip.pal").forEach(b=>{
+    b.addEventListener("click",()=>setPalette(b.dataset.pal));
+  });
+  const btnSeed=$("btnSeed"), btnPause=$("btnPause");
+  btnSeed.addEventListener("click",()=>{
+    newPlate(false);
+    btnSeed.setAttribute("aria-pressed","true");
+    setTimeout(()=>btnSeed.setAttribute("aria-pressed","false"),350);
+  });
+  btnPause.addEventListener("click",()=>{
+    paused=!paused;
+    btnPause.setAttribute("aria-pressed",String(paused));
+    btnPause.textContent=paused?"▶ Resume":"❚❚ Pause";
+  });
+  document.addEventListener("keydown",e=>{
+    if(e.target.closest("input,textarea")) return;
+    if(e.key==="r"||e.key==="R") btnSeed.click();
+    if(e.key===" "){ e.preventDefault(); btnPause.click(); }
+  });
+
+  /* ---------- pointer turbulence ---------- */
+  let lastPX=null,lastPY=null,lastPT=0;
+  cvs.addEventListener("pointermove",e=>{
+    const r=cvs.getBoundingClientRect();
+    const x=e.clientX-r.left, y=e.clientY-r.top;
+    const now=performance.now();
+    if(lastPX!==null){
+      const dt=Math.max(16,now-lastPT);
+      pointer.vx=clamp((x-lastPX)/dt*8,-14,14);
+      pointer.vy=clamp((y-lastPY)/dt*8,-14,14);
+    }
+    lastPX=x; lastPY=y; lastPT=now;
+    pointer.x=x; pointer.y=y; pointer.active=true;
+    el.hint.classList.add("gone");
+  });
+  cvs.addEventListener("pointerleave",()=>{ pointer.active=false; pointer.x=-1e4; pointer.y=-1e4; });
+
+  /* ---------- adaptive quality ---------- */
+  let fpsAcc=0, fpsN=0, fpsShown=60, lastAdapt=0;
+  function adapt(now){
+    fpsAcc+=1; fpsN++;
+    if(now-lastAdapt>1500){
+      const fps=fpsN/((now-lastAdapt)/1000);
+      fpsShown=Math.round(fps);
+      el.fps.textContent=fpsShown;
+      if(fps<44 && targetCount>700){
+        targetCount=Math.max(700,Math.round(targetCount*0.88));
+        particles.length=Math.min(particles.length,targetCount);
+        el.part.textContent=particles.length;
+      } else if(fps>56 && particles.length<clamp(Math.round((W*DPR*H*DPR)/900*0.32),700,5200)){
+        targetCount=Math.min(clamp(Math.round((W*DPR*H*DPR)/900*0.32),700,5200),targetCount+120);
+        while(particles.length<targetCount) particles.push(spawn());
+        el.part.textContent=particles.length;
+      }
+      lastAdapt=now; fpsN=0;
+    }
+  }
+
+  /* ---------- advection ---------- */
+  const SCALE=0.0032;   // spatial noise scale
+  function step(dt){
+    zDrift+=dt*0.045;
+    el.drift.textContent=zDrift.toFixed(2);
+    const sx=SCALE*(1+Math.sin(plateSeed%13)*0.002);
+    // trail translucent wash so density builds
+    ctx.globalAlpha=1;
+    ctx.lineWidth=1;
+    let c;
+    for(let i=0;i<particles.length;i++){
+      const p=particles[i];
+      p.px=p.x; p.py=p.y;
+      const a=flowAngle(p.x*sx, p.y*sx, zDrift);
+      let vx=Math.cos(a)*p.speed, vy=Math.sin(a)*p.speed;
+      // pointer turbulence: swirl + push
+      if(pointer.active){
+        const dx=p.x-pointer.x, dy=p.y-pointer.y;
+        const d2=dx*dx+dy*dy;
+        if(d2<32400){ // 180px radius
+          const d=Math.sqrt(d2)+1e-3;
+          const f=(1-d/180);
+          // tangential swirl + velocity push
+          vx += (-dy/d)*f*f*3.4 + pointer.vx*f*0.22;
+          vy += ( dx/d)*f*f*3.4 + pointer.vy*f*0.22;
+        }
+      }
+      p.x+=vx*dt; p.y+=vy*dt;
+      p.age+=dt;
+      // wrap edges (re-enter as new life)
+      if(p.x<-8||p.x>W+8||p.y<-8||p.y>H+8||p.age>p.life){
+        spawn(p);
+        continue;
+      }
+      const lifeF=1-p.age/p.life;
+      c=stain(p.u);
+      ctx.strokeStyle="rgba("+c[0]+","+c[1]+","+c[2]+","+(0.05+0.30*lifeF).toFixed(3)+")";
+      ctx.beginPath();
+      ctx.moveTo(p.px,p.py);
+      ctx.lineTo(p.x,p.y);
+      ctx.stroke();
+    }
+  }
+
+  /* ---------- slow palette rotation (opt-out via reduced motion) ---------- */
+  let rotTimer=0;
+  const ROT=["deep","ember","glacier","orchid"];
+  function autoRotate(dt){
+    if(REDUCED) return;
+    rotTimer+=dt;
+    if(rotTimer>75){
+      rotTimer=0;
+      const idx=(ROT.indexOf(palKey)+1)%ROT.length;
+      setPalette(ROT[idx]);
+    }
+  }
+
+  /* ---------- main loop ---------- */
+  let lastTs=performance.now();
+  function loop(now){
+    requestAnimationFrame(loop);
+    if(!running){ lastTs=now; return; }
+    const dt=Math.min(48,now-lastTs)/16.6667; lastTs=now;  // ~frames unit
+    adapt(now);
+    if(!paused){
+      step(dt);
+      autoRotate(dt/60);
+    }
+  }
+  document.addEventListener("visibilitychange",()=>{ running=!document.hidden; });
+
+  /* ---------- init ---------- */
+  resize();
+  newPlate(true);   // keep plate 17 as opening number
+  el.plDate.textContent=new Date().toISOString().slice(0,10).replace(/-/g,".");
+  // opening favour: pre-drift some strokes so first paint already paints
+  for(let k=0;k<50;k++) step(1.6);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

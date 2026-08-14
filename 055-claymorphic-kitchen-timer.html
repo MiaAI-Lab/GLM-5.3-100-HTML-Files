@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DOUGH TIME — a claymorphic kitchen companion</title>
+<style>
+:root{
+  --butter:#fdf3dc; --cream:#fff9ee; --pist:#cfe3b4; --pist2:#b7d496;
+  --straw:#ffd9e0; --straw2:#ffb9c8; --brown:#a97b58; --brown2:#8a6244;
+  --ink:#6f5747;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:"Segoe UI Rounded","Segoe UI","Nunito",system-ui,sans-serif;
+  background:
+    radial-gradient(120% 90% at 70% 10%, #fffdf6 0%, var(--butter) 60%, #f7e8c4 100%);
+  color:var(--ink); overflow:hidden;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:clamp(14px,3vh,30px); user-select:none; -webkit-user-select:none;
+  padding:clamp(12px,3vh,28px);
+}
+h1{font-size:clamp(20px,4vw,38px); font-weight:800; letter-spacing:.02em;
+  color:var(--brown2); text-shadow:0 2px 0 #fff9, 0 6px 14px #d9bfa088}
+h1 small{display:block; font-size:.32em; letter-spacing:.5em; font-weight:700;
+  color:#c2a487; margin-top:.5em; text-shadow:none}
+/* ---------- blob timer ---------- */
+.blobwrap{position:relative; touch-action:none; cursor:grab}
+.blobwrap:active{cursor:grabbing}
+.blob{
+  width:clamp(170px,34vh,240px); aspect-ratio:1; border-radius:46% 54% 52% 48%/52% 46% 54% 48%;
+  background:radial-gradient(circle at 32% 26%, #ffffff 0%, var(--pist) 42%, var(--pist2) 78%, #9cbf7d 100%);
+  position:relative;
+  box-shadow:
+    inset -14px -18px 34px #7d9c5e66,
+    inset 10px 12px 26px #ffffffcc,
+    0 18px 34px -12px #b98f5e66,
+    0 4px 8px #b98f5e33;
+  transition:border-radius .35s ease, box-shadow .25s ease;
+}
+.blob.warn{
+  background:radial-gradient(circle at 32% 26%, #fff 0%, var(--straw) 42%, var(--straw2) 80%, #f79fb2 100%);
+  box-shadow:
+    inset -14px -18px 34px #d76a8466,
+    inset 10px 12px 26px #ffffffcc,
+    0 18px 34px -12px #c56a7c66,
+    0 4px 8px #c56a7c33;
+}
+.blob.squish{animation:squish .45s cubic-bezier(.3,1.6,.4,1)}
+@keyframes squish{
+  0%{transform:scale(1,1)} 35%{transform:scale(1.14,.82)}
+  65%{transform:scale(.94,1.08)} 100%{transform:scale(1,1)}
+}
+.blob.pulse{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{
+  0%,100%{transform:scale(1)} 50%{transform:scale(1.05)}
+}
+/* face */
+.face{position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:6%; pointer-events:none}
+.eyes{display:flex; gap:16%; transform:translateY(-6%)}
+.eye{
+  width:9%; aspect-ratio:1; border-radius:50%;
+  background:var(--ink);
+  box-shadow:inset 0 -2px 3px #00000055;
+  position:relative; transition:all .3s;
+}
+.eye::after{content:""; position:absolute; top:18%; left:20%; width:34%; height:34%;
+  border-radius:50%; background:#fff; opacity:.9}
+.brows{position:absolute; width:100%; top:16%; display:flex; justify-content:center; gap:34%}
+.brow{
+  width:11%; height:3.4%; border-radius:99px; background:var(--ink);
+  opacity:0; transform:translateY(6px); transition:all .4s;
+}
+.blob.warn .brow, .blob.frantic .brow{opacity:1; transform:none}
+.blob.warn .brow.l{transform:rotate(14deg)}
+.blob.warn .brow.r{transform:rotate(-14deg)}
+.blob.frantic .brow.l{transform:rotate(24deg) translateY(-2px)}
+.blob.frantic .brow.r{transform:rotate(-24deg) translateY(-2px)}
+.mouth{
+  width:22%; height:9%; border-radius:0 0 99px 99px;
+  border:3px solid var(--ink); border-top:none;
+  transition:all .3s;
+}
+.blob.frantic .mouth{border-radius:99px; width:16%; height:12%;
+  background:#e2607a55; border:3px solid var(--ink)}
+/* sweat drops */
+.sweat{position:absolute; right:16%; top:22%; display:flex; flex-direction:column; gap:4px}
+.drop{
+  width:11px; height:14px; background:#9fd4f5; border-radius:50% 50% 60% 60%;
+  box-shadow:inset 0 -2px 3px #5aa9dd; opacity:0;
+}
+.drop.a{animation:drip 1.6s ease-in infinite}
+.drop.b{animation:drip 1.6s .5s ease-in infinite}
+@keyframes drip{
+  0%{opacity:0; transform:translateY(0) scale(.6)}
+  25%{opacity:1}
+  100%{opacity:0; transform:translateY(26px) scale(.9)}
+}
+/* countdown digits */
+.digits{
+  position:absolute; bottom:20%; left:0; right:0; text-align:center;
+  font-family:ui-rounded,"SF Pro Rounded",ui-monospace,Menlo,monospace;
+  font-size:clamp(28px,6.5vh,46px); font-weight:800; color:var(--brown2);
+  text-shadow:0 2px 0 #fff9, 0 4px 10px #b98f5e55;
+  letter-spacing:.04em;
+}
+.blob.warn .digits{color:#b04a63}
+/* loaf progress ring */
+.ring{
+  position:absolute; inset:-9%; border-radius:50%; pointer-events:none;
+}
+.ring svg{width:100%; height:100%; transform:rotate(-90deg)}
+/* chips */
+.chips{display:flex; gap:clamp(6px,1.4vw,14px); flex-wrap:wrap; justify-content:center}
+.chip{
+  font:inherit; font-weight:800; font-size:clamp(13px,2.2vw,18px);
+  padding:clamp(9px,1.6vh,14px) clamp(14px,2.4vw,22px);
+  border:none; border-radius:22px; cursor:pointer; color:var(--brown2);
+  background:radial-gradient(circle at 30% 25%, #fff, var(--butter) 70%, #f3ddb2 100%);
+  box-shadow:
+    inset -5px -7px 12px #dfc08d66,
+    inset 4px 5px 9px #ffffffcc,
+    0 8px 14px -6px #b98f5e77;
+  transition:transform .16s cubic-bezier(.3,1.6,.4,1), box-shadow .2s;
+}
+.chip:hover{transform:translateY(-3px) scale(1.04)}
+.chip:active, .chip.wobble{animation:wob .5s cubic-bezier(.3,1.6,.4,1)}
+@keyframes wob{
+  0%{transform:scale(1,1)} 30%{transform:scale(1.12,.85)}
+  60%{transform:scale(.92,1.1)} 100%{transform:scale(1,1)}
+}
+.chip.on{
+  background:radial-gradient(circle at 30% 25%, #fff, var(--pist) 70%, var(--pist2) 100%);
+  color:#4f7136;
+  box-shadow:
+    inset -5px -7px 12px #93b67266,
+    inset 4px 5px 9px #ffffffcc,
+    0 8px 14px -6px #8fae6d99;
+}
+.sub{font-size:clamp(10px,1.6vw,13px); font-weight:700; letter-spacing:.24em;
+  color:#c2a487; text-align:center}
+/* loaf + confetti layer */
+.done-layer{
+  position:fixed; inset:0; pointer-events:none; z-index:40; overflow:hidden;
+}
+.loaf{
+  position:fixed; left:50%; top:50%; z-index:41;
+  width:clamp(120px,24vh,180px); aspect-ratio:5/3.4;
+  transform:translate(-50%,-50%) scale(0); cursor:pointer;
+  transition:transform .55s cubic-bezier(.3,1.7,.4,1);
+}
+.loaf.pop{transform:translate(-50%,-50%) scale(1)}
+.loaf .body{
+  position:absolute; inset:12% 4% 0; border-radius:38% 38% 26% 26%/52% 52% 20% 20%;
+  background:radial-gradient(circle at 35% 25%, #f2cf9a, #e0a967 60%, #c8874a 100%);
+  box-shadow:inset -8px -10px 20px #a96d3755, inset 6px 8px 14px #ffe9c266, 0 14px 24px -10px #b98f5e88;
+}
+.loaf .slash{position:absolute; left:16%; right:16%; top:6%; height:40%;
+  border-radius:50% 50% 40% 40%; border-top:5px solid #b9deeb;
+  border-radius:99px 99px 60px 60px; opacity:.9; transform:rotate(-3deg)}
+.loaf .slash2{position:absolute; left:24%; right:24%; top:10%; height:30%;
+  border-top:4px solid #b9deeb; border-radius:99px; opacity:.7; transform:rotate(4deg)}
+.loaf .tagline{
+  position:absolute; bottom:-34px; left:0; right:0; text-align:center;
+  font-weight:800; font-size:13px; letter-spacing:.3em; color:var(--brown2)}
+.conf{position:absolute; width:9px; height:12px; border-radius:40% 40% 60% 60%;
+  background:#fff; opacity:0}
+@keyframes puff{
+  0%{opacity:1; transform:translate(0,0) rotate(0) scale(1)}
+  100%{opacity:0; transform:translate(var(--dx),var(--dy)) rotate(var(--rot)) scale(.5)}
+}
+.conf.go{animation:puff 1.4s ease-out forwards}
+@media (max-width:480px){
+  .chips{max-width:340px}
+}
+@media (prefers-reduced-motion:reduce){
+  .blob.squish,.blob.pulse,.chip:active,.chip.wobble,.drop{animation:none !important}
+  .conf.go{animation-duration:.4s}
+}
+</style>
+</head>
+<body>
+<h1>DOUGH TIME <small>KITCHEN COMPANION · パン焼きタイマー</small></h1>
+
+<div class="blobwrap" id="blobwrap">
+  <div class="ring">
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+      <circle cx="50" cy="50" r="46.5" fill="none" stroke="#ffffff" stroke-width="6" opacity=".8"/>
+      <circle id="ringFill" cx="50" cy="50" r="46.5" fill="none" stroke="#e0a967"
+        stroke-width="6" stroke-linecap="round" stroke-dasharray="292.2" stroke-dashoffset="292.2"/>
+    </svg>
+  </div>
+  <div class="blob" id="blob" role="button" tabindex="0" aria-label="Start or pause timer">
+    <div class="brows"><span class="brow l"></span><span class="brow r"></span></div>
+    <div class="face">
+      <div class="eyes"><span class="eye"></span><span class="eye"></span></div>
+      <div class="mouth"></div>
+    </div>
+    <div class="sweat"><span class="drop a"></span><span class="drop b"></span></div>
+    <div class="digits" id="digits">03:00</div>
+  </div>
+</div>
+
+<div class="chips" id="chips">
+  <button class="chip" data-m="1">1</button>
+  <button class="chip" data-m="3">3</button>
+  <button class="chip on" data-m="5">5</button>
+  <button class="chip" data-m="10">10</button>
+  <button class="chip" data-m="15">15</button>
+  <button class="chip" data-m="30">30</button>
+</div>
+<p class="sub" id="status">TAP THE BLOB TO START · 5 MINUTES</p>
+
+<div class="done-layer" id="doneLayer"></div>
+<div class="loaf" id="loaf" role="button" tabindex="0" aria-label="Finished loaf, tap to dismiss">
+  <div class="body"></div>
+  <div class="slash"></div>
+  <div class="slash2"></div>
+  <div class="tagline">BAKED! TAP ME</div>
+</div>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const blob=$("blob"), blobwrap=$("blobwrap"), digits=$("digits"), status=$("status");
+const ringFill=$("ringFill"), loaf=$("loaf"), doneLayer=$("doneLayer");
+const RING_LEN=292.2;
+let totalSec=300, remainSec=300, running=false, doneFired=false;
+let endTime=0, tickTimer=null;
+
+function fmt(s){
+  s=Math.max(0,Math.ceil(s));
+  const m=Math.floor(s/60), r=s%60;
+  return String(m).padStart(2,"0")+":"+String(r).padStart(2,"0");
+}
+function render(){
+  digits.textContent=fmt(remainSec);
+  const k=totalSec>0?remainSec/totalSec:0;
+  ringFill.setAttribute("stroke-dashoffset",(RING_LEN*(1-k)).toFixed(1));
+  /* face escalation */
+  const frac=totalSec>0?remainSec/totalSec:1;
+  blob.classList.toggle("warn", running && frac<=.5 && frac>0);
+  blob.classList.toggle("frantic", running && (frac<=.2||remainSec<=30));
+  blob.classList.toggle("pulse", running && remainSec<=30 && remainSec>0);
+  status.textContent = doneFired ? "FRESH FROM THE OVEN"
+    : running ? "BAKING · "+fmt(remainSec)+" LEFT — TAP TO PAUSE"
+    : remainSec<totalSec ? "PAUSED · "+fmt(remainSec)+" LEFT"
+    : "TAP THE BLOB TO START · "+Math.round(totalSec/60)+" MINUTES";
+}
+function setMinutes(m){
+  totalSec=m*60; remainSec=totalSec; running=false; doneFired=false;
+  clearInterval(tickTimer);
+  document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",+c.dataset.m===m));
+  loaf.classList.remove("pop");
+  render();
+}
+$("chips").addEventListener("click",e=>{
+  const c=e.target.closest(".chip"); if(!c) return;
+  c.classList.remove("wobble"); void c.offsetWidth; c.classList.add("wobble");
+  setMinutes(+c.dataset.m);
+  ensureAC();
+});
+
+/* ---------- start / pause via blob ---------- */
+function toggle(){
+  ensureAC();
+  if(doneFired){loaf.classList.remove("pop"); doneFired=false; setMinutes(totalSec/60); return}
+  if(running){ /* pause */
+    running=false; clearInterval(tickTimer);
+  }else{
+    if(remainSec<=0) remainSec=totalSec;
+    running=true;
+    endTime=performance.now()+remainSec*1000;
+    tickTimer=setInterval(tick,200);
+    squish();
+  }
+  render();
+}
+function tick(){
+  remainSec=(endTime-performance.now())/1000;
+  if(remainSec<=0){remainSec=0; running=false; clearInterval(tickTimer); finish();}
+  render();
+}
+function squish(){
+  blob.classList.remove("squish"); void blob.offsetWidth; blob.classList.add("squish");
+}
+blob.addEventListener("click",toggle);
+blob.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle()}});
+loaf.addEventListener("click",()=>{loaf.classList.remove("pop"); doneFired=false; setMinutes(totalSec/60)});
+loaf.addEventListener("keydown",e=>{if(e.key==="Enter"){loaf.classList.remove("pop");doneFired=false;setMinutes(totalSec/60)}});
+
+/* ---------- cheek stretch ---------- */
+let drag=null;
+blobwrap.addEventListener("pointerdown",e=>{
+  /* only stretch from edges of the blob, not center face */
+  const r=blob.getBoundingClientRect();
+  const cx=r.left+r.width/2, cy=r.top+r.height/2;
+  const d=Math.hypot(e.clientX-cx,e.clientY-cy);
+  if(d>r.width*0.32 && d<r.width*0.62){
+    drag={x:e.clientX,y:e.clientY,sx:1,sy:1};
+    blobwrap.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
+});
+blobwrap.addEventListener("pointermove",e=>{
+  if(!drag) return;
+  const dx=(e.clientX-drag.x)/220, dy=(e.clientY-drag.y)/220;
+  blob.style.transform=`scale(${1+Math.max(-.15,Math.min(.22,dx))},${1+Math.max(-.15,Math.min(.22,dy))})`;
+});
+blobwrap.addEventListener("pointerup",()=>{
+  if(!drag) return; drag=null;
+  blob.style.transition="transform .5s cubic-bezier(.3,1.8,.4,1)";
+  blob.style.transform="";
+  setTimeout(()=>blob.style.transition="",520);
+});
+
+/* ---------- finish: ding + flour confetti + loaf ---------- */
+function finish(){
+  doneFired=true;
+  render();
+  ding();
+  flourPuff();
+  setTimeout(()=>loaf.classList.add("pop"),250);
+}
+function flourPuff(){
+  const colors=["#ffffff","#fdf3dc","#f3ddb2","#fff9ee","#f7e8c4"];
+  for(let i=0;i<36;i++){
+    const c=document.createElement("i");
+    c.className="conf go";
+    const a=Math.random()*Math.PI*2, v=90+Math.random()*180;
+    c.style.left=(innerWidth/2+(Math.random()-.5)*140)+"px";
+    c.style.top=(innerHeight/2+(Math.random()-.5)*120)+"px";
+    c.style.background=colors[i%colors.length];
+    c.style.setProperty("--dx",(Math.cos(a)*v)+"px");
+    c.style.setProperty("--dy",(Math.sin(a)*v-60)+"px");
+    c.style.setProperty("--rot",(Math.random()*540-270)+"deg");
+    doneLayer.appendChild(c);
+    setTimeout(()=>c.remove(),1500);
+  }
+}
+
+/* ---------- audio: gesture-gated warm ding ---------- */
+let AC=null;
+function ensureAC(){
+  try{
+    if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==="suspended") AC.resume();
+  }catch(e){}
+}
+function ding(){
+  if(!AC) return;
+  try{
+    const t0=AC.currentTime;
+    const partials=[[880,.05,2.2],[1320,.03,1.6],[2200,.012,0.9]];
+    partials.forEach(([f,v,dur])=>{
+      const o=AC.createOscillator(), g=AC.createGain();
+      o.type="sine"; o.frequency.value=f;
+      g.gain.setValueAtTime(0.0001,t0);
+      g.gain.exponentialRampToValueAtTime(v,t0+.015);
+      g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+      o.connect(g).connect(AC.destination);
+      o.start(t0); o.stop(t0+dur+.05);
+    });
+  }catch(e){}
+}
+/* keyboard shortcuts */
+addEventListener("keydown",e=>{
+  if(e.key===" "&&e.target===document.body){e.preventDefault();toggle()}
+});
+setMinutes(5);
+/* gentle idle breathing so the blob feels alive before any tap */
+const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+if(!reduced && matchMedia("(pointer:fine)").matches){
+  let hover=false;
+  blob.addEventListener("pointerenter",()=>hover=true);
+  blob.addEventListener("pointerleave",()=>hover=false);
+  (function idle(){
+    if(!running && !drag && !doneFired && !hover){
+      const t=performance.now()*.0012;
+      blob.style.borderRadius=`${46+Math.sin(t)*3}% ${54-Math.sin(t)*3}% ${52+Math.cos(t)*3}% ${48-Math.cos(t)*3}%/${52-Math.cos(t)*2}% ${46+Math.cos(t)*2}% ${54+Math.sin(t)*2}% ${48-Math.sin(t)*2}%`;
+    }
+    requestAnimationFrame(idle);
+  })();
+}
+</script>
+</body>
+</html>

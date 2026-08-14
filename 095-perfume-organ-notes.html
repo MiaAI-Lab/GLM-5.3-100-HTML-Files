@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PARFUM — l'orgue des odeurs</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow-x:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(200,160,90,.13), transparent 55%),
+      linear-gradient(180deg, #221a12, #17110b);
+    color:#e8dcc8; min-height:100vh;
+    display:flex; flex-direction:column; align-items:center; padding:26px 14px 50px;
+  }
+  header { text-align:center; margin-bottom:8px; }
+  header h1 { font-size:clamp(24px, 4.6vw, 42px); font-weight:400; letter-spacing:.3em; color:#e8c98f; text-transform:uppercase; }
+  header p { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.4em; color:#8a795c; text-transform:uppercase; margin-top:6px; }
+
+  /* organ of bottles */
+  .organ {
+    position:relative; width:min(880px, 96vw); margin:26px 0;
+    display:flex; justify-content:center; align-items:flex-end; gap:0;
+    padding:20px 10px 14px;
+    background:linear-gradient(180deg, rgba(60,44,26,.5), rgba(34,26,16,.5));
+    border:1px solid rgba(232,201,143,.2); border-radius:18px;
+    box-shadow:0 30px 70px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,220,170,.1);
+  }
+  .tier { display:flex; align-items:flex-end; gap:8px; }
+  .tier2 { margin-bottom:56px; position:absolute; bottom:70px; left:50%; transform:translateX(-50%); }
+  .bottle {
+    width:34px; border-radius:5px 5px 8px 8px; cursor:grab; position:relative;
+    border:1px solid rgba(255,255,255,.18); transition:transform .16s, box-shadow .16s;
+    box-shadow:inset 0 0 8px rgba(0,0,0,.4), 0 4px 10px rgba(0,0,0,.4);
+  }
+  .bottle:hover { transform:translateY(-6px) scale(1.06); box-shadow:inset 0 0 8px rgba(0,0,0,.4), 0 12px 24px rgba(0,0,0,.55), 0 0 14px var(--ju); }
+  .bottle::before { /* neck */
+    content:""; position:absolute; top:-9px; left:50%; transform:translateX(-50%);
+    width:10px; height:9px; background:inherit; border:1px solid rgba(255,255,255,.18); border-bottom:none; border-radius:2px 2px 0 0;
+  }
+  .bottle::after { /* glint */
+    content:""; position:absolute; left:5px; top:12%; width:4px; height:60%; border-radius:99px;
+    background:rgba(255,255,255,.35); filter:blur(1px);
+  }
+  .bottle .tag { position:absolute; bottom:-20px; left:50%; transform:translateX(-50%);
+    font-family:system-ui, sans-serif; font-size:7px; letter-spacing:.1em; color:#a08c6c; white-space:nowrap; }
+
+  /* bench */
+  .benchrow { display:flex; gap:20px; width:min(880px, 96vw); flex-wrap:wrap; }
+  .bench {
+    flex:1; min-width:260px; border-radius:16px; padding:18px 20px;
+    background:rgba(28,20,12,.72); border:1px solid rgba(232,201,143,.18);
+  }
+  .bench h3 { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.32em; color:#8a795c; text-transform:uppercase; margin-bottom:12px; }
+  .slots { display:flex; gap:12px; min-height:74px; }
+  .slot {
+    width:44px; height:70px; border-radius:8px; border:1.5px dashed rgba(232,201,143,.35);
+    display:flex; align-items:center; justify-content:center; font-size:18px; color:#6a5c44;
+  }
+  .slot.filled { border-style:solid; background:rgba(232,201,143,.1); }
+  .slot .swatch { width:22px; height:40px; border-radius:4px; box-shadow:inset 0 0 6px rgba(0,0,0,.4); }
+  .accord {
+    margin-top:16px; height:120px; border-radius:12px; position:relative; overflow:hidden;
+    background:radial-gradient(ellipse at 50% 120%, #3a2c18, #1c140c);
+    border:1px solid rgba(232,201,143,.16);
+  }
+  .accord canvas { width:100%; height:100%; display:block; }
+  .accord .name {
+    position:absolute; left:0; right:0; bottom:0; padding:8px 12px; text-align:center;
+    font-style:italic; font-size:13.5px; color:#f0e2c4;
+    background:linear-gradient(180deg, transparent, rgba(0,0,0,.6));
+  }
+  .benchbtns { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  .benchbtns button {
+    flex:1; min-width:90px; background:rgba(232,201,143,.1); color:#e8c98f; border:1px solid rgba(232,201,143,.4);
+    font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.2em; text-transform:uppercase;
+    padding:10px 8px; border-radius:99px; cursor:pointer; transition:all .15s;
+  }
+  .benchbtns button:hover { background:rgba(232,201,143,.24); }
+
+  /* blotter */
+  .blotter {
+    margin-top:16px; padding:14px 16px; border-radius:12px; cursor:pointer;
+    background:rgba(246,239,221,.9); color:#3a2c18; text-align:center; transition:all .2s;
+    border:1px solid rgba(232,201,143,.5);
+  }
+  .blotter:hover { transform:translateY(-2px); box-shadow:0 10px 24px rgba(0,0,0,.4); }
+  .blotter .t { font-size:14px; font-weight:600; }
+  .blotter .s { font-size:10px; font-family:system-ui, sans-serif; letter-spacing:.14em; color:#8a6d3a; text-transform:uppercase; margin-top:3px; }
+
+  /* house library */
+  .library { margin-top:20px; width:min(880px, 96vw); }
+  .library h3 { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.32em; color:#8a795c; text-transform:uppercase; margin-bottom:12px; }
+  .flacons { display:flex; gap:12px; flex-wrap:wrap; }
+  .flacon {
+    flex:1; min-width:150px; border-radius:12px; padding:14px; cursor:pointer;
+    background:rgba(28,20,12,.6); border:1px solid rgba(232,201,143,.16); transition:all .18s;
+  }
+  .flacon:hover { border-color:rgba(232,201,143,.45); transform:translateY(-3px); }
+  .flacon .juice { height:8px; border-radius:99px; margin-bottom:10px; }
+  .flacon b { font-size:13px; color:#e8dcc8; font-weight:400; font-style:italic; display:block; }
+  .flacon span { font-size:10.5px; font-family:system-ui, sans-serif; color:#8a795c; letter-spacing:.06em; }
+
+  @media (max-width:640px) {
+    .tier2 { display:none; }
+    .bottle { width:28px; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Parfum</h1>
+    <p>l'orgue des odeurs · compose by dragging bottles</p>
+  </header>
+
+  <div class="organ" id="organ">
+    <div class="tier tier2" id="tier2"></div>
+    <div class="tier" id="tier1"></div>
+  </div>
+
+  <div class="benchrow">
+    <div class="bench">
+      <h3>the mixing table · drag up to five essences</h3>
+      <div class="slots" id="slots">
+        <div class="slot" data-i="0"></div><div class="slot" data-i="1"></div><div class="slot" data-i="2"></div>
+        <div class="slot" data-i="3"></div><div class="slot" data-i="4"></div>
+      </div>
+      <div class="accord">
+        <canvas id="accordC" width="400" height="120"></canvas>
+        <div class="name" id="accordName">the accord is empty — pull bottles from the organ</div>
+      </div>
+      <div class="benchbtns">
+        <button id="clearB">clear bench</button>
+        <button id="sealB">seal the flacon</button>
+      </div>
+    </div>
+
+    <div class="bench">
+      <h3>blotter · hover to smell one note</h3>
+      <div class="blotter" id="blotter">
+        <div class="t" id="blotT">— dip the blotter —</div>
+        <div class="s" id="blotS">hover a bottle on the organ</div>
+      </div>
+      <div class="library">
+        <h3>house library</h3>
+        <div class="flacons" id="library"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  /* ---------- essences ---------- */
+  const ESSENCES = [
+    { name: "bergamot", family: "head", color: "#d4c25a", desc: "bright, bitter citrus — the opening argument" },
+    { name: "pink pepper", family: "head", color: "#d47a6a", desc: "a dry spark, gone in ten minutes" },
+    { name: "neroli", family: "head", color: "#e8dca0", desc: "orange blossom at dawn" },
+    { name: "rose absolute", family: "heart", color: "#c9768a", desc: "the queen, and she knows it" },
+    { name: "jasmine", family: "heart", color: "#e8e0b8", desc: "indolic, honeyed, slightly wicked" },
+    { name: "orris butter", family: "heart", color: "#a89ab8", desc: "powdery violet root, old-fashioned on purpose" },
+    { name: "sandalwood", family: "base", color: "#b8935a", desc: "warm milk and quiet rooms" },
+    { name: "vetiver", family: "base", color: "#6a7a4a", desc: "dried earth after rain" },
+    { name: "ambergris", family: "base", color: "#8a7a6a", desc: "sea-salted warmth, impossibly expensive" },
+    { name: "musk", family: "base", color: "#b8a898", desc: "the smell of clean skin, allegedly" },
+    { name: "labdanum", family: "base", color: "#8a5a2e", desc: "resin, leather, ancient honey" },
+    { name: "iris concrete", family: "heart", color: "#b8aec9", desc: "cold cream and silver" },
+  ];
+  const FAMILY_ORDER = { head: 0, heart: 1, base: 2 };
+
+  /* ---------- build organ ---------- */
+  const tier1 = $("tier1"), tier2 = $("tier2");
+  ESSENCES.forEach((e, i) => {
+    const b = document.createElement("div");
+    b.className = "bottle";
+    b.style.height = (54 + FAMILY_ORDER[e.family] * 16) + "px";
+    b.style.setProperty("--ju", e.color);
+    /* glass with colored juice */
+    b.style.background =
+      "linear-gradient(180deg, rgba(255,255,255,.14) 0 18%, " + e.color + " 18% 82%, rgba(0,0,0,.25) 82%)";
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = e.name;
+    b.appendChild(tag);
+    /* hover = blotter smell */
+    b.addEventListener("mouseenter", () => {
+      $("blotT").textContent = e.name;
+      $("blotS").textContent = e.family + " note · " + e.desc;
+      $("blotter").style.boxShadow = "0 0 24px " + e.color + "55";
+    });
+    b.addEventListener("mouseleave", () => {
+      $("blotter").style.boxShadow = "";
+    });
+    /* click = add to bench */
+    b.addEventListener("click", () => addToBench(e));
+    (i % 2 === 0 ? tier1 : tier2).appendChild(b);
+  });
+
+  /* ---------- bench ---------- */
+  const bench = [];
+  function addToBench(e) {
+    if (bench.length >= 5) { note("the bench is full — seal or clear first"); return; }
+    if (bench.includes(e)) { note(e.name + " is already on the bench"); return; }
+    bench.push(e);
+    renderBench();
+    note("added " + e.name + " (" + e.family + ")");
+  }
+  function renderBench() {
+    document.querySelectorAll(".slot").forEach((slot, i) => {
+      slot.innerHTML = "";
+      slot.classList.toggle("filled", !!bench[i]);
+      if (bench[i]) {
+        const sw = document.createElement("div");
+        sw.className = "swatch";
+        sw.style.background = bench[i].color;
+        slot.appendChild(sw);
+        slot.title = bench[i].name;
+        /* click to remove */
+        slot.onclick = () => { bench.splice(i, 1); renderBench(); };
+      }
+    });
+    drawAccord();
+    $("accordName").textContent = bench.length
+      ? nameAccord()
+      : "the accord is empty — pull bottles from the organ";
+  }
+
+  /* ---------- accord naming ---------- */
+  const PREFIX = ["Éclat", "Ombre", "Sillage", "Nuit", "Aube", "Velours", "Sel", "Cendre", "Ivoire", "Orage"];
+  const SUFFIX = ["de Minuit", "d'Été", "Sauvage", "Blanc", "Interdit", "de Thé", "Perdu", "d'Iris"];
+  function nameAccord() {
+    if (!bench.length) return "—";
+    const seed = bench.reduce((s, e) => s + e.name.length * 7, 0);
+    const p = PREFIX[seed % PREFIX.length];
+    const s = SUFFIX[(seed >> 2) % SUFFIX.length];
+    return "« " + p + " " + s + " »";
+  }
+
+  /* ---------- accord visualization: blooming color field ---------- */
+  const ac = $("accordC"), ag = ac.getContext("2d");
+  let accordT = 0;
+  function drawAccord() { /* drawn each frame */ }
+  function accordLoop(now) {
+    requestAnimationFrame(accordLoop);
+    if (document.hidden) return;
+    accordT = now;
+    ag.clearRect(0, 0, 400, 120);
+    if (!bench.length) {
+      ag.fillStyle = "rgba(232,201,143,.2)";
+      ag.font = "italic 13px Georgia";
+      ag.fillText("empty bench", 160, 64);
+      return;
+    }
+    /* volatility layers: head evaporates first */
+    const t = (now / 1000) % 60 / 60;
+    bench.forEach((e, i) => {
+      const life = e.family === "head" ? Math.max(0, 1 - t * 3) : e.family === "heart" ? Math.max(0, 1 - Math.max(0, t - 0.2) * 1.4) : 1 - t * 0.3;
+      const r = 26 + i * 12;
+      const cx = 200 + Math.sin(now / 1400 + i * 2) * 30;
+      const cy = 100 - life * 20;
+      const grd = ag.createRadialGradient(cx, cy, 2, cx, cy, r + 26);
+      grd.addColorStop(0, e.color + "");
+      grd.addColorStop(1, "rgba(0,0,0,0)");
+      ag.globalAlpha = 0.24 * Math.max(0.15, life);
+      ag.fillStyle = grd;
+      ag.beginPath(); ag.arc(cx, cy, r + 26, 0, 6.283); ag.fill();
+    });
+    ag.globalAlpha = 1;
+  }
+  requestAnimationFrame(accordLoop);
+
+  /* ---------- seal the flacon ---------- */
+  $("sealB").addEventListener("click", () => {
+    if (bench.length < 2) { note("an accord needs at least two essences"); return; }
+    const f = document.createElement("div");
+    f.className = "flacon";
+    f.innerHTML =
+      '<div class="juice" style="background:linear-gradient(90deg,' + bench.map(e => e.color).join(",") + ')"></div>' +
+      "<b>" + nameAccord() + "</b>" +
+      "<span>" + bench.map(e => e.name).join(" · ") + "</span>";
+    f.addEventListener("click", () => {
+      /* load its essences back */
+      bench.length = 0;
+      [...f.querySelectorAll("span")][0].textContent.split(" · ").forEach(n => {
+        const e = ESSENCES.find(x => x.name === n);
+        if (e) bench.push(e);
+      });
+      renderBench();
+      note("reopened " + nameAccord());
+    });
+    $("library").prepend(f);
+    note("sealed: " + nameAccord());
+    bench.length = 0;
+    renderBench();
+  });
+  $("clearB").addEventListener("click", () => { bench.length = 0; renderBench(); });
+
+  /* ---------- presets (the greats) ---------- */
+  const PRESETS = [
+    { name: "ambre Impérial", family: "amber chypre", story: "resins and old libraries; napoleon's court smelled of something like this", essences: ["bergamot", "labdanum", "sandalwood", "ambergris"] },
+    { name: "vert Écrasant", family: "green floral", story: "crushed leaves and galbanum; spring with an attitude", essences: ["neroli", "iris concrete", "vetiver"] },
+    { name: "cuir de Nuit", family: "leather", story: "smoked, animalic, faintly dangerous", essences: ["pink pepper", "labdanum", "musk", "vetiver"] },
+  ];
+  PRESETS.forEach(p => {
+    const f = document.createElement("div");
+    f.className = "flacon";
+    f.innerHTML =
+      '<div class="juice" style="background:linear-gradient(90deg,' + p.essences.map(n => ESSENCES.find(e => e.name === n).color).join(",") + ')"></div>' +
+      "<b>" + p.name + "</b><span>" + p.family + "</span>";
+    f.addEventListener("click", () => {
+      bench.length = 0;
+      p.essences.forEach(n => bench.push(ESSENCES.find(e => e.name === n)));
+      renderBench();
+      note(p.name + " — " + p.story);
+    });
+    $("library").appendChild(f);
+  });
+
+  /* ---------- toast ---------- */
+  let toastEl = null;
+  function note(m) {
+    if (!toastEl) {
+      toastEl = document.createElement("div");
+      toastEl.style.cssText = "position:fixed;top:14px;left:50%;transform:translate(-50%,-90px);background:#f6efdd;color:#3a2c18;padding:10px 22px;border-radius:99px;font-family:system-ui,sans-serif;font-size:11.5px;letter-spacing:.06em;transition:transform .4s cubic-bezier(.2,1.4,.4,1);z-index:90;box-shadow:0 12px 30px rgba(0,0,0,.5);";
+      document.body.appendChild(toastEl);
+    }
+    toastEl.textContent = m;
+    toastEl.style.transform = "translate(-50%,0)";
+    clearTimeout(toastEl._t);
+    toastEl._t = setTimeout(() => { toastEl.style.transform = "translate(-50%,-90px)"; }, 2600);
+  }
+  renderBench();
+})();
+</script>
+</body>
+</html>

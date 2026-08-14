@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NUMBERS, SOFTLY — a wool felt calculator</title>
+<style>
+  :root {
+    --felt: #8b8680; --felt-hi: #98938c; --felt-lo: #767170;
+    --panel: #a49e96; --stitch: #d8cfc0;
+    --linen: #efe8d8; --linen-lo: #e2d9c5;
+    --ink: #5d5348; --ink-soft: #7a6f61;
+    --mustard: #c9972f; --mustard-dk: #a87b20;
+    --tomato: #c25438; --tomato-dk: #a2402a;
+    --digit: #6b5c49;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    min-height:100vh;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px; padding:24px 12px;
+    font-family: Avenir, "Segoe UI", "Trebuchet MS", Verdana, sans-serif;
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #9d9791 0%, #85807b 48%, #6f6a66 100%);
+    position:relative; overflow-x:hidden;
+  }
+  /* felt fabric noise, two offset layers */
+  body::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    opacity:.55; mix-blend-mode:overlay;
+    background-image:
+      repeating-linear-gradient( 34deg, rgba(255,255,255,.035) 0 1px, transparent 1px 3px),
+      repeating-linear-gradient(-21deg, rgba(0,0,0,.045) 0 1px, transparent 1px 4px);
+  }
+  body::after {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.5;
+    background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.6px);
+    background-size: 7px 7px, 11px 11px;
+  }
+  .masthead { position:relative; z-index:1; text-align:center; }
+  .masthead h1 {
+    font-size:clamp(15px, 2.6vw, 21px); letter-spacing:.34em; font-weight:600;
+    color:#e8e1d5; text-shadow:0 1px 0 rgba(0,0,0,.25);
+  }
+  .masthead p { font-size:11.5px; letter-spacing:.22em; color:#c9c1b3; margin-top:4px; }
+
+  .calc {
+    position:relative; z-index:1;
+    width:min(400px, 94vw);
+    background: linear-gradient(160deg, var(--felt-hi), var(--felt) 55%, var(--felt-lo));
+    border-radius:26px;
+    padding:20px 18px 22px;
+    box-shadow:
+      0 2px 0 rgba(255,255,255,.28) inset,
+      0 30px 50px -18px rgba(20,16,12,.6),
+      0 8px 18px rgba(20,16,12,.35);
+  }
+  /* stitched inner outline around the panel */
+  .calc::before {
+    content:""; position:absolute; inset:9px; border-radius:18px;
+    border:2px dashed var(--stitch); opacity:.65; pointer-events:none;
+  }
+  .brandrow { display:flex; align-items:center; justify-content:space-between; margin:2px 6px 12px; }
+  .brand { font-size:10px; letter-spacing:.28em; color:#e9e2d4; opacity:.85; }
+  .brand b { font-weight:700; }
+  .sound {
+    border:none; cursor:pointer; background:none; padding:4px 6px; border-radius:9px;
+    color:#efe9dd; font-size:10px; letter-spacing:.14em; opacity:.8;
+  }
+  .sound:hover { opacity:1; }
+  .sound::after { content:"OFF"; }
+  .sound.on::after { content:"ON"; }
+  .sound::before { content:"♪ "; }
+
+  /* display: stitched linen window */
+  .display-wrap { position:relative; margin:0 2px 16px; }
+  .display {
+    position:relative; background:
+      radial-gradient(140% 120% at 20% 0%, #f7f1e3 0%, var(--linen) 45%, var(--linen-lo) 100%);
+    border-radius:14px; padding:14px 18px 12px; min-height:86px;
+    display:flex; flex-direction:column; justify-content:flex-end; align-items:flex-end; gap:2px;
+    box-shadow: 0 2px 10px rgba(40,30,20,.35), 0 1px 0 rgba(255,255,255,.5) inset;
+  }
+  .display::before {
+    content:""; position:absolute; inset:6px; border-radius:9px;
+    border:2px dashed rgba(122,111,97,.35); pointer-events:none;
+  }
+  .tape {
+    font-size:13px; letter-spacing:.12em; color:var(--ink-soft);
+    min-height:16px; font-weight:600; max-width:100%; overflow:hidden;
+    text-align:right; white-space:nowrap; text-overflow:ellipsis;
+  }
+  .readout {
+    font-size:clamp(30px, 9vw, 42px); line-height:1.05; font-weight:600;
+    color:var(--digit); font-variant-numeric: tabular-nums;
+    letter-spacing:.02em; max-width:100%; overflow:hidden;
+    text-shadow:0 1px 0 rgba(255,255,255,.55);
+  }
+  .readout.err { color:var(--tomato-dk); font-size:clamp(19px, 5.4vw, 26px); letter-spacing:.03em; }
+
+  /* keys */
+  .keys {
+    display:grid; grid-template-columns:repeat(4, 1fr); gap:11px;
+  }
+  .key {
+    position:relative; border:none; cursor:pointer; -webkit-tap-highlight-color:transparent;
+    font-family:inherit; font-size:20px; font-weight:600; color:#f4efe4;
+    height:56px; border-radius:15px;
+    background:linear-gradient(175deg, #a9a49d, #918c86 70%, #84807a);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.35) inset,
+      0 6px 0 -1px #615d58,
+      0 8px 12px rgba(25,20,15,.4);
+    transition: transform .09s ease, box-shadow .09s ease, filter .15s ease;
+    text-shadow:0 -1px 0 rgba(0,0,0,.28);
+  }
+  .key::after {
+    content:""; position:absolute; inset:4px; border-radius:11px;
+    border:1.5px dashed rgba(240,232,220,.28); pointer-events:none;
+  }
+  .key:hover { filter:brightness(1.06); }
+  .key:focus-visible { outline:2px solid var(--stitch); outline-offset:3px; }
+  .key.wide { grid-column: span 2; }
+  .key.op { background:linear-gradient(175deg, #d9a53e, var(--mustard) 60%, var(--mustard-dk)); box-shadow:0 1px 0 rgba(255,255,255,.4) inset, 0 6px 0 -1px #7d5c15, 0 8px 12px rgba(25,20,15,.4); }
+  .key.eq { background:linear-gradient(175deg, #d4654a, var(--tomato) 60%, var(--tomato-dk)); box-shadow:0 1px 0 rgba(255,255,255,.4) inset, 0 6px 0 -1px #7c2c1b, 0 8px 12px rgba(25,20,15,.4); }
+  .key.ghost { color:#dcd5c8; font-size:19px; }
+  .key.pressed, .key:active {
+    transform: translateY(5px);
+    box-shadow: 0 1px 0 rgba(255,255,255,.25) inset, 0 1px 0 -1px #615d58, 0 2px 4px rgba(25,20,15,.4);
+  }
+  @keyframes squish-pop {
+    0% { transform:scale(1,1); }
+    35% { transform:scale(1.08,.86) translateY(4px); }
+    65% { transform:scale(.96,1.05) translateY(0); }
+    100% { transform:scale(1,1); }
+  }
+  .key.pop { animation: squish-pop .22s cubic-bezier(.34,1.56,.64,1); }
+  @media (prefers-reduced-motion: reduce) {
+    .key.pop { animation:none; }
+    .key, .calc { transition:none; }
+  }
+  .foot {
+    position:relative; z-index:1; font-size:10.5px; letter-spacing:.18em;
+    color:#b9b1a3; text-align:center; max-width:420px;
+  }
+  @media (max-width:379px){ .keys{gap:8px;} .key{height:50px; font-size:18px;} .calc{padding:16px 12px 18px;} }
+</style>
+</head>
+<body>
+  <div class="masthead">
+    <h1>NUMBERS, SOFTLY</h1>
+    <p>A CALCULATOR UPHOLSTERED IN WOOL FELT</p>
+  </div>
+
+  <div class="calc" role="group" aria-label="Wool felt calculator">
+    <div class="brandrow">
+      <span class="brand"><b>SOFTLY</b> · MODEL 26</span>
+      <button class="sound" id="soundBtn" aria-pressed="false" aria-label="Toggle key sounds">KEY POP</button>
+    </div>
+    <div class="display-wrap">
+      <div class="display" aria-live="polite">
+        <div class="tape" id="tape"></div>
+        <div class="readout" id="readout">0</div>
+      </div>
+    </div>
+    <div class="keys">
+      <button class="key ghost" data-k="c">AC</button>
+      <button class="key ghost" data-k="neg">±</button>
+      <button class="key ghost" data-k="pct">%</button>
+      <button class="key op" data-k="/">÷</button>
+      <button class="key" data-k="7">7</button>
+      <button class="key" data-k="8">8</button>
+      <button class="key" data-k="9">9</button>
+      <button class="key op" data-k="*">×</button>
+      <button class="key" data-k="4">4</button>
+      <button class="key" data-k="5">5</button>
+      <button class="key" data-k="6">6</button>
+      <button class="key op" data-k="-">−</button>
+      <button class="key" data-k="1">1</button>
+      <button class="key" data-k="2">2</button>
+      <button class="key" data-k="3">3</button>
+      <button class="key op" data-k="+">+</button>
+      <button class="key wide ghost" data-k="0">0</button>
+      <button class="key" data-k=".">.</button>
+      <button class="key eq wide" data-k="=">=</button>
+    </div>
+  </div>
+
+  <p class="foot">EVERY KEY SPRINGS · SOUND OPTIONAL · ÷ BY 0 ANSWERED IN STITCH</p>
+
+<script>
+'use strict';
+/* ---------- wool felt calculator: state + arithmetic engine ---------- */
+const readout = document.getElementById('readout');
+const tapeEl  = document.getElementById('tape');
+const soundBtn= document.getElementById('soundBtn');
+
+const S = {
+  acc: null,        // accumulated value
+  op: null,         // pending operator '+','-','*','/'
+  cur: '0',         // current entry string
+  fresh: false,     // next digit starts a new number
+  lastOp: null, lastB: null,  // repeat-equals memory
+  err: false,
+};
+
+const OPGLYPH = { '+':'+', '-':'−', '*':'×', '/':'÷' };
+
+function fmt(n) {
+  if (!isFinite(n)) return '∞';
+  // cap to 12 significant digits, trim float fuzz
+  let s = Number(n.toPrecision(12)).toString();
+  if (s.length > 14 && s.includes('e')) s = n.toExponential(6);
+  return s;
+}
+function curVal() { return parseFloat(S.cur) || 0; }
+
+function apply(a, op, b) {
+  switch (op) {
+    case '+': return a + b;
+    case '-': return a - b;
+    case '*': return a * b;
+    case '/': return b === 0 ? NaN : a / b;
+  }
+  return b;
+}
+
+const WIT = [
+  'DIVIDED BY ZERO — THE WOOL REFUSES',
+  'INFINITY IS NOT MACHINE-WASHABLE',
+  'SOME SEAMS SHOULD NOT BE OPENED',
+];
+let witIdx = 0;
+
+function render() {
+  if (S.err) {
+    readout.textContent = S.errText;
+    readout.classList.add('err');
+    tapeEl.textContent = '· · ·';
+    return;
+  }
+  readout.classList.remove('err');
+  readout.textContent = S.cur;
+  const bits = [];
+  if (S.acc !== null) bits.push(fmt(S.acc));
+  if (S.op) bits.push(OPGLYPH[S.op]);
+  if (!S.fresh && S.acc !== null) bits.push(S.cur);
+  tapeEl.textContent = bits.join('  ');
+  if (readout.scrollWidth > readout.clientWidth) {
+    readout.style.fontSize = 'clamp(19px, 5vw, 26px)';
+  } else {
+    readout.style.fontSize = '';
+  }
+}
+
+/* ---------- key press: squish + spring + soft pop ---------- */
+const keys = Array.from(document.querySelectorAll('.key'));
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function squish(btn) {
+  if (reducedMotion) return;
+  btn.classList.remove('pop');
+  void btn.offsetWidth;           // restart animation
+  btn.classList.add('pop');
+}
+
+/* ---------- WebAudio: gesture-gated soft pops ---------- */
+let AC = null, master = null, soundOn = false;
+function audio() {
+  if (AC) return true;
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    master = AC.createGain();
+    master.gain.value = 0.14;
+    master.connect(AC.destination);
+  } catch (e) { AC = null; }
+  return !!AC;
+}
+function pop(kind) {
+  if (!soundOn || !audio()) return;
+  if (AC.state === 'suspended') { AC.resume().catch(function(){}); }
+  const t = AC.currentTime;
+  const o = AC.createOscillator();
+  const g = AC.createGain();
+  const base = kind === 'eq' ? 300 : kind === 'op' ? 210 : 170 + Math.random() * 60;
+  o.type = 'sine';
+  o.frequency.setValueAtTime(base * 2.2, t);
+  o.frequency.exponentialRampToValueAtTime(base * 0.9, t + 0.07);
+  const v = kind === 'eq' ? 0.9 : kind === 'op' ? 0.6 : 0.42;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(v, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+  o.connect(g); g.connect(master);
+  o.start(t); o.stop(t + 0.2);
+}
+soundBtn.addEventListener('click', function () {
+  soundOn = !soundOn;
+  soundBtn.classList.toggle('on', soundOn);
+  soundBtn.setAttribute('aria-pressed', String(soundOn));
+  if (soundOn) { audio(); pop('op'); }
+});
+
+/* ---------- calculator logic ---------- */
+function press(k, btn) {
+  if (S.err) {
+    // any key after an error resets (AC-like), except pressing = again
+    if (k !== 'c') { S.err = false; }
+  }
+  if (/[0-9]/.test(k)) {
+    if (S.fresh || S.cur === '0') { S.cur = k; S.fresh = false; }
+    else if (S.cur.replace('-', '').replace('.', '').length < 12) S.cur += k;
+    pop('d');
+  } else if (k === '.') {
+    if (S.fresh) { S.cur = '0.'; S.fresh = false; }
+    else if (!S.cur.includes('.')) S.cur += '.';
+    pop('d');
+  } else if (k === 'c') {
+    S.acc = null; S.op = null; S.cur = '0'; S.fresh = false;
+    S.err = false; S.lastOp = null; S.lastB = null;
+    pop('op');
+  } else if (k === 'neg') {
+    if (S.cur !== '0') {
+      S.cur = S.cur.startsWith('-') ? S.cur.slice(1) : '-' + S.cur;
+    }
+    pop('d');
+  } else if (k === 'pct') {
+    const v = curVal();
+    const base = (S.acc !== null && S.op) ? S.acc : (S.acc !== null ? S.acc : v);
+    // percent of running total when an op is pending; else /100
+    S.cur = fmt(S.op ? S.acc * v / 100 : v / 100);
+    S.fresh = false;
+    pop('op');
+  } else if ('+-*/'.includes(k)) {
+    if (S.err) { pop('op'); render(); return; }
+    if (S.op && !S.fresh) {
+      const r = apply(S.acc, S.op, curVal());
+      if (!isFinite(r) || isNaN(r)) return showError();
+      S.acc = r; S.cur = fmt(r);
+    } else if (S.acc === null || S.fresh === false || S.acc === null) {
+      if (S.acc === null) S.acc = curVal();
+    }
+    if (S.acc === null) S.acc = curVal();
+    S.op = k; S.fresh = true;
+    S.lastOp = null; S.lastB = null;
+    pop('op');
+  } else if (k === '=') {
+    if (S.err) { pop('eq'); render(); return; }
+    let a, op, b;
+    if (S.op) {
+      a = S.acc; op = S.op; b = curVal();
+      S.lastOp = op; S.lastB = b;
+    } else if (S.lastOp) {
+      a = curVal(); op = S.lastOp; b = S.lastB;   // repeated equals
+    } else {
+      a = curVal(); op = null; b = curVal();
+    }
+    if (op) {
+      const r = apply(a, op, b);
+      if (isNaN(r) || !isFinite(r)) return showError();
+      S.acc = null; S.op = null;
+      S.cur = fmt(r); S.fresh = true;
+    } else {
+      S.acc = null; S.op = null; S.fresh = true;
+    }
+    pop('eq');
+  }
+  render();
+}
+
+function showError() {
+  S.err = true;
+  S.errText = WIT[witIdx % WIT.length];
+  witIdx++;
+  S.acc = null; S.op = null; S.fresh = true; S.lastOp = null;
+  pop('eq');
+  render();
+}
+
+keys.forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    squish(btn);
+    press(btn.dataset.k, btn);
+  });
+});
+
+/* physical keyboard support */
+const KEYMAP = {
+  '/':'/', '*':'*', 'x':'*', 'X':'*', '-':'-', '+':'+',
+  'Enter':'=', '=':'=', '%':'pct', ',':'.',
+  'c':'c', 'C':'c', 'Escape':'c', 'Backspace':'c', 'n':'neg', 'N':'neg',
+};
+document.addEventListener('keydown', function (e) {
+  let k = null;
+  if (/^[0-9]$/.test(e.key)) k = e.key;
+  else if (e.key === '.' || e.key === ',') k = '.';
+  else if (KEYMAP[e.key]) k = KEYMAP[e.key];
+  if (!k) return;
+  e.preventDefault();
+  const btn = keys.find(function (b) { return b.dataset.k === k; });
+  if (btn) { squish(btn); btn.classList.add('pressed'); setTimeout(function(){ btn.classList.remove('pressed'); }, 110); }
+  press(k, btn);
+});
+
+render();
+
+</script>
+</body>
+</html>

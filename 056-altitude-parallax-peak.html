@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SUMMIT — 8,849 m</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:#0c1420; color:#e8eef8; overflow-x:hidden;
+  }
+  /* layered ridgelines */
+  .ridge { position:fixed; left:0; right:0; z-index:0; pointer-events:none; }
+  main { position:relative; z-index:5; }
+  .chapter { min-height:100vh; display:flex; align-items:center; padding:14vh 8vw; }
+  .chapter .inner { max-width:500px; }
+  .chapter:nth-child(even) .inner { margin-left:auto; text-align:right; }
+  .k { font-family:system-ui, sans-serif; font-size:10px; letter-spacing:.44em; text-transform:uppercase; color:#8fa4c4; margin-bottom:18px; }
+  .chapter h2 { font-size:clamp(28px, 4.6vw, 48px); font-weight:400; line-height:1.16; margin-bottom:22px; }
+  .chapter h2 b { color:#ffd9a0; font-weight:600; }
+  .chapter p { font-family:system-ui, sans-serif; font-weight:300; font-size:15.5px; line-height:1.85; color:#a9bcd8; }
+  .stat {
+    display:inline-flex; gap:24px; margin-top:26px; padding:14px 20px;
+    border:1px solid rgba(160,190,230,.18); border-radius:12px;
+    background:rgba(10,20,34,.5); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  }
+  .stat div { text-align:center; }
+  .stat b { display:block; font-size:20px; font-weight:400; color:#ffe9c4; font-variant-numeric:tabular-nums; }
+  .stat span { font-family:system-ui, sans-serif; font-size:8.5px; letter-spacing:.22em; text-transform:uppercase; color:#8fa4c4; }
+
+  /* altitude meter */
+  .meter {
+    position:fixed; right:24px; top:50%; transform:translateY(-50%); z-index:20;
+    display:flex; flex-direction:column; align-items:center; gap:0;
+  }
+  .meter .track {
+    width:3px; height:56vh; background:rgba(160,190,230,.18); border-radius:3px; position:relative;
+  }
+  .meter .fill {
+    position:absolute; top:0; left:0; width:100%; border-radius:3px; height:0%;
+    background:linear-gradient(180deg, #ffe9c4, #ff9d5c); box-shadow:0 0 10px rgba(255,200,140,.6);
+  }
+  .meter .climber {
+    position:absolute; left:50%; top:0%; transform:translate(-50%,-50%);
+    width:11px; height:11px; border-radius:50%; background:#ffe9c4; box-shadow:0 0 14px #ffd9a0;
+  }
+  .camps { display:flex; flex-direction:column-reverse; gap:0; height:56vh; justify-content:space-between; margin-left:10px; }
+  .camps span { font-family:system-ui, sans-serif; font-size:8px; letter-spacing:.14em; color:#6a82a8; text-transform:uppercase; writing-mode:vertical-rl; }
+  .altread { position:fixed; left:24px; bottom:20px; z-index:20; font-family:system-ui, sans-serif;
+    font-size:11px; letter-spacing:.22em; color:#8fa4c4; text-transform:uppercase; font-variant-numeric:tabular-nums; }
+  .altread b { color:#ffe9c4; font-weight:600; }
+  .o2line { position:fixed; left:24px; top:20px; z-index:20; font-family:system-ui, sans-serif;
+    font-size:10px; letter-spacing:.2em; color:#8fa4c4; text-transform:uppercase; }
+  .o2line b { color:#ff9d5c; font-weight:600; }
+
+  .oxygen-off body { }
+  body.hypoxia .vignette { opacity:1; }
+  .vignette { position:fixed; inset:0; z-index:30; pointer-events:none; opacity:0; transition:opacity 1.4s;
+    background:radial-gradient(ellipse at center, transparent 42%, rgba(8,10,18,.66) 100%); }
+
+  .finale { min-height:130vh; align-items:flex-end; padding-bottom:18vh; position:relative; }
+  .flagwrap { margin-top:30px; display:flex; gap:5px; justify-content:flex-end; }
+  .flagpole { width:2px; height:40px; background:#c9d4e4; position:relative; }
+  .flagpole::after {
+    content:""; position:absolute; top:2px; left:2px; border-style:solid; border-width:6px 0 6px 14px;
+    border-color:transparent transparent transparent #c2492e; transform-origin:left center; animation:flap 2.2s ease-in-out infinite;
+  }
+  @keyframes flap { 0%,100% { transform:skewY(0); } 50% { transform:skewY(-7deg); } }
+  .flagbtn {
+    margin-top:22px; background:transparent; border:1px solid #ffd9a0; color:#ffd9a0;
+    font-family:system-ui, sans-serif; font-size:10px; letter-spacing:.26em; text-transform:uppercase;
+    padding:12px 24px; border-radius:99px; cursor:pointer; transition:all .2s;
+  }
+  .flagbtn:hover { background:#ffd9a0; color:#14100c; }
+  .flagbtn.planted { background:#c2492e; border-color:#c2492e; color:#fff; }
+
+  @media (max-width:640px) {
+    .meter { right:10px; }
+    .camps span { font-size:7px; }
+    .chapter:nth-child(even) .inner { text-align:left; margin-left:0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .flagpole::after { animation:none; }
+    html { scroll-behavior:auto; }
+  }
+</style>
+</head>
+<body>
+  <svg class="ridge" id="ridge1" style="bottom:0;height:46vh" viewBox="0 0 1200 400" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 400 L0 240 L90 180 L170 240 L260 140 L350 230 L430 170 L520 250 L640 120 L760 220 L840 160 L960 250 L1050 180 L1200 260 L1200 400 Z" fill="#0e1826"/>
+  </svg>
+  <svg class="ridge" id="ridge2" style="bottom:0;height:34vh" viewBox="0 0 1200 300" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 300 L0 190 L120 120 L220 190 L330 90 L450 200 L560 130 L680 210 L800 100 L920 190 L1030 130 L1200 200 L1200 300 Z" fill="#122031"/>
+  </svg>
+  <div class="vignette" id="vig"></div>
+
+  <div class="o2line">supplementary o2 <b id="o2v">on</b></div>
+  <div class="altread">altitude <b id="altv">5,364 m</b> · <span id="tempv">-12°c</span></div>
+
+  <div class="meter" aria-hidden="true">
+    <div class="track"><div class="fill" id="mFill"></div><div class="climber" id="mClimb"></div></div>
+  </div>
+
+  <main>
+    <section class="chapter">
+      <div class="inner">
+        <div class="k">base camp · 5,364 m</div>
+        <h2>The mountain does not <b>negotiate.</b></h2>
+        <p>You begin at base camp in the icefall's shadow, where the glacier groans all night
+        like a ship. Above you: the western cwm, the lhotse face, the geneva spur —
+        and somewhere past the south col, a wind that has killed better climbers than either of us.
+        Scroll to climb. There is no shortcut key.</p>
+        <div class="stat"><div><b>5,364</b><span>m · base</span></div><div><b>-12°C</b><span>at dawn</span></div><div><b>98%</b><span>o₂ sat</span></div></div>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="inner">
+        <div class="k">camp ii · 6,400 m</div>
+        <h2>The valley of <b>silent wind.</b></h2>
+        <p>By camp two the air has thinned to a rumor. Every step is a sentence you must
+        finish before breathing. The lhotse face rises ahead like a held breath —
+        fixed ropes the color of old butter stitching the ice.</p>
+        <div class="stat"><div><b>6,400</b><span>m · c2</span></div><div><b>-24°C</b><span>with wind</span></div><div><b>88%</b><span>o₂ sat</span></div></div>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="inner">
+        <div class="k">south col · 7,986 m</div>
+        <h2>Into the <b>death zone.</b></h2>
+        <p>Above eight thousand metres your body is dying faster than it can heal.
+        That is not poetry; it is arithmetic. Toggles the oxygen off if you want to
+        feel what the mountain takes — the page itself will narrow.</p>
+        <div class="stat"><div><b>7,986</b><span>m · col</span></div><div><b>-31°C</b><span>jet stream</span></div><div><b>71%</b><span>o₂ sat</span></div></div>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="inner">
+        <div class="k">the hillary step · 8,790 m</div>
+        <h2>One step. <b>One breath.</b> Repeat.</h2>
+        <p>The summit pyramid is not climbing so much as very slow falling upward.
+        The blue spot becomes the black sky becomes everything. Somewhere below,
+        the world you agreed to return to.</p>
+        <div class="stat"><div><b>8,790</b><span>m · step</span></div><div><b>-38°C</b><span>squall</span></div><div><b>58%</b><span>o₂ sat</span></div></div>
+      </div>
+    </section>
+
+    <section class="chapter finale">
+      <div class="inner">
+        <div class="k">summit · 8,849 m</div>
+        <h2>The top of the <b>troposphere.</b></h2>
+        <p>You are standing where the weather lives. The horizon curves, faintly,
+        like a held breath let go. Take your photograph — the wind will take
+        everything else.</p>
+        <div class="flagwrap" id="flagwrap" aria-hidden="true"></div>
+        <button class="flagbtn" id="plantBtn">plant the flag</button>
+      </div>
+    </section>
+  </main>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const CAMPS = [
+    { alt: 5364, temp: -12 },
+    { alt: 6400, temp: -24 },
+    { alt: 7986, temp: -31 },
+    { alt: 8790, temp: -38 },
+    { alt: 8849, temp: -40 },
+  ];
+  let o2 = true;
+
+  addEventListener("scroll", () => {
+    const p = Math.max(0, Math.min(1, scrollY / (document.body.scrollHeight - innerHeight)));
+    /* altitude interpolate */
+    const alt = 5364 + p * (8849 - 5364);
+    const ci = Math.min(CAMPS.length - 2, Math.floor(p * (CAMPS.length - 1)));
+    const cp = (p * (CAMPS.length - 1)) - ci;
+    const temp = CAMPS[ci].temp + (CAMPS[ci + 1].temp - CAMPS[ci].temp) * cp;
+    $("altv").textContent = Math.round(alt).toLocaleString("en-US") + " m";
+    $("tempv").textContent = Math.round(temp) + "°c";
+    /* meter */
+    $("mFill").style.height = (p * 100) + "%";
+    $("mClimb").style.top = (p * 100) + "%";
+    /* ridges sink as you climb */
+    const sink = p * 26;
+    $("ridge1").style.transform = "translateY(" + sink + "vh)";
+    $("ridge2").style.transform = "translateY(" + (sink * 1.5) + "vh)";
+    $("ridge1").style.opacity = String(Math.max(0.25, 1 - p * 0.7));
+    /* hypoxia vignette in death zone without o2 */
+    const death = alt > 7986;
+    document.body.classList.toggle("hypoxia", death && !o2);
+    $("o2v").textContent = o2 ? "on" : "off";
+  }, { passive: true });
+
+  /* oxygen toggle */
+  addEventListener("keydown", (e) => {
+    if (e.key.toLowerCase() === "o") {
+      o2 = !o2;
+      dispatchEvent(new Event("scroll"));
+    }
+  });
+  /* also clicking the readout toggles */
+  $("o2v").addEventListener("click", () => { o2 = !o2; dispatchEvent(new Event("scroll")); });
+  $("o2v").style.cursor = "pointer";
+
+  /* ridge parallax on pointer */
+  addEventListener("pointermove", (e) => {
+    const dx = (e.clientX / innerWidth - 0.5) * 2;
+    $("ridge1").style.marginLeft = (-dx * 16) + "px";
+    $("ridge2").style.marginLeft = (-dx * 30) + "px";
+  }, { passive: true });
+
+  /* plant the flag */
+  $("plantBtn").addEventListener("click", function () {
+    if (this.classList.contains("planted")) return;
+    this.classList.add("planted");
+    this.textContent = "flag planted ✓";
+    for (let i = 0; i < 5; i++) {
+      const p = document.createElement("span");
+      p.className = "flagpole";
+      p.style.height = (26 + Math.random() * 26) + "px";
+      p.querySelector && null;
+      p.style.animationDelay = (i * 0.3) + "s";
+      $("flagwrap").appendChild(p);
+    }
+    snap();
+  });
+
+  /* summit wind audio */
+  let AC = null;
+  function snap() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      /* flag snap: short noise burst */
+      const buf = AC.createBuffer(1, AC.sampleRate * 0.2, AC.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
+      const src = AC.createBufferSource(); src.buffer = buf;
+      const f = AC.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 2000; f.Q.value = 1.4;
+      const g2 = AC.createGain(); g2.gain.value = 0.1;
+      src.connect(f); f.connect(g2); g2.connect(AC.destination);
+      src.start();
+    } catch (e) {}
+  }
+})();
+</script>
+</body>
+</html>

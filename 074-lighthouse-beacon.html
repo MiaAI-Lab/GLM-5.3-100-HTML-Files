@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THE LAST LIGHT — beacon station</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:linear-gradient(180deg, #040814 0%, #081226 55%, #0a1a30 100%);
+    color:#d8e2f0; touch-action:none; user-select:none; -webkit-user-select:none;
+  }
+  canvas#c { position:fixed; inset:0; width:100%; height:100%; }
+  .hud {
+    position:fixed; left:22px; top:18px; z-index:10;
+  }
+  .hud h1 { font-size:16px; font-weight:300; letter-spacing:.46em; text-transform:uppercase; color:#e8eef8; }
+  .hud p { font-size:9px; font-family:system-ui, sans-serif; letter-spacing:.26em; text-transform:uppercase; color:#6a82a8; margin-top:5px; }
+
+  /* log panel */
+  .log {
+    position:fixed; right:18px; top:16px; z-index:10; width:250px;
+    background:rgba(6,12,24,.72); border:1px solid rgba(140,170,220,.16); border-radius:12px;
+    padding:12px 14px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    font-family:"Courier New", monospace; font-size:10.5px; color:#8fa8c8; line-height:1.8;
+  }
+  .log h3 { font-family:system-ui, sans-serif; font-size:8.5px; letter-spacing:.3em; color:#6a82a8; text-transform:uppercase; margin-bottom:8px; }
+  .log .entry { opacity:0; animation:logIn .5s forwards; }
+  @keyframes logIn { to { opacity:1; } }
+  .log .entry i { color:#ffd9a0; font-style:normal; }
+
+  .controls {
+    position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:10;
+    display:flex; gap:12px; align-items:center; padding:12px 18px; border-radius:99px;
+    background:rgba(6,12,24,.8); border:1px solid rgba(140,170,220,.2);
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); flex-wrap:wrap; justify-content:center;
+  }
+  .controls .lab { font-family:system-ui, sans-serif; font-size:8.5px; letter-spacing:.24em; color:#6a82a8; text-transform:uppercase; }
+  input[type=range] { -webkit-appearance:none; appearance:none; width:110px; height:3px; border-radius:99px;
+    background:#1c3050; outline:none; cursor:pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#ffd9a0; box-shadow:0 0 8px #ffd9a0; }
+  .controls button {
+    background:rgba(140,170,220,.08); color:#c8d8ec; border:1px solid rgba(140,170,220,.3); border-radius:99px;
+    font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.18em; text-transform:uppercase;
+    padding:8px 16px; cursor:pointer; transition:all .15s;
+  }
+  .controls button:hover { background:rgba(140,170,220,.22); }
+  .controls button.on { background:#d4a537; border-color:#d4a537; color:#141008; }
+
+  .shipcard {
+    position:fixed; left:22px; bottom:80px; z-index:20; width:220px;
+    background:rgba(6,12,24,.85); border:1px solid rgba(140,170,220,.25); border-radius:12px;
+    padding:14px 16px; font-size:12px; font-family:system-ui, sans-serif; color:#c8d8ec;
+    opacity:0; transform:translateY(10px); transition:all .3s; pointer-events:none;
+  }
+  .shipcard.show { opacity:1; transform:none; }
+  .shipcard b { color:#ffd9a0; }
+  .shipcard .sil { margin-top:10px; }
+  @media (max-width:640px) { .log { display:none; } }
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <div class="hud">
+    <h1>The Last Light</h1>
+    <p>beacon station 9 · est. 1834 · still watching</p>
+  </div>
+
+  <div class="log" id="log">
+    <h3>keeper's log</h3>
+    <div id="logBody"></div>
+  </div>
+
+  <div class="shipcard" id="shipcard">
+    <b id="shipName">—</b><br>
+    <span id="shipInfo" style="font-size:11px;color:#8fa8c8;">—</span>
+    <div class="sil">
+      <svg id="shipSil" width="120" height="34" viewBox="0 0 120 34" aria-hidden="true">
+        <path d="M4 24 L108 24 L116 30 L8 30 Z" fill="#0e1a2c" stroke="#4a6a8c" stroke-width="1"/>
+        <rect x="30" y="14" width="8" height="10" fill="#0e1a2c" stroke="#4a6a8c"/>
+        <rect x="52" y="10" width="8" height="14" fill="#0e1a2c" stroke="#4a6a8c"/>
+        <rect x="74" y="16" width="6" height="8" fill="#0e1a2c" stroke="#4a6a8c"/>
+        <circle cx="56" cy="8" r="1.4" fill="#ffd9a0"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="controls">
+    <span class="lab">fog</span>
+    <input type="range" id="fogR" min="0" max="100" value="25">
+    <button id="dawnBtn">let dawn come</button>
+    <button id="logBtn">write in log</button>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const cv = $("c"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let beamAngle = 0, beamSpeed = 0.5, fog = 0.25, dawn = 0; /* dawn 0..1 */
+  let ships = [], stars = [];
+
+  const SHIPS = [
+    { name: "MV Kestrel", info: "tramp freighter · 4,200 dwt · bound for lisbon" },
+    { name: "Alba Fjord", info: "product tanker · slow roll of ballast water" },
+    { name: "Solstice", info: "coastal ferry · knows the keeper by name" },
+    { name: "Halyard", info: "fishing boat · running lights mismatched since 2019" },
+  ];
+
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    /* stars */
+    stars = [];
+    for (let i = 0; i < 140; i++) {
+      stars.push({ x: Math.random() * W, y: Math.random() * H * 0.5, r: Math.random() * 1.2 + 0.3, tw: Math.random() * 6.28 });
+    }
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  /* ships spawn occasionally */
+  function spawnShip() {
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    ships.push({
+      x: dir > 0 ? -60 : W + 60,
+      y: H * (0.62 + Math.random() * 0.2),
+      vx: dir * (0.22 + Math.random() * 0.25),
+      info: SHIPS[Math.floor(Math.random() * SHIPS.length)],
+      lit: false,
+    });
+  }
+  spawnShip();
+
+  /* ---------- geometry ---------- */
+  function lighthouse() {
+    return { x: W * 0.5, y: H * 0.46, baseW: 46, h: H * 0.28 };
+  }
+
+  /* ---------- render ---------- */
+  let lastShipN = 0;
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+    const LH = lighthouse();
+
+    /* sky/sea grade by dawn */
+    const sky = g.createLinearGradient(0, 0, 0, H * 0.62);
+    if (dawn < 0.5) {
+      sky.addColorStop(0, "#040814");
+      sky.addColorStop(1, dawn > 0 ? `rgb(${4 + dawn * 2 * 90}, ${8 + dawn * 2 * 80}, ${20 + dawn * 2 * 80})` : "#0a1a30");
+    } else {
+      const k = (dawn - 0.5) / 0.5;
+      sky.addColorStop(0, `rgb(${94 + k * 120}, ${88 + k * 100}, ${100 + k * 90})`);
+      sky.addColorStop(1, `rgb(${214 - k * 40}, ${168 - k * 20}, ${160 - k * 40})`);
+    }
+    g.fillStyle = sky;
+    g.fillRect(0, 0, W, H * 0.62);
+    const sea = g.createLinearGradient(0, H * 0.62, 0, H);
+    sea.addColorStop(0, dawn < 0.5 ? "#0a1c30" : "#3a5a78");
+    sea.addColorStop(1, dawn < 0.5 ? "#050e1a" : "#2a4a66");
+    g.fillStyle = sea;
+    g.fillRect(0, H * 0.62, W, H * 0.38);
+
+    /* stars fade with dawn */
+    stars.forEach(s => {
+      const a = (0.4 + 0.6 * Math.sin(now / 900 + s.tw)) * (1 - dawn);
+      g.fillStyle = "rgba(230,240,255," + a * 0.8 + ")";
+      g.fillRect(s.x, s.y, s.r, s.r);
+    });
+
+    /* rocks */
+    g.fillStyle = dawn < 0.5 ? "#060c16" : "#2a3444";
+    g.beginPath();
+    g.moveTo(0, H);
+    g.lineTo(0, H * 0.86);
+    g.quadraticCurveTo(W * 0.3, H * 0.78, W * 0.5, H * 0.84);
+    g.quadraticCurveTo(W * 0.7, H * 0.9, W, H * 0.82);
+    g.lineTo(W, H);
+    g.fill();
+
+    /* beam sweep (only at night) */
+    const beamOn = dawn < 0.55;
+    if (beamOn) {
+      beamAngle += beamSpeed * 0.012;
+      const bx = LH.x, by = LH.y - LH.h + 30;
+      const len = Math.max(W, H) * 1.2;
+      /* two cones */
+      for (const side of [0, Math.PI]) {
+        const a = beamAngle + side;
+        const grd = g.createLinearGradient(bx, by, bx + Math.cos(a) * len, by + Math.sin(a) * len);
+        const fogBoost = 0.10 + fog * 0.22;
+        grd.addColorStop(0, "rgba(255,238,180," + fogBoost + ")");
+        grd.addColorStop(1, "rgba(255,238,180,0)");
+        g.fillStyle = grd;
+        g.beginPath();
+        g.moveTo(bx, by);
+        g.lineTo(bx + Math.cos(a - 0.055) * len, by + Math.sin(a - 0.055) * len);
+        g.lineTo(bx + Math.cos(a + 0.055) * len, by + Math.sin(a + 0.055) * len);
+        g.closePath();
+        g.fill();
+      }
+    }
+
+    /* lighthouse tower */
+    const lx = LH.x, h = LH.h;
+    g.save();
+    /* tapered tower */
+    g.beginPath();
+    g.moveTo(lx - LH.baseW / 2, H * 0.84);
+    g.lineTo(lx - 13, H * 0.84 - h);
+    g.lineTo(lx + 13, H * 0.84 - h);
+    g.lineTo(lx + LH.baseW / 2, H * 0.84);
+    g.closePath();
+    const tower = g.createLinearGradient(lx - 24, 0, lx + 24, 0);
+    tower.addColorStop(0, dawn < 0.5 ? "#1a2436" : "#c8b8a8");
+    tower.addColorStop(0.5, dawn < 0.5 ? "#26344a" : "#f0e4d4");
+    tower.addColorStop(1, dawn < 0.5 ? "#141e2e" : "#b8a890");
+    g.fillStyle = tower;
+    g.fill();
+    /* stripes */
+    g.fillStyle = dawn < 0.5 ? "#0c1522" : "#a84a3a";
+    for (let i = 0; i < 3; i++) {
+      const yy = H * 0.84 - h * (0.3 + i * 0.24);
+      const ww = 10 + i * 2;
+      g.fillRect(lx - ww, yy, ww * 2, h * 0.12);
+    }
+    /* lantern room */
+    g.fillStyle = dawn < 0.5 ? "#101a28" : "#d8c8b8";
+    g.fillRect(lx - 16, H * 0.84 - h - 26, 32, 26);
+    /* lamp */
+    const lampGlow = beamOn ? 0.9 : 0.2;
+    const lamp = g.createRadialGradient(lx, H * 0.84 - h - 13, 2, lx, H * 0.84 - h - 13, 30);
+    lamp.addColorStop(0, "rgba(255,244,200," + lampGlow + ")");
+    lamp.addColorStop(1, "rgba(255,244,200,0)");
+    g.fillStyle = lamp;
+    g.beginPath(); g.arc(lx, H * 0.84 - h - 13, 30, 0, 6.283); g.fill();
+    /* gallery deck + roof */
+    g.fillStyle = dawn < 0.5 ? "#18243a" : "#8a7a68";
+    g.fillRect(lx - 20, H * 0.84 - h - 30, 40, 5);
+    g.beginPath();
+    g.moveTo(lx - 18, H * 0.84 - h - 30);
+    g.lineTo(lx, H * 0.84 - h - 44);
+    g.lineTo(lx + 18, H * 0.84 - h - 30);
+    g.closePath();
+    g.fill();
+    g.restore();
+
+    /* fog bands */
+    if (fog > 0.05) {
+      for (let i = 0; i < 4; i++) {
+        const fy = H * (0.5 + i * 0.12) + Math.sin(now / 4000 + i * 2) * 12;
+        const fgr = g.createLinearGradient(0, fy - 30, 0, fy + 30);
+        fgr.addColorStop(0, "rgba(190,205,220,0)");
+        fgr.addColorStop(0.5, "rgba(190,205,220," + fog * 0.14 + ")");
+        fgr.addColorStop(1, "rgba(190,205,220,0)");
+        g.fillStyle = fgr;
+        g.fillRect(0, fy - 30, W, 60);
+      }
+    }
+
+    /* ships */
+    ships.forEach(s => {
+      s.x += s.vx;
+      /* lit when beam crosses */
+      const bx = LH.x, by = LH.y - LH.h + 30;
+      const angToShip = Math.atan2(s.y - by, s.x - bx);
+      let d = Math.abs(((beamAngle - angToShip) % 6.283 + 6.283) % 6.283);
+      if (d > 3.1416) d = 6.283 - d;
+      const inBeam = beamOn && d < 0.09;
+      if (inBeam && !s.lit) {
+        s.lit = true;
+        s.litT = now;
+        if (Math.random() < 0.5) horn();
+        showShipCard(s);
+      }
+      /* hull */
+      g.fillStyle = dawn < 0.5 ? (s.lit && now - s.litT < 2500 ? "#3a5a7c" : "#101c2c") : "#4a5a6c";
+      g.beginPath();
+      g.moveTo(s.x - 16, s.y);
+      g.lineTo(s.x + 16, s.y);
+      g.lineTo(s.x + 12, s.y + 6);
+      g.lineTo(s.x - 12, s.y + 6);
+      g.closePath();
+      g.fill();
+      /* superstructure */
+      g.fillRect(s.x - 5, s.y - 8, 8, 8);
+      /* running lights */
+      g.fillStyle = "#ff5a4a";
+      g.fillRect(s.x - 16, s.y - 2, 2, 2);
+      g.fillStyle = "#5aff8a";
+      g.fillRect(s.x + 14, s.y - 2, 2, 2);
+      /* mast light glows when beamed */
+      if (s.lit && now - s.litT < 2500) {
+        const lg = g.createRadialGradient(s.x, s.y - 10, 1, s.x, s.y - 10, 14);
+        lg.addColorStop(0, "rgba(255,240,190,.8)");
+        lg.addColorStop(1, "rgba(255,240,190,0)");
+        g.fillStyle = lg;
+        g.beginPath(); g.arc(s.x, s.y - 10, 14, 0, 6.283); g.fill();
+      }
+    });
+    ships = ships.filter(s => s.x > -100 && s.x < W + 100);
+    if (Math.random() < 0.0012) spawnShip();
+
+    /* sea shimmer */
+    g.fillStyle = "rgba(255,255,255,.04)";
+    for (let i = 0; i < 20; i++) {
+      const sy = H * 0.65 + (i * 37) % (H * 0.3);
+      const sx = (i * 173 + now / 40) % W;
+      g.fillRect(sx, sy, 30 - (i % 5) * 4, 1.2);
+    }
+  }
+  requestAnimationFrame(loop);
+
+  /* ---------- ship card ---------- */
+  let cardT = null;
+  function showShipCard(s) {
+    $("shipName").textContent = s.info.name;
+    $("shipInfo").textContent = s.info.info;
+    $("shipcard").classList.add("show");
+    clearTimeout(cardT);
+    cardT = setTimeout(() => $("shipcard").classList.remove("show"), 4200);
+  }
+
+  /* ---------- audio: distant horn ---------- */
+  let AC = null;
+  function horn() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      const t0 = AC.currentTime;
+      const o = AC.createOscillator(), gn = AC.createGain();
+      o.type = "sawtooth"; o.frequency.value = 82;
+      const f = AC.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 300;
+      gn.gain.setValueAtTime(0.0001, t0);
+      gn.gain.linearRampToValueAtTime(0.05, t0 + 0.4);
+      gn.gain.setValueAtTime(0.05, t0 + 1.2);
+      gn.gain.linearRampToValueAtTime(0.0001, t0 + 2);
+      o.connect(f); f.connect(gn); gn.connect(AC.destination);
+      o.start(t0); o.stop(t0 + 2.1);
+    } catch (e) {}
+  }
+
+  /* ---------- keeper's log ---------- */
+  const LOGS = [
+    "wind ne, fresh. lamp trimmed, <i>all well</i>.",
+    "fog bank at dusk. bell rung thrice. no answer.",
+    "the ferry saluted twice today. i saluted back with the shutter.",
+    "kept the light. what else does a keeper do.",
+    "a gull has opinions about the gallery rail.",
+    "paint ordered. again. the sea keeps eating the tower.",
+    "quiet watch. the best kind.",
+  ];
+  let li = 0;
+  function addLog() {
+    const d = document.createElement("div");
+    d.className = "entry";
+    d.innerHTML = "· " + LOGS[li % LOGS.length];
+    li++;
+    $("logBody").prepend(d);
+    while ($("logBody").children.length > 5) $("logBody").lastChild.remove();
+  }
+  addLog(); addLog();
+  setInterval(() => { if (!document.hidden && Math.random() < 0.4) addLog(); }, 14000);
+  $("logBtn").addEventListener("click", () => {
+    const v = prompt("write your entry, keeper:");
+    if (v) {
+      const d = document.createElement("div");
+      d.className = "entry";
+      d.innerHTML = "· <i>" + v.replace(/</g, "&lt;") + "</i>";
+      $("logBody").prepend(d);
+    }
+  });
+
+  /* ---------- controls ---------- */
+  $("fogR").addEventListener("input", (e) => { fog = parseInt(e.target.value, 10) / 100; });
+  /* drag beam speed */
+  let draggingBeam = false;
+  cv.addEventListener("pointerdown", (e) => {
+    if (Math.abs(e.clientX - lighthouse().x) < 80) draggingBeam = true;
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (draggingBeam) {
+      const LH = lighthouse();
+      const by = LH.y - LH.h + 30;
+      const target = Math.atan2(e.clientY - by, e.clientX - LH.x);
+      let diff = (target - beamAngle) % 6.283;
+      if (diff > 3.1416) diff -= 6.283;
+      if (diff < -3.1416) diff += 6.283;
+      beamAngle += diff * 0.4;
+      beamSpeed = Math.max(0.1, Math.min(2.4, Math.abs(diff) * 2.2));
+    }
+  });
+  addEventListener("pointerup", () => { draggingBeam = false; });
+
+  /* dawn sequence */
+  let dawning = false;
+  $("dawnBtn").addEventListener("click", function () {
+    if (dawning) return;
+    dawning = true;
+    this.textContent = "dawn is coming…";
+    const iv = setInterval(() => {
+      dawn += 0.01;
+      if (dawn >= 1) {
+        clearInterval(iv);
+        this.textContent = "night falls again";
+        setTimeout(() => {
+          const fade = setInterval(() => {
+            dawn -= 0.02;
+            if (dawn <= 0) {
+              clearInterval(fade);
+              dawn = 0;
+              dawning = false;
+              this.textContent = "let dawn come";
+            }
+          }, 60);
+        }, 4000);
+      }
+    }, 90);
+  });
+})();
+</script>
+</body>
+</html>

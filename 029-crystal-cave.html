@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUMEN CAVERNS — an explorable crystal cave</title>
+<style>
+  :root {
+    --stone-0:#07090e; --stone-1:#0d1119; --stone-2:#151b26;
+    --cyan:#3fd8e8; --violet:#9a6cf0; --mint:#57e6b0;
+    --txt:#8fa8b8;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    background:
+      radial-gradient(120% 80% at 50% 115%, #0a1a1e 0%, transparent 55%),
+      linear-gradient(180deg, var(--stone-1), var(--stone-0) 70%);
+    overflow:hidden;
+    font-family: "Gill Sans", "Segoe UI", Calibri, sans-serif;
+    color:var(--txt);
+  }
+  .stage { position:fixed; inset:0; cursor:none; }
+  canvas.floor { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  svg.cave { position:absolute; inset:0; width:100%; height:100%; display:block; }
+
+  .lantern-tip {
+    position:fixed; pointer-events:none; z-index:40;
+    width:10px; height:10px; border-radius:50%;
+    background:radial-gradient(circle, rgba(255,238,190,.95), rgba(255,220,140,0) 70%);
+    transform:translate(-50%,-50%);
+    transition:opacity .3s;
+  }
+
+  .hud {
+    position:fixed; top:18px; left:20px; z-index:50; max-width:290px;
+    text-shadow:0 1px 6px #000;
+  }
+  .hud h1 { font-size:15px; letter-spacing:.42em; color:#cfe8ea; font-weight:500; }
+  .hud p  { font-size:10.5px; letter-spacing:.18em; margin-top:6px; line-height:1.8; }
+
+  .controls {
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+    z-index:50; display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center;
+    padding:0 12px;
+  }
+  .cbtn {
+    font:inherit; font-size:10.5px; letter-spacing:.22em; cursor:pointer;
+    color:#bcd8da; background:rgba(10,16,22,.55);
+    border:1px solid rgba(120,180,190,.25); border-radius:999px;
+    padding:9px 18px; backdrop-filter:blur(3px);
+    transition:border-color .3s, color .3s;
+  }
+  .cbtn:hover { border-color:rgba(160,230,240,.6); color:#eaffff; }
+  .cbtn.active {
+    border-color:var(--mint); color:var(--mint);
+    box-shadow:0 0 18px rgba(87,230,176,.25);
+  }
+  .whisper {
+    position:fixed; bottom:64px; left:50%; transform:translateX(-50%);
+    font-size:10px; letter-spacing:.3em; color:#5f7d84; z-index:50;
+    text-shadow:0 1px 4px #000; opacity:.9; pointer-events:none; text-align:center;
+  }
+  @media (max-width:480px){
+    .hud{ max-width:220px; } .hud h1{ font-size:13px; letter-spacing:.3em; }
+    .cbtn{ padding:8px 14px; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .lantern-tip{ transition:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <canvas class="floor" id="floorFx"></canvas>
+    <svg class="cave" id="cave" aria-label="Crystal cavern"></svg>
+  </div>
+  <div class="lantern-tip" id="tip" style="opacity:0"></div>
+
+  <div class="hud">
+    <h1>LUMEN CAVERNS</h1>
+    <p>YOUR CURSOR IS A LANTERN —<br>MOVE IT TO WAKE THE CRYSTALS.<br>TAP A CRYSTAL TO HEAR ITS TONE.</p>
+  </div>
+
+  <div class="whisper" id="whisper">hush — the cave is listening</div>
+
+  <div class="controls">
+    <button class="cbtn" id="soundBtn" aria-pressed="false">CHIMES: OFF</button>
+    <button class="cbtn" id="breatheBtn">DEEP BREATHE</button>
+    <button class="cbtn" id="sporeBtn">RELEASE SPORES</button>
+  </div>
+
+<script>
+'use strict';
+/* ---------- LUMEN CAVERNS: procedural cave ---------- */
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('cave');
+const stage = document.getElementById('stage');
+const floorFx = document.getElementById('floorFx');
+const fctx = floorFx.getContext('2d');
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let W = innerWidth, H = innerHeight;
+
+/* lantern position (normalized + px), eased */
+const lantern = { x:0.5, y:0.45, px:0, py:0, tx:0.5, ty:0.45 };
+
+/* ---------- stone: layered noise polygons ---------- */
+function rnd(seedObj){ return seedObj.v = (seedObj.v * 16807) % 2147483647; }
+function buildStone(){
+  const seed = { v: 20260814 };
+  const layers = [];
+  for (let L=0; L<4; L++){
+    let d = 'M0 ' + (H*(0.1+L*0.06)).toFixed(1);
+    for (let x=0; x<=W; x+=Math.max(40, W/24)){
+      const y = H*(0.12+L*0.08) + (rnd(seed)/2147483647 - .5)*H*0.22
+              + Math.sin(x*0.004 + L*2.1)*H*0.05;
+      d += ' L' + x.toFixed(1) + ' ' + y.toFixed(1);
+    }
+    d += ' L' + W + ' ' + H + ' L0 ' + H + ' Z';
+    layers.push(d);
+  }
+  return layers;
+}
+function buildShards(seedObj, count, palette, ymin, ymax){
+  const shards = [];
+  for (let i=0;i<count;i++){
+    const x = 0.04 + (rnd(seedObj)/2147483647)*0.92;
+    const y = ymin + (rnd(seedObj)/2147483647)*(ymax-ymin);
+    const n = 3 + Math.floor(rnd(seedObj)%3);
+    const hue = palette[Math.floor(rnd(seedObj))%palette.length];
+    const scale = 0.5 + (rnd(seedObj)/2147483647)*0.9;
+    const tilt = (rnd(seedObj)/2147483647 - .5) * 0.9;
+    shards.push({ x, y, n, hue, scale, tilt, glow:0, id:i });
+  }
+  return shards;
+}
+function shardPath(s, size){
+  // crystal cluster: n shards fanning up
+  let d = '';
+  for (let k=0;k<s.n;k++){
+    const a = -Math.PI/2 + (k - (s.n-1)/2) * 0.42 + s.tilt*0.3;
+    const len = size * s.scale * (0.6 + 0.5*Math.abs(Math.sin(k*2.3+s.id)));
+    const w = size * s.scale * 0.16;
+    const bx = 0, by = 0;
+    const tipx = bx + Math.cos(a)*len, tipy = by + Math.sin(a)*len;
+    const lx = bx + Math.cos(a - Math.PI/2)*w, ly = by + Math.sin(a - Math.PI/2)*w;
+    const rx = bx + Math.cos(a + Math.PI/2)*w, ry = by + Math.sin(a + Math.PI/2)*w;
+    d += 'M'+bx.toFixed(1)+' '+by.toFixed(1)+
+         ' L'+lx.toFixed(1)+' '+ly.toFixed(1)+
+         ' L'+tipx.toFixed(1)+' '+tipy.toFixed(1)+
+         ' L'+rx.toFixed(1)+' '+ry.toFixed(1)+' Z ';
+  }
+  return d;
+}
+
+const PALETTE = ['#3fd8e8', '#9a6cf0', '#57e6b0'];
+const seed = { v: 987654321 };
+const clusters = [
+  // {cx, cy} anchor points; each holds 3-6 crystals
+];
+const crystals = [];   // {x,y (norm), hue, size, el, glowEl, polyEl, glow, toneIdx}
+function buildCave(){
+  svg.innerHTML = '';
+  // stone strata
+  const layers = buildStone();
+  layers.forEach(function(d, i){
+    const p = document.createElementNS(NS,'path');
+    p.setAttribute('d', d);
+    p.setAttribute('fill', 'rgba(' + (18+i*6) + ',' + (24+i*6) + ',' + (34+i*7) + ',0.9)');
+    p.setAttribute('stroke', 'rgba(60,80,95,0.18)');
+    p.setAttribute('stroke-width','1');
+    svg.appendChild(p);
+  });
+  // scattered rock chips
+  for (let i=0;i<26;i++){
+    const x = (rnd(seed)/2147483647)*W, y = (rnd(seed)/2147483647)*H;
+    const r = 3 + (rnd(seed)%14);
+    const el = document.createElementNS(NS,'polygon');
+    let pts = '';
+    for (let k=0;k<5;k++){
+      const a = k/5*Math.PI*2;
+      pts += (x+Math.cos(a)*r*(0.7+rnd(seed)%6/10)).toFixed(1)+','+
+             (y+Math.sin(a)*r*(0.7+rnd(seed)%6/10)).toFixed(1)+' ';
+    }
+    el.setAttribute('points', pts);
+    el.setAttribute('fill','rgba(30,40,52,.55)');
+    el.setAttribute('stroke','rgba(70,95,110,.14)');
+    svg.appendChild(el);
+  }
+  // crystal clusters
+  const anchors = [
+    [0.18,0.62],[0.36,0.78],[0.55,0.58],[0.72,0.74],[0.86,0.52],
+    [0.28,0.40],[0.62,0.34],[0.44,0.9],[0.9,0.8],[0.08,0.86],
+  ];
+  anchors.forEach(function(a, ai){
+    const n = 3 + Math.floor(rnd(seed)%4);
+    for (let k=0;k<n;k++){
+      const x = a[0] + (rnd(seed)/2147483647-.5)*0.06;
+      const y = a[1] + (rnd(seed)/2147483647-.5)*0.05;
+      const hue = PALETTE[Math.floor(rnd(seed))%3];
+      const size = 34 + (rnd(seed)%46);
+      const gEl = document.createElementNS(NS,'circle');
+      gEl.setAttribute('r', (size*1.5).toFixed(1));
+      gEl.setAttribute('cx','0'); gEl.setAttribute('cy','0');
+      gEl.setAttribute('fill', hue);
+      gEl.setAttribute('opacity','0');
+      gEl.setAttribute('filter','none');
+      const cEl = document.createElementNS(NS,'path');
+      cEl.setAttribute('d', shardPath({x,y,n:3+Math.floor(rnd(seed)%3),hue,scale:0.5+(rnd(seed)%70)/100, tilt:(rnd(seed)%100)/100-0.5, id:ai*7+k}, size));
+      cEl.setAttribute('fill', 'rgba(10,14,20,0.85)');
+      cEl.setAttribute('stroke', hue);
+      cEl.setAttribute('stroke-width','1.2');
+      cEl.setAttribute('stroke-opacity','0.5');
+      const facet = document.createElementNS(NS,'path');
+      facet.setAttribute('d', cEl.getAttribute('d'));
+      facet.setAttribute('fill', hue);
+      facet.setAttribute('opacity','0');
+      svg.appendChild(gEl);
+      svg.appendChild(cEl);
+      svg.appendChild(facet);
+      crystals.push({
+        x, y, hue, size, el:cEl, glowEl:gEl, facet,
+        glow:0, cluster:ai,
+        tone: Math.floor(rnd(seed)%5),
+      });
+    }
+  });
+}
+
+/* ---------- spores of light (canvas layer) ---------- */
+const spores = [];
+for (let i=0;i<42;i++){
+  spores.push({
+    x:Math.random(), y:Math.random(),
+    vx:(Math.random()-.5)*0.00007, vy:-0.00003 - Math.random()*0.00006,
+    r: 1 + Math.random()*2.1, tw: Math.random()*Math.PI*2,
+  });
+}
+/* deep water ripples at floor */
+const ripples = [];
+function spawnRipple(){
+  ripples.push({ x:Math.random()*0.8+0.1, t:0 });
+  if (ripples.length > 5) ripples.shift();
+}
+setInterval(spawnRipple, 3600);
+
+/* ---------- lantern + dim veil drawing ---------- */
+let darkness = 1;        // 1 = normal veil; breathe raises toward 1.6
+let breatheUntil = 0;
+function drawVeil(){
+  const w = floorFx.width, h = floorFx.height;
+  fctx.clearRect(0,0,w,h);
+  // darkness with lantern hole
+  fctx.globalCompositeOperation = 'source-over';
+  const g = fctx.createRadialGradient(
+    lantern.px, lantern.py, 0,
+    lantern.px, lantern.py, Math.max(140, W*0.22)
+  );
+  const dim = Math.min(0.93, 0.62*darkness);
+  g.addColorStop(0, 'rgba(4,6,10,0)');
+  g.addColorStop(0.55, 'rgba(4,6,10,'+(dim*0.5)+')');
+  g.addColorStop(1, 'rgba(4,6,10,'+dim+')');
+  fctx.fillStyle = g;
+  fctx.fillRect(0,0,w,h);
+  fctx.fillStyle = 'rgba(4,6,10,'+(dim*0.98)+')';
+  // lantern warm halo
+  const halo = fctx.createRadialGradient(
+    lantern.px, lantern.py, 0, lantern.px, lantern.py, Math.max(120, W*0.2));
+  halo.addColorStop(0, 'rgba(255,232,180,0.14)');
+  halo.addColorStop(1, 'rgba(255,232,180,0)');
+  fctx.globalCompositeOperation = 'lighter';
+  fctx.fillStyle = halo;
+  fctx.fillRect(0,0,w,h);
+  // spores
+  for (const s of spores){
+    const sx = s.x*w, sy = s.y*h;
+    const d = Math.hypot(sx-lantern.px, sy-lantern.py);
+    const near = Math.max(0, 1 - d/(W*0.3));
+    const a = 0.06 + near*0.4 + Math.sin(s.tw)*0.05;
+    if (a <= 0.02) continue;
+    fctx.fillStyle = 'rgba(190,235,255,'+a.toFixed(3)+')';
+    fctx.beginPath(); fctx.arc(sx, sy, s.r*(1+near), 0, Math.PI*2); fctx.fill();
+  }
+  // ripples on cave floor pool
+  fctx.strokeStyle = 'rgba(120,200,220,0.10)';
+  for (const r of ripples){
+    const cx = r.x*w, cy = h*0.94;
+    const rad = r.t * w * 0.09;
+    for (let k=0;k<3;k++){
+      fctx.beginPath();
+      fctx.ellipse(cx, cy, rad + k*12, (rad + k*12)*0.16, 0, 0, Math.PI*2);
+      fctx.globalAlpha = Math.max(0, 0.3 - r.t*0.22 - k*0.06);
+      fctx.stroke();
+    }
+    fctx.globalAlpha = 1;
+  }
+  fctx.globalCompositeOperation = 'source-over';
+}
+
+/* ---------- crystal illumination ---------- */
+function illuminate(){
+  for (const c of crystals){
+    const cx = c.x*W, cy = c.y*H;
+    const d = Math.hypot(cx-lantern.px, cy-lantern.py);
+    const R = Math.max(150, W*0.24);
+    let near = Math.max(0, 1 - d/R);
+    if (performance.now() < breatheUntil){
+      // deep breathe: only nearest cluster lights
+      const sameClusterNearest = nearestClusterId() === c.cluster;
+      near = sameClusterNearest ? Math.max(near, 0.85) : near*0.12;
+    }
+    const glow = Math.min(1, near + c.glow);
+    const t = performance.now()*0.0004 + c.tone;
+    const shimmer = 0.82 + 0.18*Math.sin(t*1.7 + c.cluster);
+    c.el.setAttribute('transform',
+      'translate('+cx.toFixed(1)+' '+(cy).toFixed(1)+')');
+    c.glowEl.setAttribute('transform',
+      'translate('+cx.toFixed(1)+' '+(cy).toFixed(1)+')');
+    c.glowEl.setAttribute('opacity', (glow*0.30*shimmer).toFixed(3));
+    c.glowEl.setAttribute('r', (c.size*(1.1+glow*0.7)).toFixed(1));
+    c.facet.setAttribute('transform',
+      'translate('+cx.toFixed(1)+' '+(cy).toFixed(1)+')');
+    c.facet.setAttribute('opacity', (glow*0.4*shimmer).toFixed(3));
+    c.el.setAttribute('stroke-opacity', (0.15 + glow*0.7).toFixed(3));
+    c.el.setAttribute('fill', 'rgba(10,14,20,'+(0.9-glow*0.35).toFixed(3)+')');
+    c.glow = Math.max(0, c.glow - 0.004);
+  }
+}
+function nearestClusterId(){
+  let best = -1, bd = 1e9;
+  for (const c of crystals){
+    const d = Math.hypot(c.x*W-lantern.px, c.y*H-lantern.py);
+    if (d < bd){ bd = d; best = c.cluster; }
+  }
+  return best;
+}
+
+/* ---------- WebAudio pentatonic chimes (gesture-gated) ---------- */
+let AC=null, master=null, chimes=false;
+const soundBtn = document.getElementById('soundBtn');
+const PENTA = [261.63, 293.66, 329.63, 392.00, 440.00];  // C D E G A
+function ensureAudio(){
+  if (AC) return true;
+  try {
+    AC = new (window.AudioContext||window.webkitAudioContext)();
+    master = AC.createGain(); master.gain.value = 0.16;
+    master.connect(AC.destination);
+  } catch(e){ AC = null; }
+  return !!AC;
+}
+soundBtn.addEventListener('click', function(){
+  chimes = !chimes;
+  soundBtn.textContent = 'CHIMES: ' + (chimes ? 'ON' : 'OFF');
+  soundBtn.classList.toggle('active', chimes);
+  soundBtn.setAttribute('aria-pressed', String(chimes));
+  if (chimes && ensureAudio() && AC.state==='suspended') AC.resume().catch(function(){});
+});
+function chime(idx, vol){
+  if (!chimes || !ensureAudio() || !AC) return;
+  const t = AC.currentTime;
+  const f = PENTA[((idx%PENTA.length)+PENTA.length)%PENTA.length] * (idx >= 5 && idx < 10 ? 2 : 1);
+  const o = AC.createOscillator(), o2 = AC.createOscillator(), g = AC.createGain();
+  o.type='sine'; o.frequency.value = f;
+  o2.type='sine'; o2.frequency.value = f*2.01;   // beating partial
+  const g2 = AC.createGain(); g2.gain.value = 0.3;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol||0.5, t+0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+2.2);
+  o.connect(g); o2.connect(g2); g2.connect(g); g.connect(master);
+  o.start(t); o2.start(t); o.stop(t+2.3); o2.stop(t+2.3);
+}
+
+/* ---------- interactions ---------- */
+const tip = document.getElementById('tip');
+const whisper = document.getElementById('whisper');
+const WHISPERS = [
+  'hush — the cave is listening',
+  'the crystals remember sunlight',
+  'somewhere below, water moves',
+  'your lantern is small and brave',
+];
+let whisperIdx = 0;
+setInterval(function(){
+  whisperIdx = (whisperIdx+1)%WHISPERS.length;
+  whisper.style.opacity = 0;
+  setTimeout(function(){
+    whisper.textContent = WHISPERS[whisperIdx];
+    whisper.style.opacity = .9;
+  }, 600);
+}, 7000);
+whisper.style.transition = 'opacity .6s';
+
+stage.addEventListener('pointermove', function(e){
+  lantern.tx = e.clientX / W;
+  lantern.ty = e.clientY / H;
+  tip.style.opacity = 1;
+});
+stage.addEventListener('pointerleave', function(){ tip.style.opacity = 0; });
+stage.addEventListener('pointerdown', function(e){
+  // find crystal within grab radius
+  let best = null, bd = 90;
+  for (const c of crystals){
+    const d = Math.hypot(c.x*W - e.clientX, c.y*H - e.clientY);
+    if (d < bd){ bd = d; best = c; }
+  }
+  if (best){
+    best.glow = 1.2;
+    chime(best.tone);
+    // neighbors hum softly too
+    for (const c of crystals){
+      if (c !== best && c.cluster === best.cluster) c.glow = Math.max(c.glow, 0.7);
+    }
+  }
+});
+
+document.getElementById('breatheBtn').addEventListener('click', function(){
+  breatheUntil = performance.now() + 6000;
+  const btn = this;
+  btn.classList.add('active');
+  setTimeout(function(){ btn.classList.remove('active'); }, 6000);
+  darkness = 1.35;
+  setTimeout(function(){ darkness = 1; }, 6000);
+});
+document.getElementById('sporeBtn').addEventListener('click', function(){
+  for (let i=0;i<16;i++){
+    spores.push({
+      x: lantern.tx, y: lantern.ty,
+      vx:(Math.random()-.5)*0.0004, vy:-0.0001-Math.random()*0.0003,
+      r: 1+Math.random()*2, tw: Math.random()*6,
+    });
+  }
+  while (spores.length > 90) spores.shift();
+});
+
+/* ---------- resize + main loop ---------- */
+function resize(){
+  W = innerWidth; H = innerHeight;
+  const DPR = Math.min(2, devicePixelRatio||1);
+  floorFx.width = W*DPR; floorFx.height = H*DPR;
+  fctx.setTransform(DPR,0,0,DPR,0,0);
+  buildCave();
+}
+window.addEventListener('resize', resize);
+
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(60, now-last); last = now;
+  // ease lantern toward target
+  const ease = reduced ? 1 : 0.09;
+  lantern.x += (lantern.tx - lantern.x)*ease;
+  lantern.y += (lantern.ty - lantern.y)*ease;
+  lantern.px = lantern.x*W; lantern.py = lantern.y*H;
+  tip.style.left = lantern.px+'px';
+  tip.style.top = lantern.py+'px';
+  // drift spores
+  if (!reduced){
+    for (const s of spores){
+      s.x += s.vx*dt; s.y += s.vy*dt; s.tw += dt*0.002;
+      if (s.y < -0.02){ s.y = 1.02; s.x = Math.random(); }
+      if (s.x < -0.02) s.x = 1.02;
+      if (s.x > 1.02) s.x = -0.02;
+    }
+    for (const r of ripples) r.t += dt*0.0004;
+  }
+  drawVeil();
+  illuminate();
+  requestAnimationFrame(frame);
+}
+resize();
+requestAnimationFrame(frame);
+
+
+</script>
+</body>
+</html>

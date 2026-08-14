@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WORDS IN MOTION — a kinetic typography stage</title>
+<style>
+  :root{
+    --paper:#F4F1EA; --ink:#141210; --accent:#FF3B00;
+    --mono:"Courier New",Courier,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    background:var(--paper); color:var(--ink);
+    overflow:hidden;
+  }
+  /* faint registration marks of a rehearsal room */
+  body::before,body::after{
+    content:""; position:fixed; pointer-events:none; z-index:1; opacity:.5;
+  }
+  body::before{
+    left:50%; top:0; bottom:0; width:1px;
+    background:repeating-linear-gradient(180deg, rgba(20,18,16,.14) 0 6px, transparent 6px 22px);
+  }
+  body::after{
+    top:50%; left:0; right:0; height:1px;
+    background:repeating-linear-gradient(90deg, rgba(20,18,16,.14) 0 6px, transparent 6px 22px);
+  }
+  .stage{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    perspective:1100px;
+  }
+  #word{
+    position:relative; display:flex; align-items:baseline; justify-content:center;
+    font-weight:900; line-height:1;
+    font-size:clamp(3.4rem, 16vw, 15rem);
+    letter-spacing:-.03em; will-change:transform;
+    transform-style:preserve-3d;
+  }
+  #word span{
+    display:inline-block; will-change:transform,opacity;
+    transform-origin:50% 50%;
+  }
+  #word span.acc{color:var(--accent)}
+  /* edges: scene name + beat counter */
+  .edgeTL,.edgeTR,.edgeBL{
+    position:fixed; z-index:5; font-family:var(--mono);
+    font-size:.64rem; letter-spacing:.28em; text-transform:uppercase;
+    color:var(--ink); opacity:.85; pointer-events:none;
+  }
+  .edgeTL{top:1rem; left:1.2rem}
+  .edgeTR{top:1rem; right:1.2rem; text-align:right}
+  .edgeBL{bottom:5.6rem; left:1.2rem; line-height:1.9}
+  .edgeTL b{font-weight:700; color:var(--accent)}
+  .edgeBR{
+    position:fixed; z-index:5; right:1.2rem; bottom:5.6rem;
+    font-family:var(--mono); font-size:.6rem; letter-spacing:.2em;
+    text-transform:uppercase; text-align:right; line-height:1.9;
+    color:rgba(20,18,16,.62); pointer-events:none;
+  }
+  .edgeBR .now{color:var(--ink); font-weight:700}
+  .edgeBR em{font-style:normal; color:var(--accent)}
+  .edgeTR .rec{display:inline-block; width:.5em; height:.5em; border-radius:50%;
+    background:var(--accent); margin-right:.5em; vertical-align:baseline;
+    animation:blink 1.6s steps(1) infinite}
+  @keyframes blink{50%{opacity:.15}}
+  /* control desk */
+  .desk{
+    position:fixed; z-index:6; left:0; right:0; bottom:0;
+    display:flex; align-items:center; gap:.9rem; flex-wrap:wrap;
+    padding:.7rem 1.2rem calc(.7rem + env(safe-area-inset-bottom));
+    background:linear-gradient(0deg, rgba(244,241,234,.96), rgba(244,241,234,.78));
+    border-top:1px solid rgba(20,18,16,.25);
+    backdrop-filter:blur(6px);
+  }
+  .desk button,.desk input[type="text"]{
+    font-family:var(--mono); font-size:.72rem; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--ink);
+  }
+  .btn{
+    background:transparent; border:1px solid var(--ink); border-radius:999px;
+    padding:.5rem 1.05rem; cursor:pointer; transition:background .15s,color .15s,transform .15s;
+    min-width:3.2rem;
+  }
+  .btn:hover{background:var(--ink); color:var(--paper); transform:translateY(-1px)}
+  .btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .btn.primary[aria-pressed="true"]{
+    background:var(--accent); border-color:var(--accent); color:#FFF;
+  }
+  .wordbox{
+    flex:1 1 9rem; min-width:7rem; max-width:18rem;
+    border:1px solid var(--ink); border-radius:999px;
+    padding:.5rem 1rem; background:transparent;
+    letter-spacing:.2em; text-transform:uppercase; text-align:center;
+  }
+  .wordbox:focus{outline:2px solid var(--accent); outline-offset:2px}
+  .wordbox::placeholder{color:rgba(20,18,16,.4); letter-spacing:.2em}
+  /* scrubber timeline */
+  .timeline{
+    position:fixed; z-index:6; left:0; right:0; bottom:3.5rem;
+    height:1.7rem; padding:0 1.2rem; display:flex; align-items:center; gap:.55rem;
+  }
+  .timeline .lab{
+    font-family:var(--mono); font-size:.56rem; letter-spacing:.2em;
+    text-transform:uppercase; opacity:.7; flex:none;
+  }
+  .track{
+    position:relative; flex:1; height:1.7rem; cursor:pointer; touch-action:none;
+  }
+  .track .rail{
+    position:absolute; left:0; right:0; top:50%; height:1px; background:rgba(20,18,16,.35);
+  }
+  .track .fill{
+    position:absolute; left:0; top:50%; height:1px; background:var(--accent);
+    width:0%;
+  }
+  .track .knob{
+    position:absolute; top:50%; left:0%; width:.78rem; height:.78rem;
+    background:var(--paper); border:1.5px solid var(--ink); border-radius:50%;
+    transform:translate(-50%,-50%); pointer-events:none;
+  }
+  .track .cue{
+    position:absolute; top:50%; width:1px; height:.55rem; transform:translate(-50%,-50%);
+    background:rgba(20,18,16,.4);
+  }
+  .track .cue.now{background:var(--accent); height:.8rem; width:2px}
+  /* tempo slider */
+  .tempo{display:flex; align-items:center; gap:.55rem; flex:none}
+  .tempo input{
+    -webkit-appearance:none; appearance:none; width:6.4rem; height:1px;
+    background:rgba(20,18,16,.4); outline:none; cursor:pointer;
+  }
+  .tempo input::-webkit-slider-thumb{
+    -webkit-appearance:none; width:.85rem; height:.85rem; border-radius:50%;
+    background:var(--ink); cursor:pointer;
+  }
+  .tempo input::-moz-range-thumb{
+    width:.85rem; height:.85rem; border-radius:50%; background:var(--ink);
+    border:0; cursor:pointer;
+  }
+  .tempo .val{font-family:var(--mono); font-size:.62rem; letter-spacing:.12em; min-width:4.2ch}
+  @media (max-width:620px){
+    .edgeBL{display:none}
+    .desk{gap:.5rem; padding:.55rem .8rem}
+    .tempo input{width:4.6rem}
+    #word{font-size:clamp(2.6rem,18vw,6rem)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .edgeTR .rec{animation:none}
+    .btn{transition:none}
+  }
+</style>
+</head>
+<body>
+  <div class="edgeTL">REHEARSAL RM 2 — <b id="sceneName">SCATTER</b></div>
+  <div class="edgeTR"><span class="rec"></span>TAKE <span id="takeNo">001</span> · BEAT <span id="beatNo">0000</span></div>
+  <div class="edgeBL" id="cueCard">type a new word to re-choreograph<br>space play/pause · click timeline to scrub</div>
+  <div class="edgeBR" id="callSheet">
+    call sheet — 6 scenes<br>
+    <span data-sc="SCATTER">01 scatter</span> · <span data-sc="STRETCH">02 stretch</span><br>
+    <span data-sc="FLIP 3D">03 flip 3d</span> · <span data-sc="RIPPLE">04 ripple</span><br>
+    <span data-sc="GRAVITY">05 gravity</span> · <span data-sc="CASE SNAP">06 case snap</span><br>
+    word: <em id="csWord">MOTION</em> · dancers: <em id="csDancers">6</em>
+  </div>
+
+  <main class="stage" aria-label="Kinetic typography stage">
+    <div id="word" aria-live="polite"></div>
+  </main>
+
+  <div class="timeline" aria-label="Scene timeline">
+    <span class="lab">Timeline</span>
+    <div class="track" id="track">
+      <div class="rail"></div>
+      <div class="fill" id="fill"></div>
+      <div class="knob" id="knob"></div>
+    </div>
+  </div>
+
+  <div class="desk">
+    <button class="btn primary" id="btnPlay" aria-pressed="true" aria-label="Play or pause">❚❚</button>
+    <input class="wordbox" id="wordInput" type="text" maxlength="12"
+           value="MOTION" placeholder="type a word" aria-label="Word to choreograph">
+    <div class="tempo">
+      <span class="lab" id="tempoLab" style="font-family:var(--mono);font-size:.56rem;letter-spacing:.2em;text-transform:uppercase;opacity:.7">Tempo</span>
+      <input type="range" id="tempo" min="0.4" max="2.2" step="0.05" value="1" aria-label="Tempo">
+      <span class="val" id="tempoVal">×1.00</span>
+    </div>
+    <button class="btn" id="btnRestart" aria-label="Restart from first scene">↺</button>
+  </div>
+<script>
+"use strict";
+(function(){
+  const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const wordEl = document.getElementById("word");
+  const sceneName = document.getElementById("sceneName");
+  const beatNo = document.getElementById("beatNo");
+  const takeNo = document.getElementById("takeNo");
+  const btnPlay = document.getElementById("btnPlay");
+  const btnRestart = document.getElementById("btnRestart");
+  const wordInput = document.getElementById("wordInput");
+  const tempo = document.getElementById("tempo");
+  const tempoVal = document.getElementById("tempoVal");
+  const track = document.getElementById("track");
+  const fill = document.getElementById("fill");
+  const knob = document.getElementById("knob");
+  const cueCard = document.getElementById("cueCard");
+  const csWord = document.getElementById("csWord");
+  const csDancers = document.getElementById("csDancers");
+  const callSheet = document.getElementById("callSheet");
+
+  /* ---------- letter engine ---------- */
+  let letters=[];
+  function setWord(str){
+    str=(str||"MOTION").trim().slice(0,12)||"MOTION";
+    wordEl.innerHTML=""; letters=[];
+    const acc=(Math.random()*str.length)|0;
+    for(let i=0;i<str.length;i++){
+      const s=document.createElement("span");
+      s.textContent=str[i]===" "?"·":str[i];
+      if(i===acc) s.classList.add("acc");
+      wordEl.appendChild(s);
+      letters.push({
+        el:s, ch:s.textContent, cased:false,
+        i, n:str.length,
+        jx:Math.random()*2-1, jy:Math.random()*2-1, jr:Math.random()*2-1,
+        ph:Math.random()*Math.PI*2,
+        dx:0,dy:0,dz:0,rx:0,ry:0,rz:0,sx:1,sy:1,op:1
+      });
+    }
+    csWord.textContent=str.toUpperCase();
+    csDancers.textContent=letters.length;
+  }
+  function renderLetters(){
+    for(const L of letters){
+      L.el.style.transform="translate3d("+L.dx.toFixed(2)+"px,"+L.dy.toFixed(2)+"px,"+L.dz.toFixed(2)+"px)"+
+        " rotateX("+L.rx.toFixed(2)+"deg) rotateY("+L.ry.toFixed(2)+"deg) rotateZ("+L.rz.toFixed(2)+"deg)"+
+        " scale("+Math.max(0.01,L.sx).toFixed(3)+","+Math.max(0.01,L.sy).toFixed(3)+")";
+      L.el.style.opacity=L.op.toFixed(3);
+    }
+  }
+  function neutral(){
+    for(const L of letters){ L.dx=L.dy=L.dz=0; L.rx=L.ry=L.rz=0; L.sx=L.sy=1; L.op=1; }
+  }
+  const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+  const easeOut=t=>1-Math.pow(1-t,3);
+  const easeInOut=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+  const bounce=t=>{
+    const n1=7.5625,d1=2.75;
+    if(t<1/d1) return n1*t*t;
+    if(t<2/d1) return n1*(t-=1.5/d1)*t+.75;
+    if(t<2.5/d1) return n1*(t-=2.25/d1)*t+.9375;
+    return n1*(t-=2.625/d1)*t+.984375;
+  };
+
+  /* ---------- choreography: each scene maps u∈[0,1] → letter poses ---------- */
+  const SCENES=[
+    { name:"SCATTER", dur:3.2, step(u){
+        const amp = u<0.42 ? easeInOut(u/0.42) : u<0.5 ? 1 : 1-easeInOut((u-0.5)/0.5);
+        for(const L of letters){
+          const st = 0.82+0.18*Math.sin(L.ph);
+          L.dx = L.jx*230*amp*st;
+          L.dy = (L.jy*170-30)*amp*st;
+          L.dz = L.jr*90*amp;
+          L.rz = L.jr*140*amp;
+          L.ry = L.jx*70*amp;
+          L.op = 1-0.45*amp*st;
+        }
+      }},
+    { name:"STRETCH", dur:2.6, step(u){
+        for(const L of letters){
+          const uu = clamp(u*1.35 - L.i*0.045, 0, 1);
+          const sy = 1 + 1.25*Math.sin(uu*Math.PI);
+          L.sy = sy;
+          L.sx = clamp(1-(sy-1)*0.34, .4, 1);
+          L.dy = (1-sy)*-6;
+        }
+      }},
+    { name:"FLIP 3D", dur:2.8, step(u){
+        for(const L of letters){
+          const uu = clamp(u*1.25 - L.i*0.05, 0, 1);
+          L.ry = 720*easeInOut(uu);
+          L.dz = 140*Math.sin(uu*Math.PI);
+          L.dy = -26*Math.sin(uu*Math.PI);
+        }
+      }},
+    { name:"RIPPLE", dur:3.0, step(u){
+        const env = Math.sin(u*Math.PI);
+        for(const L of letters){
+          L.dy = Math.sin(u*Math.PI*5 + L.i*0.85 + L.ph*0.3)*52*env;
+          L.rz = Math.cos(u*Math.PI*5 + L.i*0.85)*9*env;
+          L.sx = L.sy = 1+0.06*env*Math.sin(u*Math.PI*5+L.i*0.85);
+        }
+      }},
+    { name:"GRAVITY", dur:3.0, step(u){
+        for(const L of letters){
+          const uu = clamp((u - L.i*0.05)/0.62, 0, 1);
+          if(uu<=0){ L.dy=-360; L.op=0; }
+          else {
+            L.dy = -360*(1-bounce(uu));
+            L.op = clamp(uu*8,0,1);
+            L.sy = 1 - 0.16*Math.max(0, 1-Math.abs(uu-0.62)*10) * (uu<0.62?1:0);
+          }
+        }
+      }},
+    { name:"CASE SNAP", dur:2.6, step(u){
+        const SEG=6;
+        const seg = Math.min(SEG-1, Math.floor(u*SEG));
+        const f = u*SEG - seg;
+        const upper = seg%2===0;
+        for(const L of letters){
+          if((L.ch!=="·") &&
+             ((upper && L.el.textContent!==L.ch.toUpperCase()) ||
+              (!upper && L.el.textContent!==L.ch.toLowerCase()))){
+            L.el.textContent = upper? L.ch.toUpperCase(): L.ch.toLowerCase();
+            L.cased = true;
+          }
+          const pop = Math.max(0, 1-f*3.2);
+          L.sy = 1+0.16*pop;
+          L.sx = 1-0.08*pop;
+          L.dy = -14*pop;
+        }
+      }}
+  ];
+  const TOTAL = SCENES.reduce((a,s)=>a+s.dur,0);
+
+  /* ---------- transport ---------- */
+  let t=0;                 // seconds through the choreography
+  let playing=true;
+  let tempoMul=1;
+  let lastTs=performance.now();
+  let running=true;
+  let beat=0;
+
+  function poseAt(tt){
+    let acc=0;
+    for(let s=0;s<SCENES.length;s++){
+      const sc=SCENES[s];
+      if(tt<acc+sc.dur || s===SCENES.length-1){
+        const u=clamp((tt-acc)/sc.dur,0,1);
+        return {sc,u};
+      }
+      acc+=sc.dur;
+    }
+  }
+
+  let curName="";
+  function update(tt){
+    neutral();
+    const p=poseAt(tt);
+    if(p){
+      p.sc.step(REDUCED? (p.u<0.5?p.u*0.8+0.1:p.u) : p.u);
+      if(p.sc.name!==curName){
+        curName=p.sc.name;
+        sceneName.textContent=curName;
+        callSheet.querySelectorAll("[data-sc]").forEach(sp=>
+          sp.classList.toggle("now", sp.dataset.sc===curName));
+      }
+    }
+    renderLetters();
+    // timeline
+    const pct=clamp(tt/TOTAL,0,1)*100;
+    fill.style.width=pct+"%";
+    knob.style.left=pct+"%";
+    beatNo.textContent=String(beat).padStart(4,"0");
+  }
+
+  function loop(ts){
+    requestAnimationFrame(loop);
+    if(!running){ lastTs=ts; return; }
+    const dt=Math.min(80,ts-lastTs)/1000; lastTs=ts;
+    if(playing){
+      t+=dt*tempoMul;
+      beat+=dt*tempoMul*2;
+      if(t>=TOTAL){
+        t-=TOTAL;
+        takeNo.textContent=String((parseInt(takeNo.textContent,10)||0)+1).padStart(3,"0");
+      }
+    }
+    update(t);
+  }
+  document.addEventListener("visibilitychange",()=>{ running=!document.hidden; });
+
+  /* ---------- controls ---------- */
+  btnPlay.addEventListener("click",()=>{
+    playing=!playing;
+    btnPlay.setAttribute("aria-pressed",String(playing));
+    btnPlay.textContent=playing?"❚❚":"▶";
+  });
+  btnRestart.addEventListener("click",()=>{ t=0; beat=0; playing=true;
+    btnPlay.textContent="❚❚"; btnPlay.setAttribute("aria-pressed","true"); });
+  tempo.addEventListener("input",()=>{
+    tempoMul=parseFloat(tempo.value);
+    tempoVal.textContent="×"+tempoMul.toFixed(2);
+  });
+  wordInput.addEventListener("input",()=>{
+    setWord(wordInput.value);
+    t=0; beat=0;
+    takeNo.textContent=String((parseInt(takeNo.textContent,10)||0)+1).padStart(3,"0");
+    cueCard.textContent="new take — "+letters.length+" dancers on stage";
+  });
+  wordInput.addEventListener("keydown",e=>{
+    if(e.key==="Enter"){ wordInput.blur(); e.preventDefault(); }
+    e.stopPropagation();
+  });
+  document.addEventListener("keydown",e=>{
+    if(e.key===" " && !e.target.closest("input")){
+      e.preventDefault(); btnPlay.click();
+    }
+  });
+
+  /* ---------- scrubber ---------- */
+  function scrub(clientX){
+    const r=track.getBoundingClientRect();
+    const pct=clamp((clientX-r.left)/r.width,0,1);
+    t=pct*TOTAL; update(t);
+  }
+  let scrubbing=false;
+  track.addEventListener("pointerdown",e=>{
+    scrubbing=true; track.setPointerCapture(e.pointerId); scrub(e.clientX);
+  });
+  track.addEventListener("pointermove",e=>{ if(scrubbing) scrub(e.clientX); });
+  const endS=()=>{scrubbing=false;};
+  track.addEventListener("pointerup",endS);
+  track.addEventListener("pointercancel",endS);
+
+  /* ---------- timeline cues ---------- */
+  (function cues(){
+    let acc=0, html="";
+    for(const sc of SCENES){
+      const pct=(acc/TOTAL)*100;
+      html+='<div class="cue" style="left:'+pct.toFixed(2)+'%" title="'+sc.name+'"></div>';
+      acc+=sc.dur;
+    }
+    track.insertAdjacentHTML("afterbegin",html);
+  })();
+
+  /* ---------- init ---------- */
+  setWord("MOTION");
+  update(0);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

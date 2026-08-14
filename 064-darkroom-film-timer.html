@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THE DARKROOM — a film development timer</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family:"Courier New", Courier, monospace;
+    background:#0d0503; color:#e8a06a;
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:26px;
+    padding:16px;
+  }
+  /* safelight ambience */
+  body::before {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:40;
+    background:radial-gradient(ellipse at 50% 45%, rgba(255,70,20,.07), rgba(120,20,4,.2) 90%);
+  }
+  body::after {
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:41;
+    box-shadow:inset 0 0 140px 40px rgba(0,0,0,.75);
+  }
+  header { text-align:center; z-index:5; }
+  header h1 { font-size:clamp(18px, 3.4vw, 28px); font-weight:400; letter-spacing:.5em; text-transform:uppercase; color:#ff8a4a; text-shadow:0 0 24px rgba(255,100,40,.5); }
+  header p { font-size:9px; letter-spacing:.4em; color:#8a4a2a; text-transform:uppercase; margin-top:8px; }
+
+  .bench { display:flex; gap:40px; align-items:center; flex-wrap:wrap; justify-content:center; z-index:5; }
+  /* timer dial */
+  .dialwrap { position:relative; width:240px; height:240px; }
+  .dial { width:100%; height:100%; }
+  .readout {
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    pointer-events:none;
+  }
+  .readout .stage { font-size:11px; letter-spacing:.3em; color:#8a4a2a; text-transform:uppercase; }
+  .readout .time { font-size:44px; font-weight:700; color:#ffb88a; text-shadow:0 0 18px rgba(255,120,60,.6); font-variant-numeric:tabular-nums; }
+  .readout .sub { font-size:9px; color:#8a4a2a; letter-spacing:.2em; }
+
+  /* developing tray */
+  .trayunit { display:flex; flex-direction:column; gap:14px; align-items:center; }
+  .tray {
+    width:320px; height:120px; border-radius:8px; position:relative; overflow:hidden;
+    background:linear-gradient(180deg, #1c0d06, #140803);
+    border:3px solid #2c1a0e;
+    box-shadow:inset 0 4px 14px rgba(0,0,0,.8);
+  }
+  .liquid {
+    position:absolute; left:0; right:0; bottom:0; height:74%;
+    background:linear-gradient(180deg, rgba(180,60,20,.5), rgba(90,20,8,.6));
+  }
+  .liquid::before, .liquid::after {
+    content:""; position:absolute; top:-5px; left:0; right:0; height:9px;
+    background:radial-gradient(ellipse at 50% 100%, rgba(255,110,50,.5), transparent 70%);
+    animation:slosh 3.2s ease-in-out infinite;
+  }
+  .liquid::after { animation-delay:1.6s; }
+  @keyframes slosh {
+    0%,100% { transform:translateX(-6px) scaleY(1); }
+    50% { transform:translateX(6px) scaleY(1.4); }
+  }
+  /* the emerging photograph */
+  .photo {
+    position:absolute; left:50%; top:50%; width:120px; height:86px;
+    transform:translate(-50%,-50%) rotate(-4deg);
+    opacity:0; transition:opacity 3s linear;
+    border:3px solid #d8d0c0; background:#0a0604;
+    overflow:hidden;
+  }
+  .photo canvas { width:100%; height:100%; display:block; }
+  .traylabels { display:flex; width:320px; justify-content:space-between; }
+  .traylabels span { font-size:9px; letter-spacing:.2em; color:#8a4a2a; text-transform:uppercase; }
+  .traylabels span.on { color:#ffb88a; text-shadow:0 0 10px rgba(255,120,60,.7); }
+
+  /* stages list */
+  .stages { display:flex; flex-direction:column; gap:8px; }
+  .stg {
+    display:flex; align-items:center; gap:14px; padding:12px 18px; border-radius:8px;
+    border:1px solid rgba(255,120,60,.22); background:rgba(30,10,4,.6); cursor:pointer;
+    transition:all .2s; min-width:250px;
+  }
+  .stg:hover { border-color:rgba(255,140,70,.5); }
+  .stg.on { border-color:#ff8a4a; background:rgba(80,24,8,.7); box-shadow:0 0 20px rgba(255,100,40,.25); }
+  .stg.done { opacity:.5; }
+  .stg .nm { font-size:13px; letter-spacing:.16em; text-transform:uppercase; color:#e8a06a; }
+  .stg .dur { margin-left:auto; font-size:12px; color:#8a4a2a; font-variant-numeric:tabular-nums; }
+  .stg.on .dur { color:#ffb88a; }
+
+  .controls { display:flex; gap:12px; z-index:5; }
+  .controls button {
+    background:rgba(255,120,60,.08); color:#e8a06a; border:1px solid rgba(255,120,60,.4);
+    font:inherit; font-size:10px; letter-spacing:.24em; text-transform:uppercase;
+    padding:12px 26px; border-radius:99px; cursor:pointer; transition:all .15s;
+  }
+  .controls button:hover { background:rgba(255,120,60,.22); }
+  .controls button.on { background:#c2491e; border-color:#c2491e; color:#ffd8c0; }
+  .soundline { font-size:9px; letter-spacing:.24em; color:#6a3a22; text-transform:uppercase; z-index:5; }
+  @media (max-width:640px) { .bench { gap:20px; } .tray { width:260px; } .traylabels { width:260px; } }
+  @media (prefers-reduced-motion: reduce) { .liquid::before, .liquid::after { animation:none; } }
+</style>
+</head>
+<body>
+  <header>
+    <h1>The Darkroom</h1>
+    <p>safelight on · tri-x · d-76 stock</p>
+  </header>
+
+  <div class="bench">
+    <div class="dialwrap">
+      <canvas class="dial" id="dial" width="240" height="240"></canvas>
+      <div class="readout">
+        <span class="stage" id="stageV">develop</span>
+        <span class="time" id="timeV">8:00</span>
+        <span class="sub" id="subV">tap tray to agitate</span>
+      </div>
+    </div>
+
+    <div class="trayunit">
+      <div class="tray" id="tray">
+        <div class="liquid"></div>
+        <div class="photo" id="photoEl"><canvas id="photoC" width="240" height="172"></canvas></div>
+      </div>
+      <div class="traylabels">
+        <span id="lbDev" class="on">developer</span>
+        <span id="lbStop">stop</span>
+        <span id="lbFix">fix</span>
+        <span id="lbWash">wash</span>
+      </div>
+    </div>
+
+    <div class="stages">
+      <div class="stg on" data-s="0"><span class="nm">develop</span><span class="dur">8:00</span></div>
+      <div class="stg" data-s="1"><span class="nm">stop bath</span><span class="dur">0:30</span></div>
+      <div class="stg" data-s="2"><span class="nm">fix</span><span class="dur">4:00</span></div>
+      <div class="stg" data-s="3"><span class="nm">wash</span><span class="dur">5:00</span></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="startBtn">▶ start</button>
+    <button id="soundBtn">sound: off</button>
+  </div>
+  <span class="soundline">the image appears in the developer · patience</span>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById($id(id));
+  function $id(id) { return id; }
+  const STAGES = [
+    { name: "develop", total: 480, label: "lbDev" },
+    { name: "stop", total: 30, label: "lbStop" },
+    { name: "fix", total: 240, label: "lbFix" },
+    { name: "wash", total: 300, label: "lbWash" },
+  ];
+  let sIdx = 0, left = STAGES[0].total, running = false, soundOn = false;
+  let agitate = 0;
+
+  /* ---------- the latent photograph ---------- */
+  const pc = $("photoC"), pg = pc.getContext("2d");
+  function paintPhoto(revealK) {
+    /* revealK 0..1 : more of the image emerges */
+    const w = pc.width, h = pc.height;
+    pg.clearRect(0, 0, w, h);
+    /* latent scene: a pier at dusk, drawn in grays */
+    const grade = 255 * revealK;
+    const bg = pg.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, "rgb(" + (grade * 0.72 | 0) + "," + (grade * 0.7 | 0) + "," + (grade * 0.74 | 0) + ")");
+    bg.addColorStop(1, "rgb(" + (grade * 0.32 | 0) + "," + (grade * 0.3 | 0) + "," + (grade * 0.34 | 0) + ")");
+    pg.fillStyle = bg;
+    pg.fillRect(0, 0, w, h);
+    /* sun */
+    pg.fillStyle = "rgb(" + (grade | 0) + "," + (grade * 0.94 | 0) + "," + (grade * 0.8 | 0) + ")";
+    pg.beginPath(); pg.arc(w * 0.68, h * 0.34, 16, 0, 6.283); pg.fill();
+    /* pier posts */
+    pg.fillStyle = "rgb(" + (grade * 0.22 | 0) + "," + (grade * 0.2 | 0) + "," + (grade * 0.22 | 0) + ")";
+    for (let i = 0; i < 5; i++) {
+      pg.fillRect(w * 0.18 + i * w * 0.16, h * 0.55, 7, h * 0.45);
+    }
+    pg.fillRect(w * 0.1, h * 0.52, w * 0.8, 7);
+    /* birds */
+    pg.strokeStyle = "rgb(" + (grade * 0.16 | 0) + "," + (grade * 0.15 | 0) + "," + (grade * 0.16 | 0) + ")";
+    pg.lineWidth = 2;
+    [[0.3, 0.2], [0.38, 0.16], [0.46, 0.22]].forEach(([fx, fy]) => {
+      pg.beginPath();
+      pg.moveTo(w * fx - 8, h * fy);
+      pg.quadraticCurveTo(w * fx, h * fy - 6, w * fx + 8, h * fy);
+      pg.stroke();
+    });
+    /* grain grows as it emerges */
+    for (let i = 0; i < 400 * revealK; i++) {
+      pg.fillStyle = "rgba(255,255,255,.06)";
+      pg.fillRect(Math.random() * w, Math.random() * h, 1, 1);
+    }
+  }
+  paintPhoto(0);
+
+  /* ---------- dial ---------- */
+  const dial = $("dial"), dg = dial.getContext("2d");
+  function drawDial() {
+    dg.clearRect(0, 0, 240, 240);
+    const cx = 120, cy = 120, R = 104;
+    /* face */
+    dg.strokeStyle = "rgba(255,120,60,.35)";
+    dg.lineWidth = 2;
+    dg.beginPath(); dg.arc(cx, cy, R, 0, 6.283); dg.stroke();
+    /* ticks */
+    for (let i = 0; i < 60; i++) {
+      const a = (6.283 / 60) * i - 1.57;
+      const maj = i % 5 === 0;
+      dg.strokeStyle = maj ? "rgba(255,140,80,.7)" : "rgba(255,120,60,.28)";
+      dg.lineWidth = maj ? 2 : 1;
+      dg.beginPath();
+      dg.moveTo(cx + Math.cos(a) * (R - 2), cy + Math.sin(a) * (R - 2));
+      dg.lineTo(cx + Math.cos(a) * (R - (maj ? 12 : 7)), cy + Math.sin(a) * (R - (maj ? 12 : 7)));
+      dg.stroke();
+    }
+    /* progress arc */
+    const total = STAGES[sIdx].total;
+    const k = 1 - left / total;
+    dg.strokeStyle = "#ff8a4a";
+    dg.lineWidth = 5;
+    dg.shadowColor = "#ff6a2a";
+    dg.shadowBlur = 14;
+    dg.beginPath();
+    dg.arc(cx, cy, R - 18, -1.57, -1.57 + 6.283 * k);
+    dg.stroke();
+    dg.shadowBlur = 0;
+    /* red hand */
+    const handA = -1.57 + 6.283 * k;
+    dg.strokeStyle = "#e8552a";
+    dg.lineWidth = 3;
+    dg.beginPath();
+    dg.moveTo(cx, cy);
+    dg.lineTo(cx + Math.cos(handA) * (R - 26), cy + Math.sin(handA) * (R - 26));
+    dg.stroke();
+    dg.fillStyle = "#ffb88a";
+    dg.beginPath(); dg.arc(cx, cy, 5, 0, 6.283); dg.fill();
+  }
+  drawDial();
+
+  /* ---------- ticking ---------- */
+  let lastTick = 0;
+  setInterval(() => {
+    if (!running || document.hidden) return;
+    left--;
+    const m = Math.floor(left / 60), s2 = left % 60;
+    $("timeV").textContent = m + ":" + String(s2).padStart(2, "0");
+    drawDial();
+    /* seconds tick in final 10 */
+    if (left <= 10 && left > 0) tick(1100, 0.03);
+    if (left <= 0) nextStage();
+    /* photograph emerges during develop */
+    if (sIdx === 0) {
+      const k = 1 - left / STAGES[0].total;
+      paintPhoto(Math.min(1, k * 0.5 + (sIdx > 0 ? 0.5 : 0)));
+      $("photoEl").style.opacity = Math.min(0.9, k * 0.9).toFixed(2);
+    }
+    /* washing completes the full reveal */
+    if (sIdx >= 2) {
+      paintPhoto(1);
+      $("photoEl").style.opacity = "1";
+    }
+  }, 1000);
+
+  function nextStage() {
+    document.querySelectorAll(".stg")[sIdx].classList.add("done");
+    document.getElementById(STAGES[sIdx].label).classList.remove("on");
+    sIdx++;
+    if (sIdx >= STAGES.length) {
+      running = false;
+      $("stageV").textContent = "done";
+      $("timeV").textContent = "0:00";
+      $("subV").textContent = "hang to dry";
+      $("startBtn").textContent = "▶ again";
+      sIdx = 0; left = STAGES[0].total;
+      document.querySelectorAll(".stg").forEach(s => s.classList.remove("done", "on"));
+      document.querySelector(".stg").classList.add("on");
+      return;
+    }
+    left = STAGES[sIdx].total;
+    $("stageV").textContent = STAGES[sIdx].name;
+    document.querySelectorAll(".stg").forEach((s, i) => s.classList.toggle("on", i === sIdx));
+    document.getElementById(STAGES[sIdx].label).classList.add("on");
+    chime(660);
+  }
+
+  /* ---------- controls ---------- */
+  $("startBtn").addEventListener("click", function () {
+    running = !running;
+    this.textContent = running ? "❙❙ pause" : "▶ start";
+    this.classList.toggle("on", running);
+  });
+  document.querySelectorAll(".stg").forEach((s, i) => s.addEventListener("click", () => {
+    sIdx = i; left = STAGES[i].total;
+    $("stageV").textContent = STAGES[i].name;
+    $("timeV").textContent = Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0");
+    document.querySelectorAll(".stg").forEach((x, k) => x.classList.toggle("on", k === i));
+    STAGES.forEach(st => document.getElementById(st.label).classList.remove("on"));
+    document.getElementById(STAGES[i].label).classList.add("on");
+    drawDial();
+  }));
+
+  /* ---------- agitation ---------- */
+  $("tray").addEventListener("click", () => {
+    agitate = 1;
+    tick(500, 0.04);
+    $("subV").textContent = "agitating…";
+    setTimeout(() => { $("subV").textContent = "tap tray to agitate"; }, 1200);
+  });
+  setInterval(() => {
+    if (agitate > 0 && !document.hidden) {
+      agitate *= 0.9;
+      $("tray").style.transform = "rotate(" + (Math.sin(Date.now() / 90) * agitate * 1.6) + "deg)";
+      if (agitate < 0.03) { agitate = 0; $("tray").style.transform = ""; }
+    }
+  }, 40);
+
+  /* ---------- audio ---------- */
+  let AC = null;
+  function ac() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+    return AC;
+  }
+  function tick(f, vol) {
+    if (!soundOn) return;
+    const c = ac(); if (!c) return;
+    try {
+      const t0 = c.currentTime;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = "square"; o.frequency.value = f;
+      g.gain.setValueAtTime(vol, t0);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.06);
+      o.connect(g); g.connect(c.destination);
+      o.start(t0); o.stop(t0 + 0.07);
+    } catch (e) {}
+  }
+  function chime(f) {
+    if (!soundOn) return;
+    const c = ac(); if (!c) return;
+    try {
+      const t0 = c.currentTime;
+      [f, f * 1.5].forEach((ff, i) => {
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = "sine"; o.frequency.value = ff;
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(0.05 / (i + 1), t0 + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.2);
+        o.connect(g); g.connect(c.destination);
+        o.start(t0); o.stop(t0 + 1.3);
+      });
+    } catch (e) {}
+  }
+  $("soundBtn").addEventListener("click", function () {
+    soundOn = !soundOn;
+    this.textContent = "sound: " + (soundOn ? "on" : "off");
+    this.classList.toggle("on", soundOn);
+    if (soundOn) { ac(); tick(880, 0.03); }
+  });
+})();
+</script>
+</body>
+</html>

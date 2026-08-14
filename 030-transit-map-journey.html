@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LINE 7 — TRANSIT</title>
+<style>
+  :root {
+    --bone:#efe9dc; --bone-lo:#e4dcc9; --ink:#26221c;
+    --red:#d94f3d; --emerald:#1e9e6a; --amber:#e0a526; --azure:#2f7fd4;
+    --card:#faf6ec; --line:#d8cfba;
+  }
+  body.night {
+    --bone:#14161c; --bone-lo:#0d0f14; --ink:#d8d4c8;
+    --card:#1c1f27; --line:#2a2e3a;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { height:100%; }
+  body {
+    min-height:100%;
+    background: var(--bone);
+    color:var(--ink);
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    transition: background .5s ease, color .5s ease;
+    overflow-x:hidden;
+  }
+  body::before {  /* paper tooth */
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image: radial-gradient(rgba(0,0,0,.045) 1px, transparent 1.4px);
+    background-size:6px 6px; opacity:.5;
+  }
+
+  header {
+    position:relative; z-index:2;
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    padding:16px 22px 10px;
+  }
+  .bulb {
+    width:34px; height:34px; border-radius:50%; flex:none;
+    background:radial-gradient(circle at 35% 30%, #ff8d7a, var(--red) 70%);
+    box-shadow:0 2px 6px rgba(217,79,61,.4);
+  }
+  header h1 { font-size:clamp(17px,3vw,23px); font-weight:800; letter-spacing:.06em; }
+  header h1 small { display:block; font-size:10px; font-weight:500; letter-spacing:.3em; opacity:.65; }
+  .hbtns { margin-left:auto; display:flex; gap:8px; }
+  .hbtn {
+    font:inherit; font-size:10.5px; letter-spacing:.14em; cursor:pointer;
+    color:var(--ink); background:var(--card); border:1.5px solid var(--ink);
+    border-radius:999px; padding:7px 14px; font-weight:700;
+    transition:transform .12s ease;
+  }
+  .hbtn:active { transform:scale(.94); }
+  .hbtn.on { background:var(--ink); color:var(--bone); }
+
+  .board {
+    position:relative; z-index:1;
+    width:min(980px, 96vw); margin:4px auto 8px;
+    background:var(--card);
+    border:2px solid var(--ink); border-radius:14px;
+    box-shadow: 6px 6px 0 rgba(38,34,28,.22);
+    overflow:hidden;
+  }
+  svg.map { display:block; width:100%; height:auto; }
+
+  .flip {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:10px 16px; border-top:2px solid var(--ink);
+    background:var(--bone-lo);
+  }
+  .flip .lbl { font-size:9.5px; letter-spacing:.26em; font-weight:700; opacity:.7; }
+  .flipcells { display:flex; gap:3px; }
+  .cell {
+    width:16px; height:26px; border-radius:3px;
+    background:var(--ink); color:var(--bone);
+    display:flex; align-items:center; justify-content:center;
+    font-size:15px; font-weight:800; font-variant-numeric:tabular-nums;
+  }
+  .cell.blank { background:transparent; }
+  .cell.spin { animation: cellspin .34s ease; }
+  @keyframes cellspin {
+    0% { transform:rotateX(0); } 50% { transform:rotateX(90deg); } 100% { transform:rotateX(0); }
+  }
+  .eta { margin-left:auto; font-size:12px; font-weight:700; letter-spacing:.08em; }
+  .eta b { font-size:17px; }
+
+  .panel {
+    position:relative; z-index:1;
+    width:min(980px, 96vw); margin:0 auto 26px;
+    display:grid; gap:12px; grid-template-columns: 1.2fr 1fr;
+  }
+  .box {
+    background:var(--card); border:2px solid var(--ink); border-radius:12px;
+    box-shadow:4px 4px 0 rgba(38,34,28,.18); padding:14px 16px;
+  }
+  .box h3 { font-size:10px; letter-spacing:.3em; font-weight:800; margin-bottom:10px; }
+  .stationcard .name { font-size:19px; font-weight:800; letter-spacing:.02em; }
+  .zonechip {
+    display:inline-block; margin-left:8px; padding:2px 9px; border-radius:999px;
+    font-size:10px; font-weight:700; letter-spacing:.1em; color:#fff;
+    background:var(--azure); vertical-align:middle;
+  }
+  .metarow { display:flex; gap:18px; margin-top:8px; font-size:12px; flex-wrap:wrap; }
+  .metarow b { font-weight:800; }
+  .empty-note { font-size:12px; opacity:.7; line-height:1.7; }
+
+  .planner .row { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+  select {
+    font:inherit; font-size:13px; padding:7px 9px; border-radius:8px;
+    border:1.5px solid var(--ink); background:var(--bone); color:var(--ink);
+    max-width:100%;
+  }
+  .go {
+    font:inherit; font-size:11px; letter-spacing:.16em; font-weight:800; cursor:pointer;
+    background:var(--emerald); color:#fff; border:none; border-radius:999px;
+    padding:9px 18px; box-shadow:0 3px 0 #147a4f;
+  }
+  .go:active { transform:translateY(2px); box-shadow:0 1px 0 #147a4f; }
+  .tripinfo { font-size:12px; line-height:1.8; }
+  .tripinfo b { color:var(--emerald); }
+
+  .speedrow { display:flex; align-items:center; gap:10px; margin-top:10px; }
+  input[type=range] { flex:1; accent-color:var(--red); cursor:pointer; }
+  .speedval { font-size:12px; font-weight:800; min-width:64px; text-align:right; }
+
+  footer {
+    text-align:center; font-size:9.5px; letter-spacing:.3em; opacity:.55;
+    padding-bottom:22px;
+  }
+  @media (max-width:760px){
+    .panel { grid-template-columns:1fr; }
+    .hbtns { margin-left:0; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .cell.spin { animation:none; }
+    body { transition:none; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="bulb"></div>
+    <h1>LINE 7<small>METROPOLITAN TRANSIT AUTHORITY — LIVING MAP</small></h1>
+    <div class="hbtns">
+      <button class="hbtn on" id="dayBtn">DAY</button>
+      <button class="hbtn" id="nightBtn">NIGHT</button>
+    </div>
+  </header>
+
+  <div class="board">
+    <svg class="map" id="map" viewBox="0 0 980 460" role="img" aria-label="Line 7 transit map"></svg>
+    <div class="flip">
+      <span class="lbl">NEXT</span>
+      <div class="flipcells" id="cells"></div>
+      <span class="eta" id="eta"></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="box stationcard" id="stCard">
+      <h3>STATION</h3>
+      <div class="empty-note">Click any station on the map — terminals are marked with bars, interchanges with rings. The train is already running.</div>
+    </div>
+    <div class="box planner">
+      <h3>TRIP PLANNER</h3>
+      <div class="row">
+        <select id="fromSel" aria-label="Origin"></select>
+        <span style="font-weight:800">→</span>
+        <select id="toSel" aria-label="Destination"></select>
+        <button class="go" id="goBtn">PLAN</button>
+      </div>
+      <div class="tripinfo" id="tripInfo">Pick two stops and press PLAN to light up the fastest route.</div>
+      <div class="speedrow">
+        <span class="lbl" style="font-size:9.5px;letter-spacing:.22em;font-weight:700;opacity:.7">SPEED</span>
+        <input type="range" id="speed" min="20" max="300" value="100" aria-label="Train speed">
+        <span class="speedval" id="speedVal">1.0×</span>
+      </div>
+    </div>
+  </div>
+
+  <footer>SCHEMATIC — NOT TO SCALE · LANDMARKS INDICATIVE ONLY · LINE 7 FOREVER</footer>
+
+<script>
+'use strict';
+/* ---------- LINE 7: network data ---------- */
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('map');
+
+// Orthogonal+45° polyline. Coordinates in a 980x460 viewbox.
+const STATIONS = [
+  { id:0,  name:'WESTPORT',      x:60,  y:330, kind:'term', zone:3, first:'05:12', last:'00:38', land:'lighthouse', line:'red' },
+  { id:1,  name:'HARBOURGATE',   x:170, y:330, kind:'stop', zone:3, first:'05:16', last:'00:42', land:'ferry' },
+  { id:2,  name:'OLD MILL',      x:280, y:330, kind:'stop', zone:2, first:'05:20', last:'00:46', land:'windmill' },
+  { id:3,  name:'CATHEDRAL SQ',  x:280, y:220, kind:'xch',  zone:2, first:'05:24', last:'00:50', land:'cathedral', line:'emerald' },
+  { id:4,  name:'GUILDHALL',     x:390, y:110, kind:'stop', zone:1, first:'05:28', last:'00:54', land:'clocktower' },
+  { id:5,  name:'UNION CROSS',   x:500, y:110, kind:'xch',  zone:1, first:'05:31', last:'00:57', land:'monument', line:'amber' },
+  { id:6,  name:'MUSEUM STEP',   x:610, y:110, kind:'stop', zone:1, first:'05:34', last:'01:00', land:'museum' },
+  { id:7,  name:'BRASSWORKS',    x:665, y:165, kind:'stop', zone:2, first:'05:37', last:'01:03', land:'factory' },
+  { id:8,  name:'ORCHARD LANE',  x:720, y:220, kind:'stop', zone:2, first:'05:40', last:'01:06', land:'orchard' },
+  { id:9,  name:'NORTHGATE',     x:830, y:220, kind:'xch',  zone:2, first:'05:44', last:'01:10', land:'gate', line:'azure' },
+  { id:10, name:'HIGH MEADOW',   x:830, y:110, kind:'stop', zone:3, first:'05:48', last:'01:14', land:'observatory' },
+  { id:11, name:'EASTLAND',      x:920, y:110, kind:'term', zone:3, first:'05:52', last:'01:18', land:'stadium' },
+];
+const HUES = { red:'#d94f3d', emerald:'#1e9e6a', amber:'#e0a526', azure:'#2f7fd4' };
+
+/* cumulative polyline length for positioning along the route */
+function segLen(a,b){ const dx=b.x-a.x, dy=b.y-a.y; return Math.hypot(dx,dy); }
+const cum=[0];
+for (let i=1;i<STATIONS.length;i++) cum.push(cum[i-1]+segLen(STATIONS[i-1],STATIONS[i]));
+const TOTAL = cum[cum.length-1];
+
+/* ---------- build SVG map ---------- */
+const els = { stations:{}, hitAreas:[] };
+function pathD(){
+  let d = 'M' + STATIONS[0].x + ' ' + STATIONS[0].y;
+  for (let i=1;i<STATIONS.length;i++){
+    const a = STATIONS[i-1], b = STATIONS[i];
+    if (a.x === b.x || a.y === b.y){
+      d += ' L' + b.x + ' ' + b.y;
+    } else {
+      // 45° bend: move diagonally to align with b on the axis nearer
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const adx = Math.abs(dx), ady = Math.abs(dy);
+      let bend;
+      if (adx < ady){ // vertical dominant: go diagonal until y matches
+        const diagY = b.y;
+        const diagX = a.x + Math.sign(dx)*Math.abs(dy);
+        bend = { x:diagX, y:diagY };
+      } else {
+        const diagX = b.x;
+        const diagY = a.y + Math.sign(dy)*Math.abs(dx);
+        if (Math.abs(diagY - a.y) > Math.abs(b.y - a.y)) {
+          bend = { x:diagX, y: b.y === a.y ? a.y : diagY };
+        } else {
+          bend = { x:diagX, y:diagY };
+        }
+      }
+      // clamp bend to keep it between a and b on both axes
+      bend.x = Math.min(Math.max(bend.x, Math.min(a.x,b.x)), Math.max(a.x,b.x));
+      bend.y = Math.min(Math.max(bend.y, Math.min(a.y,b.y)), Math.max(a.y,b.y));
+      d += ' L' + bend.x.toFixed(1) + ' ' + bend.y.toFixed(1) +
+           ' L' + b.x + ' ' + b.y;
+    }
+  }
+  return d;
+}
+function linePathLength(){
+  // approximate path length incl. bends (bends add sqrt2 vs 1 factor, close enough for position)
+  let L = 0;
+  for (let i=1;i<STATIONS.length;i++){
+    const a = STATIONS[i-1], b = STATIONS[i];
+    if (a.x === b.x || a.y === b.y) L += segLen(a,b);
+    else {
+      const dx = Math.abs(b.x-a.x), dy = Math.abs(b.y-a.y);
+      L += Math.min(dx,dy)*Math.SQRT2 + Math.abs(dx-dy);
+    }
+  }
+  return L;
+}
+const PATHLEN = linePathLength();
+
+const LANDMARKS = {
+  lighthouse:'M-4 10 L-4 -6 A4 5 0 0 1 4 -6 L4 10 Z M0 -11 L4 -9 L0 -7 Z',
+  ferry:'M-9 4 L-6 -2 L6 -2 L9 4 L6 6 L-6 6 Z M0 -2 L0 -8 M0 -8 L6 -5',
+  windmill:'M-1.5 9 L-3 -3 M1.5 9 L3 -3 M0 -10 L0 9 M-6 -6 L6 2 M6 -6 L-6 2',
+  cathedral:'M-8 9 L-8 -2 L-4 -2 L-4 -7 L-1.5 -2 L0 -9 L1.5 -2 L4 -7 L4 -2 L8 -2 L8 9 Z',
+  clocktower:'M-4 9 L-4 -4 L0 -9 L4 -4 L4 9 Z M0 -4 L0 -7 M-1.6 -5.4 L1.6 -5.4',
+  monument:'M-5 9 L5 9 M-3 7 L3 7 M-1.5 7 L-1.5 -5 L1.5 -5 L1.5 7 M-4 -6 L4 -6',
+  museum:'M-8 9 L-8 -1 L0 -7 L8 -1 L8 9 Z M0 9 L0 0 M-8 9 L8 9',
+  factory:'M-8 9 L-8 -3 L-3 -3 L-3 -6 L0 -3 L8 -3 L8 9 Z M-6 -3 L-6 -8 L-4 -8 L-4 -3',
+  orchard:'M0 9 L0 2 M-5 2 A5 5 0 1 1 5 2 M-2 4 A2 2 0 1 1 2 4',
+  gate:'M-7 9 L-7 -5 L-4 -8 L4 -8 L7 -5 L7 9 M-3 9 L-3 -1 L3 -1 L3 9',
+  observatory:'M-7 9 L7 9 M-5 6 L5 6 M-6 -1 A6 6 0 0 1 6 -1 L6 2 L-6 2 Z M-3 -4 L0 -9 L3 -4',
+  stadium:'M-8 3 A8 6 0 0 0 8 3 A8 6 0 0 0 -8 3 M-8 3 L-8 6 A8 6 0 0 0 8 6 L8 3 M-3 4 L3 4',
+};
+
+function el(tag, attrs, parent){
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  (parent||svg).appendChild(e);
+  return e;
+}
+
+function buildMap(){
+  svg.innerHTML = '';
+  // route casing + line
+  el('path', { d:pathD(), fill:'none', stroke:'#faf6ec', 'stroke-width':14, 'stroke-linecap':'round', 'stroke-linejoin':'round', opacity:.001, id:'casing' });
+  els.route = el('path', { d:pathD(), fill:'none', stroke:HUES.red, 'stroke-width':9, 'stroke-linecap':'round', 'stroke-linejoin':'round' });
+  els.routeGlow = el('path', { d:pathD(), fill:'none', stroke:HUES.red, 'stroke-width':16, 'stroke-linecap':'round', 'stroke-linejoin':'round', opacity:.14 });
+  // trip highlight (drawn under stations)
+  els.trip = el('path', { d:'', fill:'none', stroke:HUES.emerald, 'stroke-width':12, 'stroke-linecap':'round', 'stroke-linejoin':'round', opacity:0 });
+  // station landmarks + markers
+  for (const s of STATIONS){
+    const g = el('g', {});
+    // landmark
+    el('path', { d:LANDMARKS[s.land]||'', transform:'translate('+s.x+','+(s.y+22)+') scale(0.9)',
+      fill:'none', stroke:'#8a8272', 'stroke-width':1.6, 'stroke-linecap':'round', 'stroke-linejoin':'round', opacity:.85 }, g);
+    const label = el('text', { x:s.x, y:s.y-16, 'text-anchor':'middle', 'font-size':11.5,
+      'font-weight':700, fill:'#26221c', 'font-family':'inherit' }, g);
+    label.textContent = s.name;
+    if (s.kind === 'term'){
+      el('rect', { x:s.x-7, y:s.y-7, width:14, height:14, rx:3, fill:'#faf6ec',
+        stroke:HUES.red, 'stroke-width':4.5 }, g);
+    } else if (s.kind === 'xch'){
+      el('circle', { cx:s.x, cy:s.y, r:8, fill:'#faf6ec', stroke:'#26221c', 'stroke-width':2.6 }, g);
+      el('circle', { cx:s.x, cy:s.y, r:3, fill:HUES[s.line] || '#26221c' }, g);
+    } else {
+      el('circle', { cx:s.x, cy:s.y, r:5.5, fill:'#faf6ec', stroke:HUES.red, 'stroke-width':3.4 }, g);
+    }
+    // invisible hit area
+    const hit = el('circle', { cx:s.x, cy:s.y, r:20, fill:'transparent', style:'cursor:pointer' }, g);
+    hit.addEventListener('click', function(){ openStation(s); });
+    els.stations[s.id] = g;
+  }
+  // train
+  els.train = el('circle', { r:9, fill:'#26221c', stroke:'#faf6ec', 'stroke-width':3 });
+  els.trainHalo = el('circle', { r:16, fill:HUES.red, opacity:.25 });
+  els.trainLabel = el('text', { 'font-size':10.5, 'font-weight':800, fill:'#faf6ec',
+    'text-anchor':'middle', 'font-family':'inherit' });
+}
+
+/* ---------- train motion along the polyline ---------- */
+function pointAt(t){
+  // t in [0, PATHLEN]
+  let L = 0;
+  for (let i=1;i<STATIONS.length;i++){
+    const a = STATIONS[i-1], b = STATIONS[i];
+    let segLenV;
+    let bend = null;
+    if (a.x === b.x || a.y === b.y){
+      segLenV = segLen(a,b);
+    } else {
+      const dx = Math.abs(b.x-a.x), dy = Math.abs(b.y-a.y);
+      const diag = Math.min(dx,dy);
+      bend = { x: a.x + Math.sign(b.x-a.x)*diag, y: a.y + Math.sign(b.y-a.y)*diag };
+      segLenV = diag*Math.SQRT2 + Math.abs(dx-dy);
+    }
+    if (t <= L + segLenV){
+      let u = (t - L) / segLenV;
+      if (bend){
+        const diag = Math.min(Math.abs(b.x-a.x), Math.abs(b.y-a.y));
+        const diagLen = diag*Math.SQRT2;
+        if (t - L <= diagLen){
+          const k = (t-L)/diagLen;
+          return { x: a.x + (bend.x-a.x)*k, y: a.y + (bend.y-a.y)*k };
+        }
+        const rest = t - L - diagLen;
+        const horiz = Math.abs(b.x - bend.x) > 0;
+        return {
+          x: horiz ? bend.x + Math.sign(b.x-bend.x)*rest : bend.x,
+          y: horiz ? bend.y : bend.y + Math.sign(b.y-bend.y)*rest,
+        };
+      }
+      return { x: a.x + (b.x-a.x)*u, y: a.y + (b.y-a.y)*u };
+    }
+    L += segLenV;
+  }
+  const lastS = STATIONS[STATIONS.length-1];
+  return { x:lastS.x, y:lastS.y };
+}
+
+const trainState = { t:0, dir:1, speed:1, dwellUntil:0, lastStation:-1 };
+function nextStationIndexFrom(t, dir){
+  for (let i=0;i<STATIONS.length;i++){
+    const idx = dir > 0 ? i : STATIONS.length-1-i;
+    const st = STATIONS[idx];
+    const d = stationDist(idx);
+    if (dir > 0 ? d > t : d < t) return idx;
+  }
+  return dir > 0 ? STATIONS.length-1 : 0;
+}
+function stationDist(i){
+  // distance of station i along the bent path
+  let L = 0;
+  for (let k=1;k<=i;k++){
+    const a = STATIONS[k-1], b = STATIONS[k];
+    if (a.x === b.x || a.y === b.y) L += segLen(a,b);
+    else {
+      const dx = Math.abs(b.x-a.x), dy = Math.abs(b.y-a.y);
+      L += Math.min(dx,dy)*Math.SQRT2 + Math.abs(dx-dy);
+    }
+  }
+  return L;
+}
+
+/* ---------- flip-board readout ---------- */
+const cellsEl = document.getElementById('cells');
+const CELLN = 12;
+const cells = [];
+for (let i=0;i<CELLN;i++){
+  const c = document.createElement('div');
+  c.className = 'cell blank';
+  cellsEl.appendChild(c);
+  cells.push(c);
+}
+function setBoard(text){
+  const up = text.toUpperCase().slice(0, CELLN);
+  for (let i=0;i<CELLN;i++){
+    const ch = i < up.length ? up[i] : '';
+    if (cells[i].textContent !== ch){
+      cells[i].textContent = ch;
+      cells[i].classList.toggle('blank', !ch);
+      cells[i].classList.remove('spin');
+      void cells[i].offsetWidth;
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches){
+        setTimeout(((cc)=>()=>cc.classList.add('spin'))(cells[i]), i*24);
+      }
+    }
+  }
+}
+const etaEl = document.getElementById('eta');
+
+/* ---------- station card ---------- */
+const stCard = document.getElementById('stCard');
+function openStation(s){
+  stCard.innerHTML =
+    '<h3>STATION</h3>'+
+    '<div><span class="name">'+ s.name +'</span>'+
+    '<span class="zonechip">ZONE '+ s.zone +'</span></div>'+
+    '<div class="metarow">'+
+    '<span>FIRST <b>'+ s.first +'</b></span>'+
+    '<span>LAST <b>'+ s.last +'</b></span>'+
+    '<span>TYPE <b>'+ (s.kind==='term'?'TERMINAL':s.kind==='xch'?'INTERCHANGE':'STOP') +'</b></span>'+
+    '</div>'+
+    '<div class="metarow" style="opacity:.75;font-size:11px">'+
+    'Next stop toward ' + (trainState.dir>0?'EASTLAND':'WESTPORT') +
+    ': <b>'+ nextAfter(s.id) +'</b></div>';
+  // pulse the station
+  const g = els.stations[s.id];
+  const marker = g.querySelector('circle, rect');
+  if (marker && !matchMedia('(prefers-reduced-motion: reduce)').matches){
+    marker.style.transition = 'none';
+    marker.setAttribute('opacity','1');
+    const orig = marker.getAttribute('r');
+    if (orig){ marker.setAttribute('r', parseFloat(orig)+4); setTimeout(()=>marker.setAttribute('r', orig), 260); }
+  }
+}
+function nextAfter(id){
+  if (trainState.dir > 0) return id < STATIONS.length-1 ? STATIONS[id+1].name : '— (terminus)';
+  return id > 0 ? STATIONS[id-1].name : '— (terminus)';
+}
+
+/* ---------- trip planner ---------- */
+const fromSel = document.getElementById('fromSel');
+const toSel = document.getElementById('toSel');
+STATIONS.forEach(s => {
+  const o1 = new Option(s.name, s.id);
+  const o2 = new Option(s.name, s.id);
+  fromSel.add(o1); toSel.add(o2);
+});
+fromSel.value = '0'; toSel.value = '11';
+const tripInfo = document.getElementById('tripInfo');
+document.getElementById('goBtn').addEventListener('click', function(){
+  const a = +fromSel.value, b = +toSel.value;
+  if (a === b){
+    tripInfo.textContent = 'You are already there. Enjoy the platform.';
+    els.trip.setAttribute('opacity', 0);
+    return;
+  }
+  const lo = Math.min(a,b), hi = Math.max(a,b);
+  // sub-path geometry: walk stations lo..hi building d via pointAt samples
+  let d = '';
+  const d0 = stationDist(lo), d1 = stationDist(hi);
+  const N = 40;
+  for (let i=0;i<=N;i++){
+    const p = pointAt(d0 + (d1-d0)*i/N);
+    d += (i ? ' L' : 'M') + p.x.toFixed(1) + ' ' + p.y.toFixed(1);
+  }
+  els.trip.setAttribute('d', d);
+  els.trip.setAttribute('opacity', .9);
+  const stops = hi - lo;
+  const minutes = 2 + stops * 2;
+  tripInfo.innerHTML =
+    '<b>'+ STATIONS[a].name +'</b> → <b>'+ STATIONS[b].name +'</b><br>'+
+    (stops+1) + ' stops · about <b>'+ minutes +' min</b> · ' +
+    (Math.round(stationDist(hi)-stationDist(lo))/10).toFixed(0) + ' schematic units<br>'+
+    'Route highlighted in emerald on the map.';
+});
+
+/* ---------- speed control ---------- */
+const speedEl = document.getElementById('speed');
+const speedVal = document.getElementById('speedVal');
+speedEl.addEventListener('input', function(){
+  trainState.speed = +speedEl.value / 100;
+  speedVal.textContent = trainState.speed.toFixed(1) + '×';
+});
+
+/* ---------- night mode ---------- */
+const dayBtn = document.getElementById('dayBtn');
+const nightBtn = document.getElementById('nightBtn');
+function setNight(on){
+  document.body.classList.toggle('night', on);
+  dayBtn.classList.toggle('on', !on);
+  nightBtn.classList.toggle('on', on);
+  svg.style.background = on ? 'transparent' : 'transparent';
+  // restyle SVG text for night
+  svg.querySelectorAll('text').forEach(t => t.setAttribute('fill', on ? '#d8d4c8' : '#26221c'));
+  svg.querySelectorAll('path').forEach(p => {
+    if (p.getAttribute('stroke') === '#8a8272') p.setAttribute('stroke', on ? '#5b6270' : '#8a8272');
+  });
+}
+dayBtn.addEventListener('click', function(){ setNight(false); });
+nightBtn.addEventListener('click', function(){ setNight(true); });
+
+/* ---------- main loop ---------- */
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(60, now-last); last = now;
+  if (!reduced || trainState.lastStation === -1){
+    if (now > trainState.dwellUntil){
+      trainState.t += trainState.dir * dt * 0.055 * trainState.speed;
+      // arrive at stations
+      for (let i=0;i<STATIONS.length;i++){
+        const sd = stationDist(i);
+        const crossed = trainState.dir > 0
+          ? trainState.t >= sd && trainState.lastStation !== i && trainState.t - dt*0.055*trainState.speed < sd + 6
+          : trainState.t <= sd && trainState.lastStation !== i && trainState.t + dt*0.055*trainState.speed > sd - 6;
+        if (crossed && Math.abs(trainState.t - sd) < 8){
+          trainState.lastStation = i;
+          trainState.dwellUntil = now + (reduced ? 0 : 900);
+          setBoard(STATIONS[i].name);
+          // ETA to the terminus
+          const remain = Math.abs(stationDist(trainState.dir>0 ? STATIONS.length-1 : 0) - trainState.t);
+          const mins = Math.max(1, Math.round(remain / 26 / Math.max(.2, trainState.speed)));
+          etaEl.innerHTML = 'arrives <b>'+ STATIONS[i].name +'</b> · terminus in <b>' + mins + ' min</b>';
+        }
+      }
+    }
+    // reverse at termini
+    if (trainState.t >= PATHLEN){ trainState.t = PATHLEN; trainState.dir = -1; trainState.lastStation = -1; }
+    if (trainState.t <= 0){ trainState.t = 0; trainState.dir = 1; trainState.lastStation = -1; }
+  }
+  const p = pointAt(trainState.t);
+  els.trainHalo.setAttribute('cx', p.x); els.trainHalo.setAttribute('cy', p.y);
+  els.train.setAttribute('cx', p.x); els.train.setAttribute('cy', p.y);
+  els.trainLabel.setAttribute('x', p.x);
+  els.trainLabel.setAttribute('y', p.y - 16);
+  els.trainLabel.textContent = '7';
+  requestAnimationFrame(frame);
+}
+
+/* ---------- boot ---------- */
+buildMap();
+setBoard('LINE 7');
+setTimeout(function(){ setBoard(STATIONS[0].name); }, 1200);
+etaEl.innerHTML = 'train departing <b>WESTPORT</b>';
+requestAnimationFrame(frame);
+
+
+</script>
+</body>
+</html>

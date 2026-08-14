@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZOETROPE — chronophotography machine</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:
+      radial-gradient(ellipse at 50% 30%, rgba(200,160,100,.1), transparent 55%),
+      linear-gradient(180deg, #1c1410, #120c08);
+    color:#e8dcc8; display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:18px; padding:16px; user-select:none; -webkit-user-select:none;
+  }
+  h1 { font-size:clamp(18px, 3vw, 26px); font-weight:400; letter-spacing:.5em; text-transform:uppercase; color:#e8c98f; }
+  .sub { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.4em; color:#8a795c; text-transform:uppercase; }
+
+  .machine { display:flex; align-items:center; gap:34px; flex-wrap:wrap; justify-content:center; }
+  /* the drum */
+  .drumwrap { position:relative; width:min(480px, 88vw); aspect-ratio:1; }
+  .drum {
+    position:absolute; inset:0; border-radius:50%;
+    background:
+      repeating-conic-gradient(rgba(0,0,0,.42) 0deg 5.2deg, transparent 5.2deg 12deg),
+      radial-gradient(circle, #2c2118 58%, #221a10 58.5%, #3a2c1c 60%, #1c140c 100%);
+    box-shadow:0 34px 80px rgba(0,0,0,.7), inset 0 0 40px rgba(0,0,0,.6);
+    cursor:grab;
+  }
+  .drum:active { cursor:grabbing; }
+  .drum .rim {
+    position:absolute; inset:2%; border-radius:50%;
+    border:10px solid transparent;
+    background:
+      conic-gradient(from 0deg, #8a6e3a, #d4a55a 25%, #8a6e3a 50%, #d4a55a 75%, #8a6e3a) border-box;
+    -webkit-mask:linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity:.85;
+  }
+  /* the animation strip (viewed through slit) */
+  .viewport {
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:44%; height:44%; border-radius:50%;
+    background:#0c0805; overflow:hidden;
+    box-shadow:inset 0 0 24px rgba(0,0,0,.9), 0 0 0 3px #6a543a;
+  }
+  .viewport canvas { width:100%; height:100%; display:block; }
+  .viewport .slitshade {
+    position:absolute; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(90deg, rgba(0,0,0,.72) 0 6.5%, transparent 6.5% 12.5%);
+  }
+  .stand {
+    position:absolute; left:50%; bottom:-8%; transform:translateX(-50%);
+    width:64px; height:34px;
+    background:linear-gradient(180deg, #3a2c1c, #241a10);
+    border-radius:8px 8px 4px 4px; box-shadow:0 10px 24px rgba(0,0,0,.5);
+  }
+
+  /* crank */
+  .crank {
+    width:110px; height:110px; position:relative; cursor:grab; flex-shrink:0;
+  }
+  .crank:active { cursor:grabbing; }
+  .crank .axle {
+    position:absolute; left:50%; top:50%; width:20px; height:20px; margin:-10px 0 0 -10px;
+    border-radius:50%; background:radial-gradient(circle at 35% 30%, #d8c294, #8a6e3a);
+  }
+  .crank .arm {
+    position:absolute; left:50%; top:50%; width:14px; height:66px; margin-left:-7px; transform-origin:50% 0;
+    background:linear-gradient(180deg, #d8c294, #a8865a); border-radius:7px;
+  }
+  .crank .handle {
+    position:absolute; width:22px; height:22px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #6a4a2a, #3a2814);
+    box-shadow:0 3px 6px rgba(0,0,0,.5);
+  }
+  .cranklab { text-align:center; font-family:system-ui, sans-serif; font-size:8.5px; letter-spacing:.26em; color:#8a795c; text-transform:uppercase; margin-top:6px; }
+
+  /* controls */
+  .controls { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  .controls button {
+    background:rgba(232,201,143,.08); color:#e8c98f; border:1px solid rgba(232,201,143,.35);
+    font-family:system-ui, sans-serif; font-size:9.5px; letter-spacing:.18em; text-transform:uppercase;
+    padding:10px 18px; border-radius:99px; cursor:pointer; transition:all .15s;
+  }
+  .controls button:hover { background:rgba(232,201,143,.22); }
+  .controls button.on { background:#8a6d3a; color:#f6efdd; border-color:#8a6d3a; }
+
+  /* frame stepper strip */
+  .filmstrip {
+    width:min(760px, 94vw); overflow-x:auto; white-space:nowrap; padding:10px 4px;
+    display:flex; gap:8px; align-items:center;
+  }
+  .frame {
+    width:64px; height:64px; border:2px solid #4a3a26; border-radius:6px; flex-shrink:0;
+    background:#0e0a06; cursor:pointer; position:relative; overflow:hidden;
+  }
+  .frame canvas { width:100%; height:100%; display:block; }
+  .frame .n { position:absolute; bottom:1px; right:4px; font-family:system-ui, sans-serif; font-size:8px; color:#8a795c; }
+  .frame.on { border-color:#e8c98f; box-shadow:0 0 12px rgba(232,201,143,.35); }
+  .frame.ghost::after { content:""; position:absolute; inset:0; background:rgba(232,201,143,.08); }
+  @media (max-width:720px) {
+    .machine { gap:18px; }
+    .crank { width:90px; height:90px; }
+  }
+</style>
+</head>
+<body>
+  <div>
+    <h1>Zoetrope</h1>
+    <p class="sub" style="text-align:center;margin-top:6px;">persistence of vision · 1834</p>
+  </div>
+
+  <div class="machine">
+    <div class="drumwrap">
+      <div class="drum" id="drum">
+        <div class="rim"></div>
+        <div class="viewport">
+          <canvas id="view" width="220" height="220"></canvas>
+          <div class="slitshade"></div>
+        </div>
+      </div>
+      <div class="stand"></div>
+    </div>
+    <div>
+      <div class="crank" id="crank">
+        <div class="arm" id="crankArm"><div class="handle" id="crankHandle" style="left:44px;top:66px;"></div></div>
+        <div class="axle"></div>
+      </div>
+      <div class="cranklab">crank me</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="strobeBtn">strobe light</button>
+    <button data-strip="horse" class="on">horse</button>
+    <button data-strip="diver">diver</button>
+    <button data-strip="bird">bird</button>
+    <button data-strip="juggler">juggler</button>
+  </div>
+
+  <div class="filmstrip" id="filmstrip"></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const view = $("view"), vg = view.getContext("2d");
+  const FRAMES = 12;
+  let spin = 0, spinVel = 0, strobe = false;
+  let stripKind = "horse";
+  let frames = [];
+
+  /* ---------- generate animation strips ---------- */
+  function makeFrames(kind) {
+    frames = [];
+    for (let f = 0; f < FRAMES; f++) {
+      const c = document.createElement("canvas");
+      c.width = 220; c.height = 220;
+      const x = c.getContext("2d");
+      const ph = f / FRAMES;                 /* 0..1 cycle */
+      x.fillStyle = "#0e0a06";
+      x.fillRect(0, 0, 220, 220);
+      /* sepia ground line */
+      x.strokeStyle = "rgba(200,170,120,.5)";
+      x.lineWidth = 3;
+      x.beginPath(); x.moveTo(10, 190); x.lineTo(210, 190); x.stroke();
+      x.strokeStyle = "#e8dcc8";
+      x.lineWidth = 4;
+      x.lineCap = "round";
+      if (kind === "horse") {
+        /* galloping horse: body bob + 4 legs phasing */
+        const bob = Math.sin(ph * 6.283) * 5;
+        const bx = 110, by = 130 + bob;
+        /* body */
+        x.beginPath(); x.ellipse(bx, by, 44, 20, -0.06, 0, 6.283); x.stroke();
+        /* neck + head */
+        x.beginPath();
+        x.moveTo(bx + 34, by - 8);
+        x.lineTo(bx + 54, by - 26);
+        x.lineTo(bx + 66, by - 22);
+        x.stroke();
+        /* tail */
+        x.beginPath();
+        x.moveTo(bx - 42, by - 4);
+        x.quadraticCurveTo(bx - 62, by + 2 + Math.sin(ph * 6.283) * 6, bx - 58, by + 18);
+        x.stroke();
+        /* legs: phase pairs */
+        [[-30, ph], [-20, ph + 0.5], [26, ph + 0.25], [36, ph + 0.75]].forEach(([dx, lp]) => {
+          const a = Math.sin(lp * 6.283) * 0.9;
+          x.beginPath();
+          x.moveTo(bx + dx, by + 14);
+          const mx = bx + dx + Math.sin(a) * 26;
+          const my = by + 14 + Math.cos(a) * 26;
+          x.lineTo(mx, my);
+          x.lineTo(mx + Math.sin(a + 0.5) * 18, my + Math.cos(a + 0.5) * 18);
+          x.stroke();
+        });
+      } else if (kind === "diver") {
+        /* somersaulting diver */
+        const a = ph * 6.283 * 2;
+        x.save();
+        x.translate(110, 110 + Math.sin(ph * 6.283) * 40);
+        x.rotate(a);
+        /* tucked body */
+        x.beginPath(); x.arc(0, 0, 17, 0, 6.283); x.stroke();
+        /* limbs */
+        x.beginPath(); x.moveTo(0, -17); x.lineTo(10, -28); x.stroke();
+        x.beginPath(); x.moveTo(0, 17); x.lineTo(-8, 30); x.stroke();
+        x.beginPath(); x.moveTo(-13, 8); x.lineTo(-24, 16); x.stroke();
+        x.beginPath(); x.moveTo(13, -8); x.lineTo(26, -18); x.stroke();
+        x.restore();
+        /* board */
+        x.strokeStyle = "rgba(200,170,120,.7)";
+        x.beginPath(); x.moveTo(10, 44); x.lineTo(64, 44); x.stroke();
+      } else if (kind === "bird") {
+        /* rising flapping bird */
+        const y = 170 - ph * 120;
+        const flap = Math.sin(ph * 6.283 * 2);
+        x.save();
+        x.translate(110, y);
+        /* body */
+        x.beginPath(); x.ellipse(0, 0, 20, 9, 0, 0, 6.283); x.stroke();
+        /* wings */
+        x.beginPath();
+        x.moveTo(-4, -2);
+        x.quadraticCurveTo(-18, -8 - flap * 26, -40, -flap * 34);
+        x.stroke();
+        x.beginPath();
+        x.moveTo(4, -2);
+        x.quadraticCurveTo(18, -8 - flap * 26, 40, -flap * 34);
+        x.stroke();
+        /* beak */
+        x.beginPath(); x.moveTo(20, -2); x.lineTo(30, 2); x.lineTo(20, 4); x.stroke();
+        x.restore();
+      } else {
+        /* juggler: three balls on lissajous + arms */
+        const cx = 110, cy = 130;
+        x.beginPath(); x.arc(cx, cy - 26, 15, 0, 6.283); x.stroke(); /* head */
+        x.beginPath(); x.moveTo(cx - 16, cy + 34); x.lineTo(cx + 16, cy + 34); x.stroke(); /* shoulders */
+        /* hands */
+        for (const s of [-1, 1]) {
+          const t = ph + (s < 0 ? 0 : 0.5);
+          const hx = cx + s * 30;
+          const hy = cy + 6 - Math.max(0, Math.sin(t * 6.283)) * 26;
+          x.beginPath(); x.moveTo(cx + s * 12, cy + 20); x.lineTo(hx, hy); x.stroke();
+          /* ball */
+          x.beginPath(); x.arc(hx, hy - 12, 5, 0, 6.283); x.stroke();
+        }
+        /* third ball mid-air */
+        const t3 = ph + 0.25;
+        const bx2 = cx + Math.cos(t3 * 6.283) * 26;
+        const by2 = cy - 60 - Math.sin(t3 * 6.283) * 24;
+        x.beginPath(); x.arc(bx2, by2, 5, 0, 6.283); x.stroke();
+      }
+      frames.push(c);
+    }
+  }
+  makeFrames("horse");
+
+  /* filmstrip UI */
+  const strip = $("filmstrip");
+  let currentFrame = 0;
+  function buildStrip() {
+    strip.innerHTML = "";
+    frames.forEach((c, i) => {
+      const d = document.createElement("div");
+      d.className = "frame";
+      const cc = document.createElement("canvas");
+      cc.width = 220; cc.height = 220;
+      cc.getContext("2d").drawImage(c, 0, 0);
+      d.appendChild(cc);
+      const n = document.createElement("span");
+      n.className = "n";
+      n.textContent = i + 1;
+      d.appendChild(n);
+      d.addEventListener("click", () => {
+        currentFrame = i;
+        showFrame(i);
+      });
+      strip.appendChild(d);
+    });
+  }
+  buildStrip();
+
+  function showFrame(i) {
+    vg.clearRect(0, 0, 220, 220);
+    vg.drawImage(frames[i], 0, 0);
+    /* onion skin ghost of previous */
+    vg.globalAlpha = 0.18;
+    vg.drawImage(frames[(i + FRAMES - 1) % FRAMES], 0, 0);
+    vg.globalAlpha = 1;
+    [...strip.children].forEach((el, k) => {
+      el.classList.toggle("on", k === i);
+      el.classList.toggle("ghost", k === (i + FRAMES - 1) % FRAMES);
+    });
+  }
+  showFrame(0);
+
+  /* ---------- drum physics ---------- */
+  const drum = $("drum");
+  let dragging = false, lastA = 0, lastT = 0;
+  function angAt(e) {
+    const r = drum.getBoundingClientRect();
+    return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2));
+  }
+  drum.addEventListener("pointerdown", (e) => { dragging = true; lastA = angAt(e); lastT = performance.now(); });
+  addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const a = angAt(e);
+    let d = a - lastA;
+    if (d > Math.PI) d -= 6.283;
+    if (d < -Math.PI) d += 6.283;
+    const now = performance.now();
+    const dt = Math.max(8, now - lastT);
+    spinVel = d / dt * 16.7; /* per frame */
+    spin += d;
+    lastA = a; lastT = now;
+  });
+  addEventListener("pointerup", () => { dragging = false; });
+
+  /* crank */
+  const crankArm = $("crankArm");
+  let crankA = 0, cranking = false, clastA = 0;
+  const crank = $("crank");
+  function crankAng(e) {
+    const r = crank.getBoundingClientRect();
+    return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2));
+  }
+  crank.addEventListener("pointerdown", (e) => { cranking = true; clastA = crankAng(e); });
+  addEventListener("pointermove", (e) => {
+    if (!cranking) return;
+    const a = crankAng(e);
+    let d = a - clastA;
+    if (d > Math.PI) d -= 6.283;
+    if (d < -Math.PI) d += 6.283;
+    crankA += d;
+    spinVel += d * 0.24;
+    clastA = a;
+  });
+  addEventListener("pointerup", () => { cranking = false; });
+
+  /* ---------- loop ---------- */
+  let lastFrameShown = -1;
+  function loop() {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+    /* physics */
+    spin += spinVel;
+    spinVel *= 0.985;
+    drum.style.transform = "rotate(" + (spin) + "rad)";
+    crankArm.style.transform = "rotate(" + crankA + "rad)";
+    if (cranking) crankA += 0;
+    /* frame index from drum angle */
+    const ff = Math.floor((spin / 6.283) * FRAMES * 2) % FRAMES;
+    const fi = ((ff % FRAMES) + FRAMES) % FRAMES;
+    if (fi !== lastFrameShown) {
+      lastFrameShown = fi;
+      showFrame(fi);
+    }
+  }
+  requestAnimationFrame(loop);
+
+  /* ---------- strobe ---------- */
+  $("strobeBtn").addEventListener("click", function () {
+    strobe = !strobe;
+    this.classList.toggle("on", strobe);
+    document.querySelector(".slitshade").style.display = strobe ? "none" : "block";
+    if (strobe) {
+      /* flashing overlay */
+      const fl = document.createElement("div");
+      fl.id = "strobeEl";
+      fl.style.cssText = "position:absolute;inset:0;background:#fff8e8;pointer-events:none;mix-blend-mode:overlay;";
+      document.querySelector(".viewport").appendChild(fl);
+    } else {
+      const fl = document.getElementById("strobeEl");
+      if (fl) fl.remove();
+    }
+  });
+
+  /* ---------- strip switching ---------- */
+  document.querySelectorAll("[data-strip]").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll("[data-strip]").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    stripKind = b.dataset.strip;
+    makeFrames(stripKind);
+    buildStrip();
+    showFrame(0);
+  }));
+})();
+</script>
+</body>
+</html>

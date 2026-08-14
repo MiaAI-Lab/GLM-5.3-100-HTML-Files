@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MONOLITH — system status</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background:#e9eaec; color:#1c1e24; min-height:100vh;
+    overflow-x:hidden;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  /* fog */
+  .fog { position:fixed; inset:0; pointer-events:none; z-index:1;
+    background:
+      radial-gradient(ellipse 70% 40% at 30% 80%, rgba(255,255,255,.5), transparent 60%),
+      radial-gradient(ellipse 50% 35% at 75% 70%, rgba(255,255,255,.4), transparent 65%);
+  }
+  header.bar {
+    width:100%; display:flex; align-items:center; gap:20px; padding:16px 28px;
+    border-bottom:1px solid rgba(28,30,36,.12); z-index:10;
+    background:rgba(233,234,236,.8); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    position:sticky; top:0;
+  }
+  .brand { font-size:13px; font-weight:600; letter-spacing:.32em; text-transform:uppercase; }
+  .brand em { font-style:normal; color:#8a8f9a; font-weight:400; }
+  .statuspill {
+    margin-left:auto; font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+    padding:7px 14px; border-radius:99px; background:#e4f0e4; color:#2e7d32; border:1px solid #bcd9bc;
+  }
+  main { width:min(1060px, 94vw); z-index:5; padding:30px 0 80px; }
+
+  /* hero: the monolith */
+  .hero { display:flex; gap:44px; align-items:center; margin:36px 0 54px; flex-wrap:wrap; }
+  .mono-wrap { perspective:900px; flex-shrink:0; }
+  .monolith {
+    width:120px; height:340px; position:relative; border-radius:6px;
+    background:linear-gradient(160deg, #2a2d36 0%, #171920 55%, #0c0d12 100%);
+    transform:rotateY(-14deg) rotateX(4deg);
+    box-shadow:
+      22px 30px 60px rgba(20,22,30,.45),
+      -8px -6px 30px rgba(255,255,255,.5),
+      inset 0 0 30px rgba(0,0,0,.6),
+      inset 1px 1px 0 rgba(255,255,255,.08);
+    animation:breathe 7s ease-in-out infinite;
+  }
+  .monolith::after {
+    content:""; position:absolute; inset:0; border-radius:6px;
+    background:linear-gradient(115deg, transparent 30%, rgba(255,255,255,.09) 45%, transparent 60%);
+  }
+  @keyframes breathe {
+    0%,100% { box-shadow:22px 30px 60px rgba(20,22,30,.45), -8px -6px 30px rgba(255,255,255,.5), inset 0 0 30px rgba(0,0,0,.6); }
+    50% { box-shadow:22px 30px 80px rgba(20,22,30,.55), -8px -6px 40px rgba(255,255,255,.7), inset 0 0 44px rgba(40,60,90,.25); }
+  }
+  .hero-copy h1 { font-size:clamp(30px, 5vw, 52px); font-weight:200; letter-spacing:.06em; }
+  .hero-copy h1 b { font-weight:600; }
+  .bigpct { font-size:clamp(56px, 10vw, 110px); font-weight:100; letter-spacing:-.02em; color:#1c1e24; line-height:1; margin:14px 0 6px; font-variant-numeric:tabular-nums; }
+  .bigpct small { font-size:.35em; color:#8a8f9a; }
+  .hero-copy p { color:#5a5f6a; font-size:14.5px; line-height:1.75; max-width:44ch; }
+
+  /* uptime strip */
+  .sect { margin:44px 0; }
+  .sect h2 { font-size:10px; letter-spacing:.34em; text-transform:uppercase; color:#8a8f9a; margin-bottom:16px; font-weight:500; }
+  .strip { display:flex; gap:3px; }
+  .strip i {
+    flex:1; height:44px; border-radius:3px; background:#2e7d32; position:relative; cursor:pointer;
+    transition:transform .12s;
+  }
+  .strip i:hover { transform:scaleY(1.18); }
+  .strip i.warn { background:#e0a52e; }
+  .strip i.bad { background:#c2492e; }
+  .striplab { display:flex; justify-content:space-between; font-size:9.5px; color:#9aa0ab; letter-spacing:.14em; margin-top:8px; text-transform:uppercase; }
+  .tiptool {
+    position:fixed; z-index:60; background:#1c1e24; color:#e8eaef; padding:8px 12px; border-radius:8px;
+    font-size:10.5px; pointer-events:none; opacity:0; transition:opacity .15s; white-space:nowrap;
+  }
+  .tiptool.show { opacity:1; }
+
+  /* regions grid */
+  .regions { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:14px; }
+  .region {
+    border:1px solid rgba(28,30,36,.12); border-radius:12px; padding:16px 18px; cursor:pointer;
+    background:rgba(255,255,255,.5); transition:all .18s;
+  }
+  .region:hover { border-color:rgba(28,30,36,.3); transform:translateY(-2px); }
+  .region h3 { font-size:13px; font-weight:600; letter-spacing:.04em; }
+  .region .lat { font-size:20px; font-weight:300; margin:8px 0 2px; font-variant-numeric:tabular-nums; }
+  .region .lat.good { color:#2e7d32; } .region .lat.warn { color:#b07714; } .region .lat.bad { color:#c2492e; }
+  .region canvas { width:100%; height:34px; display:block; margin-top:8px; }
+  .region .st { font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:#9aa0ab; margin-top:6px; }
+
+  /* incidents */
+  .inc { border-top:1px solid rgba(28,30,36,.1); }
+  .incident { border-bottom:1px solid rgba(28,30,36,.1); }
+  .incident button.head {
+    width:100%; text-align:left; background:none; border:none; cursor:pointer; font:inherit;
+    display:flex; align-items:center; gap:16px; padding:18px 8px; color:#1c1e24;
+  }
+  .incident .date { font-size:10.5px; color:#8a8f9a; letter-spacing:.1em; width:90px; flex-shrink:0; font-variant-numeric:tabular-nums; }
+  .incident .ttl { font-size:14px; font-weight:500; flex:1; }
+  .incident .sev {
+    font-size:9px; letter-spacing:.18em; text-transform:uppercase; padding:4px 10px; border-radius:99px;
+  }
+  .sev.minor { background:#f2ead2; color:#8a6d1a; }
+  .sev.major { background:#f2ded6; color:#a03e22; }
+  .incident .arrow { color:#9aa0ab; transition:transform .25s; font-size:11px; }
+  .incident.open .arrow { transform:rotate(90deg); }
+  .postmortem { max-height:0; overflow:hidden; transition:max-height .4s ease; }
+  .incident.open .postmortem { max-height:220px; }
+  .postmortem .inner { padding:4px 8px 22px 106px; color:#5a5f6a; font-size:13px; line-height:1.8; max-width:72ch; }
+  .postmortem b { color:#1c1e24; }
+
+  footer { width:100%; padding:22px 28px; border-top:1px solid rgba(28,30,36,.1); font-size:9.5px;
+    letter-spacing:.22em; text-transform:uppercase; color:#9aa0ab; text-align:center; z-index:5; }
+
+  @media (max-width:640px) {
+    .hero { gap:24px; }
+    .monolith { width:84px; height:240px; }
+    .postmortem .inner { padding-left:8px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .monolith { animation:none; } }
+</style>
+</head>
+<body>
+  <div class="fog"></div>
+
+  <header class="bar">
+    <div class="brand">Monolith <em>· backbone status</em></div>
+    <div class="statuspill">all systems nominal</div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="mono-wrap"><div class="monolith" id="monolith"></div></div>
+      <div class="hero-copy">
+        <h1>It is <b>operational.</b></h1>
+        <div class="bigpct">99.982<small>%</small></div>
+        <p>Rolling 90-day availability across all regions. The slab does not sleep,
+        does not dream, and has never once asked for a firmware update.</p>
+      </div>
+    </section>
+
+    <section class="sect">
+      <h2>90-day uptime</h2>
+      <div class="strip" id="strip"></div>
+      <div class="striplab"><span>90 days ago</span><span>today</span></div>
+    </section>
+
+    <section class="sect">
+      <h2>regions · latency p50 (ms)</h2>
+      <div class="regions" id="regions"></div>
+    </section>
+
+    <section class="sect">
+      <h2>incident timeline</h2>
+      <div class="inc" id="incidents"></div>
+    </section>
+  </main>
+
+  <footer>monolith backbone · ff-2 cluster · this page is fictional, the uptime is aspirational</footer>
+  <div class="tiptool" id="tiptool"></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------- 90-day strip ---------- */
+  const strip = $("strip");
+  const tip = $("tiptool");
+  for (let i = 0; i < 90; i++) {
+    const d = document.createElement("i");
+    const r = Math.random();
+    if (i === 61) d.className = "warn";
+    else if (i === 34) d.className = "bad";
+    d.addEventListener("mouseenter", (e) => {
+      const day = 90 - i;
+      let label = "day −" + day + " · 100.00%";
+      if (i === 61) label = "day −29 · 99.71% · elevated errors (eu-west)";
+      if (i === 34) label = "day −56 · 98.94% · the incident (see below)";
+      tip.textContent = label;
+      tip.classList.add("show");
+      tip.style.left = Math.min(innerWidth - 240, e.clientX + 12) + "px";
+      tip.style.top = (e.clientY - 34) + "px";
+    });
+    d.addEventListener("mouseleave", () => tip.classList.remove("show"));
+    strip.appendChild(d);
+  }
+
+  /* ---------- regions with sparklines ---------- */
+  const REGIONS = [
+    { name: "us-east", base: 12 }, { name: "us-west", base: 28 },
+    { name: "eu-west", base: 34 }, { name: "eu-north", base: 41 },
+    { name: "ap-south", base: 88 }, { name: "sa-east", base: 114 },
+  ];
+  const regionsEl = $("regions");
+  REGIONS.forEach((rg, ri) => {
+    const card = document.createElement("div");
+    card.className = "region";
+    const state = ri === 2 ? "warn" : ri === 5 ? "bad" : "good";
+    card.innerHTML =
+      "<h3>" + rg.name + "</h3>" +
+      '<div class="lat ' + state + '">' + (rg.base + (Math.random() * 4 - 2)).toFixed(1) + " ms</div>" +
+      "<canvas width='180' height='34'></canvas>" +
+      '<div class="st">' + (state === "good" ? "healthy" : state === "warn" ? "degraded · watching" : "elevated · investigating") + "</div>";
+    regionsEl.appendChild(card);
+    /* sparkline */
+    const c = card.querySelector("canvas").getContext("2d");
+    c.strokeStyle = state === "good" ? "#2e7d32" : state === "warn" ? "#e0a52e" : "#c2492e";
+    c.lineWidth = 1.4;
+    c.beginPath();
+    let y = 17;
+    for (let x = 0; x < 180; x += 4) {
+      y += (Math.random() - 0.5) * 5;
+      y = Math.max(4, Math.min(30, y));
+      x ? c.lineTo(x, y) : c.moveTo(x, y);
+    }
+    c.stroke();
+    card.addEventListener("click", () => {
+      tip.textContent = rg.name + " · " + (3 + ri) + " pops · p99 " + (rg.base * 2.4).toFixed(0) + "ms";
+      tip.classList.add("show");
+      tip.style.left = (innerWidth / 2 - 80) + "px";
+      tip.style.top = "64px";
+      setTimeout(() => tip.classList.remove("show"), 1400);
+    });
+  });
+
+  /* ---------- incidents ---------- */
+  const INCIDENTS = [
+    { date: "2026-06-19", sev: "major", title: "The Slab Slept (34m downtime)",
+      body: "<b>What happened:</b> a maintenance script asked the monolith to defragment itself. It complied, thoughtfully, for thirty-four minutes. <b>Impact:</b> all regions returned stale headers; three dashboards achieved enlightenment. <b>Fix:</b> the script now runs never. <b>Follow-up:</b> we added a second slab, then removed it — it was clearly the first slab's job." },
+    { date: "2026-07-16", sev: "minor", title: "Elevated 5xx in eu-west",
+      body: "<b>What happened:</b> a router in dublin developed a fear of packets. <b>Impact:</b> error rate touched 0.29% for nineteen minutes. <b>Fix:</b> firm but respectful conversation with the router. <b>Status:</b> resolved, monitor shipped." },
+    { date: "2026-08-02", sev: "minor", title: "Certificate renewal hiccup",
+      body: "<b>What happened:</b> the renewal bot took a scheduled nap across a deadline. <b>Impact:</b> none — the fallback certificate was already warm. <b>Status:</b> the bot now naps earlier." },
+  ];
+  const incEl = $("incidents");
+  INCIDENTS.forEach(inc => {
+    const d = document.createElement("div");
+    d.className = "incident";
+    d.innerHTML =
+      '<button class="head"><span class="date">' + inc.date + '</span>' +
+      '<span class="ttl">' + inc.title + '</span>' +
+      '<span class="sev ' + inc.sev + '">' + inc.sev + '</span>' +
+      '<span class="arrow">▶</span></button>' +
+      '<div class="postmortem"><div class="inner">' + inc.body + "</div></div>";
+    d.querySelector("button").addEventListener("click", () => d.classList.toggle("open"));
+    incEl.appendChild(d);
+  });
+
+  /* ---------- status refresh: the monolith hums ---------- */
+  document.querySelector(".statuspill").addEventListener("click", function () {
+    this.textContent = "consulting the slab…";
+    const m = $("monolith");
+    m.style.transition = "box-shadow .3s";
+    m.style.boxShadow = "22px 30px 110px rgba(40,80,160,.55), inset 0 0 60px rgba(80,120,190,.35)";
+    hum();
+    setTimeout(() => {
+      m.style.boxShadow = "";
+      this.textContent = "all systems nominal";
+      tip.textContent = "the slab acknowledges you";
+      tip.classList.add("show");
+      tip.style.left = (innerWidth / 2 - 90) + "px";
+      tip.style.top = "64px";
+      setTimeout(() => tip.classList.remove("show"), 1600);
+    }, 1400);
+  });
+
+  /* ---------- hum (gesture-gated) ---------- */
+  let AC = null;
+  function hum() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      const t0 = AC.currentTime;
+      const o = AC.createOscillator(), g = AC.createGain();
+      o.type = "sine"; o.frequency.value = 54;
+      const o2 = AC.createOscillator(), g2 = AC.createGain();
+      o2.type = "sine"; o2.frequency.value = 54 * 1.5;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.05, t0 + 0.4);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.6);
+      g2.gain.setValueAtTime(0.0001, t0);
+      g2.gain.exponentialRampToValueAtTime(0.02, t0 + 0.4);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.6);
+      o.connect(g); o2.connect(g2); g.connect(AC.destination); g2.connect(AC.destination);
+      o.start(t0); o2.start(t0); o.stop(t0 + 1.7); o2.stop(t0 + 1.7);
+    } catch (e) {}
+  }
+})();
+</script>
+</body>
+</html>

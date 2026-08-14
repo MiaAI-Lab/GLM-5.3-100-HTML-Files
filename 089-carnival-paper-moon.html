@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CARNIVAL — paper moon night</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:linear-gradient(180deg, #141031 0%, #241546 60%, #38204e 100%);
+    color:#f0e4d0; overflow:hidden; user-select:none; -webkit-user-select:none;
+  }
+  #scene { position:fixed; inset:0; }
+  canvas#c { position:absolute; inset:0; width:100%; height:100%; }
+
+  .hud { position:fixed; left:22px; top:18px; z-index:10; text-shadow:0 1px 6px rgba(0,0,0,.6); }
+  .hud h1 { font-size:16px; font-weight:400; letter-spacing:.5em; text-transform:uppercase; color:#ffe8c0; }
+  .hud p { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.28em; color:#a894c0; text-transform:uppercase; margin-top:5px; }
+
+  .scorebox { position:fixed; right:22px; top:18px; z-index:10; text-align:right;
+    font-family:system-ui, sans-serif; text-shadow:0 1px 6px rgba(0,0,0,.6); }
+  .scorebox .sc { font-size:28px; font-weight:300; color:#ffd98a; }
+  .scorebox .lab { font-size:9px; letter-spacing:.3em; text-transform:uppercase; color:#a894c0; }
+
+  .controls {
+    position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:20;
+    display:flex; gap:10px; padding:10px 14px; border-radius:99px;
+    background:rgba(20,16,40,.7); border:1px solid rgba(255,232,192,.2);
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); flex-wrap:wrap; justify-content:center;
+  }
+  .controls button {
+    background:rgba(255,232,192,.08); color:#ffe8c0; border:1px solid rgba(255,232,192,.32);
+    font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.16em; text-transform:uppercase;
+    padding:9px 16px; border-radius:99px; cursor:pointer; transition:all .15s;
+  }
+  .controls button:hover { background:rgba(255,232,192,.2); }
+  .controls button.on { background:#c9a02e; border-color:#c9a02e; color:#241a08; }
+  .hintline { position:fixed; left:22px; bottom:16px; z-index:10; font-family:system-ui, sans-serif;
+    font-size:9px; letter-spacing:.22em; color:rgba(200,180,230,.6); text-transform: uppercase; }
+  @media (max-width:640px) { .hintline { display:none; } }
+  @media (prefers-reduced-motion: reduce) { #scene { animation:none; } }
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <div class="hud">
+    <h1>Paper Moon</h1>
+    <p>carnival night · ring toss · the wheel turns</p>
+  </div>
+  <div class="scorebox">
+    <div class="sc" id="prizeV">0</div>
+    <div class="lab">prizes on the shelf</div>
+  </div>
+
+  <div class="controls">
+    <button id="motorBtn">wheel: on</button>
+    <button id="organBtn">calliope: off</button>
+    <button id="tossBtn">throw ring ×1</button>
+  </div>
+  <span class="hintline">drag near the wheel to spin it by hand · throws cost nothing but pride</span>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById($id(id));
+  function $id(id) { return id; }
+  const cv = $("c"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let wheelA = 0, wheelV = 0.004, motorOn = true;
+  let carouselA = 0;
+  let rings = [], prizes = 0;
+  let bulbs = [];
+
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  /* string bulbs between booths */
+  function stringBulbs() {
+    const b = [];
+    for (let i = 0; i <= 22; i++) {
+      const t2 = i / 22;
+      const x = t2 * W;
+      const y = H * 0.16 + Math.sin(t2 * Math.PI) * 34;
+      b.push({ x, y, ph: Math.random() * 6.28 });
+    }
+    return b;
+  }
+  bulbs = stringBulbs();
+  addEventListener("resize", () => { bulbs = stringBulbs(); });
+
+  /* ---------- ring toss ---------- */
+  /* bottles layout */
+  const bottles = [];
+  function buildBottles() {
+    bottles.length = 0;
+    const bx = W * 0.74, by = H * 0.78;
+    for (let r = 0; r < 2; r++) {
+      for (let i = 0; i < 3; i++) {
+        bottles.push({ x: bx + (i - 1) * 34 + (r ? 17 : 0), y: by - r * 26, r: 9 });
+      }
+    }
+  }
+  buildBottles();
+  addEventListener("resize", buildBottles);
+
+  $("tossBtn").addEventListener("click", () => {
+    rings.push({
+      x: W * 0.3, y: H * 0.7,
+      vx: (6 + Math.random() * 3), vy: -(7 + Math.random() * 2),
+      landed: false,
+    });
+    blip(600, 0.04);
+  });
+
+  /* ---------- audio ---------- */
+  let AC = null, organOn = false, organTimer = null;
+  function ac() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+    return AC;
+  }
+  function blip(f, vol) {
+    const c = ac(); if (!c) return;
+    try {
+      const t0 = c.currentTime;
+      const o = c.createOscillator(), g2 = c.createGain();
+      o.type = "square"; o.frequency.value = f;
+      g2.gain.setValueAtTime(vol, t0);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.12);
+      o.connect(g2); g2.connect(c.destination);
+      o.start(t0); o.stop(t0 + 0.13);
+    } catch (e) {}
+  }
+  function calliopeNote() {
+    const c = ac(); if (!c || !organOn) return;
+    const scale = [523, 587, 659, 784, 880, 1046];
+    try {
+      const t0 = c.currentTime;
+      const f = scale[Math.floor(Math.random() * scale.length)];
+      const o = c.createOscillator(), g2 = c.createGain();
+      o.type = "triangle"; o.frequency.value = f;
+      g2.gain.setValueAtTime(0.0001, t0);
+      g2.gain.exponentialRampToValueAtTime(0.03, t0 + 0.05);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+      o.connect(g2); g2.connect(c.destination);
+      o.start(t0); o.stop(t0 + 0.55);
+    } catch (e) {}
+  }
+  $("organBtn").addEventListener("click", function () {
+    organOn = !organOn;
+    this.classList.toggle("on", organOn);
+    this.textContent = "calliope: " + (organOn ? "on" : "off");
+    ac();
+    if (organOn) organTimer = setInterval(calliopeNote, 480);
+    else clearInterval(organTimer);
+  });
+  $("motorBtn").addEventListener("click", function () {
+    motorOn = !motorOn;
+    this.textContent = "wheel: " + (motorOn ? "on" : "off");
+  });
+
+  /* ---------- wheel drag ---------- */
+  let wheelDrag = false;
+  const wheelCx = () => W * 0.24, wheelCy = () => H * 0.42, wheelR = () => Math.min(W, H) * 0.2;
+  cv.addEventListener("pointerdown", (e) => {
+    if (Math.hypot(e.clientX - wheelCx(), e.clientY - wheelCy()) < wheelR() + 24) wheelDrag = true;
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (!wheelDrag) return;
+    wheelV += (e.movementX || 0) * 0.00012;
+    wheelV = Math.max(-0.05, Math.min(0.05, wheelV));
+  });
+  addEventListener("pointerup", () => { wheelDrag = false; });
+
+  /* ---------- render ---------- */
+  let t = 0;
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+    t = now;
+    /* physics */
+    if (motorOn) wheelV += (0.004 - wheelV) * 0.01;
+    else wheelV *= 0.985;
+    wheelA += wheelV;
+    carouselA += 0.006 + Math.abs(wheelV) * 0.4;
+
+    /* rings physics */
+    rings.forEach(r2 => {
+      if (r2.landed) return;
+      r2.vy += 0.32;
+      r2.x += r2.vx;
+      r2.y += r2.vy;
+      /* bottle landing */
+      for (const b of bottles) {
+        if (r2.y > b.y - 16 && Math.abs(r2.x - b.x) < 12 && r2.vy > 0) {
+          const ok = Math.random() < 0.4;
+          if (ok) {
+            r2.landed = true;
+            r2.x = b.x; r2.y = b.y - 6;
+            prizes++;
+            $("prizeV").textContent = prizes;
+            blip(1046, 0.05);
+          } else {
+            r2.vy = -r2.vy * 0.4;
+            r2.vx += (Math.random() - 0.5) * 3;
+            blip(220, 0.04);
+          }
+          return;
+        }
+      }
+      if (r2.y > H - 30) { r2.landed = true; r2.y = H - 30; blip(160, 0.03); }
+    });
+    rings = rings.filter(r2 => r2.x < W + 60 && rings.length <= 24);
+
+    draw(now);
+  }
+  requestAnimationFrame(loop);
+
+  function draw(now) {
+    /* night sky */
+    const sky = g.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, "#141031");
+    sky.addColorStop(0.6, "#241546");
+    sky.addColorStop(1, "#38204e");
+    g.fillStyle = sky;
+    g.fillRect(0, 0, W, H);
+    /* stars */
+    g.fillStyle = "rgba(240,230,255,.7)";
+    for (let i = 0; i < 70; i++) g.fillRect((i * 167) % W, (i * 71) % (H * 0.4), 1.4, 1.4);
+
+    /* paper moon */
+    const mx = W * 0.82, my = H * 0.2;
+    g.fillStyle = "#f4e8c8";
+    g.beginPath();
+    g.arc(mx, my, 44, 1.7, 4.6);
+    g.arc(mx + 52, my - 14, 40, 4.6, 1.7, true);
+    g.closePath();
+    g.fill();
+    g.fillStyle = "rgba(200,180,150,.5)";
+    g.fillRect(mx - 8, my - 10, 14, 4);
+
+    /* ferris wheel */
+    drawWheel(now);
+    /* carousel */
+    drawCarousel(now);
+    /* string bulbs */
+    drawBulbs(now);
+    /* ring toss booth */
+    drawBooth(now);
+    /* ground */
+    g.fillStyle = "#1c1230";
+    g.fillRect(0, H - 22, W, 22);
+  }
+
+  function drawWheel(now) {
+    const cx = wheelCx(), cy = wheelCy(), R = wheelR();
+    /* spokes */
+    g.strokeStyle = "#8a6a3a";
+    g.lineWidth = 3;
+    for (let i = 0; i < 12; i++) {
+      const a = wheelA + (6.283 / 12) * i;
+      g.beginPath();
+      g.moveTo(cx, cy);
+      g.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
+      g.stroke();
+    }
+    /* rim */
+    g.strokeStyle = "#c9a02e";
+    g.lineWidth = 6;
+    g.beginPath(); g.arc(cx, cy, R, 0, 6.283); g.stroke();
+    g.strokeStyle = "#8a6a3a";
+    g.lineWidth = 2;
+    g.beginPath(); g.arc(cx, cy, R * 0.7, 0, 6.283); g.stroke();
+    /* gondolas */
+    for (let i = 0; i < 12; i++) {
+      const a = wheelA + (6.283 / 12) * i;
+      const gx = cx + Math.cos(a) * R, gy = cy + Math.sin(a) * R;
+      /* hanger */
+      g.strokeStyle = "#8a6a3a";
+      g.lineWidth = 2;
+      g.beginPath(); g.moveTo(gx, gy); g.lineTo(gx, gy + 14); g.stroke();
+      /* gondola (stays upright) */
+      g.fillStyle = ["#c95a4a", "#4a8ac9", "#c9a02e", "#5ac97a", "#9a5ac9"][i % 5];
+      g.beginPath();
+      g.roundRect ? g.roundRect(gx - 9, gy + 14, 18, 14, 4) : g.rect(gx - 9, gy + 14, 18, 14);
+      g.fill();
+      /* lit window */
+      g.fillStyle = "rgba(255,240,190,.8)";
+      g.fillRect(gx - 4, gy + 17, 8, 6);
+    }
+    /* hub */
+    g.fillStyle = "#c9a02e";
+    g.beginPath(); g.arc(cx, cy, 10, 0, 6.283); g.fill();
+    /* supports */
+    g.strokeStyle = "#5a4a2e";
+    g.lineWidth = 8;
+    g.beginPath();
+    g.moveTo(cx - R * 0.7, H - 20); g.lineTo(cx, cy); g.lineTo(cx + R * 0.7, H - 20);
+    g.stroke();
+  }
+
+  function drawCarousel(now) {
+    const cx = W * 0.56, cy = H * 0.62, R = Math.min(W, H) * 0.12;
+    /* canopy */
+    g.fillStyle = "#c95a4a";
+    g.beginPath();
+    g.moveTo(cx - R - 16, cy - R);
+    g.quadraticCurveTo(cx, cy - R - 44, cx + R + 16, cy - R);
+    g.closePath();
+    g.fill();
+    /* stripes */
+    g.strokeStyle = "#f0e4d0";
+    g.lineWidth = 5;
+    for (let i = -1; i <= 1; i++) {
+      g.beginPath();
+      g.moveTo(cx + i * R * 0.5, cy - R - 4);
+      g.quadraticCurveTo(cx + i * R * 0.5, cy - R - 30, cx, cy - R - 40);
+      g.stroke();
+    }
+    /* pole */
+    g.fillStyle = "#c9a02e";
+    g.fillRect(cx - 4, cy - R, 8, R * 1.6);
+    /* horses bobbing */
+    for (let i = 0; i < 3; i++) {
+      const hx = cx + Math.cos(carouselA + i * 2.1) * R * 0.8;
+      const bob = Math.sin(carouselA * 3 + i * 2) * 5;
+      const hy = cy + 8 + bob;
+      g.save();
+      g.translate(hx, hy);
+      /* horse silhouette-ish */
+      g.fillStyle = "#f0e4d0";
+      g.beginPath();
+      g.ellipse(0, 0, 12, 6, -0.2, 0, 6.283);
+      g.fill();
+      g.beginPath();
+      g.ellipse(9, -7, 4, 5, 0.3, 0, 6.283);
+      g.fill();
+      g.fillRect(-9, 4, 3, 12);
+      g.fillRect(7, 4, 3, 12);
+      g.restore();
+      /* pole */
+      g.strokeStyle = "#c9a02e";
+      g.lineWidth = 2;
+      g.beginPath(); g.moveTo(hx, hy - 30); g.lineTo(hx, hy + 16); g.stroke();
+    }
+    /* base */
+    g.fillStyle = "#5a4a2e";
+    g.beginPath();
+    g.ellipse(cx, cy + 22, R + 14, 8, 0, 0, 6.283);
+    g.fill();
+  }
+
+  function drawBulbs(now) {
+    /* sagging string */
+    g.strokeStyle = "rgba(240,228,208,.4)";
+    g.lineWidth = 1.4;
+    g.beginPath();
+    bulbs.forEach((b, i) => i ? g.lineTo(b.x, b.y) : g.moveTo(b.x, b.y));
+    g.stroke();
+    bulbs.forEach((b, i) => {
+      const tw = 0.5 + 0.5 * Math.sin(now / 600 + b.ph);
+      g.fillStyle = "rgba(255,220,140," + (0.5 + tw * 0.5) + ")";
+      g.beginPath(); g.arc(b.x, b.y + 4, 3.2, 0, 6.283); g.fill();
+      g.fillStyle = "rgba(255,220,140," + (tw * 0.16) + ")";
+      g.beginPath(); g.arc(b.x, b.y + 4, 10, 0, 6.283); g.fill();
+    });
+  }
+
+  function drawBooth(now) {
+    const bx = W * 0.74, by = H * 0.8;
+    /* counter */
+    g.fillStyle = "#5a2e2e";
+    g.fillRect(bx - 90, by + 26, 200, 10);
+    /* striped awning */
+    for (let i = 0; i < 8; i++) {
+      g.fillStyle = i % 2 ? "#c95a4a" : "#f0e4d0";
+      g.beginPath();
+      g.moveTo(bx - 96 + i * 24, by - 58);
+      g.lineTo(bx - 72 + i * 24, by - 58);
+      g.lineTo(bx - 68 + i * 24, by - 44);
+      g.lineTo(bx - 100 + i * 24, by - 44);
+      g.closePath();
+      g.fill();
+    }
+    /* bottles */
+    bottles.forEach(b => {
+      g.fillStyle = "#7aa88a";
+      g.fillRect(b.x - 6, b.y - 18, 12, 18);
+      g.fillStyle = "#a8c8a0";
+      g.fillRect(b.x - 2, b.y - 24, 4, 6);
+    });
+    /* flying rings */
+    rings.forEach(r2 => {
+      g.strokeStyle = "#ffd98a";
+      g.lineWidth = 3;
+      g.beginPath();
+      g.ellipse(r2.x, r2.y, 10, 5, r2.vy * 0.06, 0, 6.283);
+      g.stroke();
+    });
+    /* prize shelf */
+    g.fillStyle = "#5a4a2e";
+    g.fillRect(W * 0.06, H * 0.62, 110, 8);
+    for (let i = 0; i < Math.min(prizes, 5); i++) {
+      const px = W * 0.06 + 12 + i * 22;
+      g.fillStyle = ["#c95a4a", "#4a8ac9", "#c9a02e"][i % 3];
+      g.beginPath();
+      g.arc(px, H * 0.62 - 6, 7, 0, 6.283);
+      g.fill();
+      g.fillRect(px - 1.4, H * 0.62 - 2, 3, 8);
+    }
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUMEN SANCTUM — generative stained glass</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:#14121a; color:#d8d0c0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    padding:14px; user-select:none; -webkit-user-select:none;
+  }
+  header { text-align:center; z-index:5; }
+  header h1 { font-size:clamp(18px, 3.4vw, 28px); font-weight:400; letter-spacing:.5em; text-transform:uppercase; color:#e8d8b0; }
+  header p { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.36em; color:#7a7060; text-transform:uppercase; margin-top:7px; }
+
+  .nave { position:relative; }
+  #windowWrap { position:relative; filter:drop-shadow(0 30px 70px rgba(0,0,0,.6)); }
+  canvas { display:block; }
+  /* light shafts + motes */
+  .shafts {
+    position:absolute; inset:0; pointer-events:none; z-index:3; mix-blend-mode:screen;
+  }
+  .motes { position:absolute; inset:0; pointer-events:none; z-index:4; overflow:hidden; }
+  .motes i {
+    position:absolute; width:3px; height:3px; border-radius:50%;
+    background:rgba(255,240,200,.7); animation:float 9s linear infinite;
+  }
+  @keyframes float {
+    0% { transform:translateY(0); opacity:0; }
+    15% { opacity:.8; }
+    100% { transform:translateY(-46vh) translateX(4vw); opacity:0; }
+  }
+
+  .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; z-index:5; }
+  .controls button {
+    background:rgba(232,216,176,.07); color:#d8d0c0; border:1px solid rgba(232,216,176,.3);
+    font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.18em; text-transform:uppercase;
+    padding:9px 18px; border-radius:99px; cursor:pointer; transition:all .15s;
+  }
+  .controls button:hover { background:rgba(232,216,176,.18); }
+  .suntrack { display:flex; align-items:center; gap:10px; }
+  .suntrack .lab { font-family:system-ui, sans-serif; font-size:8.5px; letter-spacing:.22em; color:#7a7060; text-transform:uppercase; }
+  input[type=range] { -webkit-appearance:none; appearance:none; width:140px; height:3px; background:#3a3630; border-radius:99px; outline:none; cursor:pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#e8d8b0; box-shadow:0 0 10px rgba(232,216,176,.7); }
+  .hintline { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.2em; color:#5a5448; text-transform:uppercase; }
+  @media (max-width:640px) { .hintline { display:none; } }
+  @media (prefers-reduced-motion: reduce) { .motes i { animation:none; } }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Lumen Sanctum</h1>
+    <p>generative stained glass · the sun does the rest</p>
+  </header>
+
+  <div class="nave">
+    <div id="windowWrap"><canvas id="glass"></canvas></div>
+    <div class="shafts" id="shafts"></div>
+    <div class="motes" id="motes"></div>
+  </div>
+
+  <div class="controls">
+    <button id="regenBtn">✦ regenerate window</button>
+    <div class="suntrack">
+      <span class="lab">sun</span>
+      <input type="range" id="sunR" min="0" max="100" value="35" aria-label="sun position">
+    </div>
+  </div>
+  <span class="hintline">hold keyboard keys a–k for the organ drone · click a panel to inspect</span>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById($id(id));
+  function $id(id) { return id; }
+  const cv = $("glass"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let seed = Math.floor(Math.random() * 9999);
+  let sun = 0.35;
+  let panels = [];
+
+  /* seeded rng */
+  function rng() { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; }
+
+  /* ---------- window geometry: pointed arch ---------- */
+  function sizeWindow() {
+    const vw = Math.min(innerWidth * 0.8, 520);
+    const vh = Math.min(innerHeight * 0.62, 700);
+    cv.width = vw; cv.height = vh;
+    cv.style.width = vw + "px";
+    cv.style.height = vh + "px";
+    W = vw; H = vh;
+  }
+  sizeWindow();
+  addEventListener("resize", () => { sizeWindow(); generate(); });
+
+  /* ---------- subdivision into panels ---------- */
+  function generate() {
+    seed = Math.floor(Math.random() * 9999);
+    panels = [];
+    /* start with the arch cell */
+    const arch = archPath();
+    subdivide(arch, 0);
+    draw();
+  }
+  function archPath() {
+    /* approximate pointed arch with a polygon */
+    const pts = [];
+    const springY = H * 0.62;
+    /* left side up */
+    pts.push([8, H - 8]);
+    pts.push([8, springY]);
+    /* left curve to apex */
+    const steps = 10;
+    for (let i = 0; i <= steps; i++) {
+      const t2 = i / steps;
+      /* two arcs meeting at apex (W/2, H*0.08) */
+      const x = 8 + (W / 2 - 8) * t2;
+      const y = springY - Math.sin(t2 * Math.PI * 0.5) * (springY - H * 0.08) * (1 - t2 * 0.15);
+      pts.push([x, y]);
+    }
+    for (let i = steps; i >= 0; i--) {
+      const t2 = i / steps;
+      const x = W - 8 - (W / 2 - 8) * t2;
+      const y = springY - Math.sin(t2 * Math.PI * 0.5) * (springY - H * 0.08) * (1 - t2 * 0.15);
+      pts.push([x, y]);
+    }
+    pts.push([W - 8, springY]);
+    pts.push([W - 8, H - 8]);
+    return pts;
+  }
+  function polyBounds(pts) {
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    pts.forEach(p => { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); });
+    return { x0, y0, x1, y1, w: x1 - x0, h: y1 - y0 };
+  }
+  function subdivide(pts, depth) {
+    const b = polyBounds(pts);
+    if (depth >= 4 || (b.w < 70 && b.h < 90) || rng() < 0.12) {
+      panels.push({ pts, hue: pickHue(), sat: 55 + rng() * 35, light: 38 + rng() * 22 });
+      return;
+    }
+    /* split along longer axis with jitter */
+    const vertical = b.w > b.h;
+    const cut = vertical
+      ? b.x0 + b.w * (0.35 + rng() * 0.3)
+      : b.y0 + b.h * (0.35 + rng() * 0.3);
+    const a = [], b2 = [];
+    pts.forEach(p => {
+      const v = vertical ? p[0] : p[1];
+      (v < cut ? a : b2).push(p);
+    });
+    if (a.length > 2 && b2.length > 2) {
+      subdivide(a, depth + 1);
+      subdivide(b2, depth + 1);
+    } else {
+      panels.push({ pts, hue: pickHue(), sat: 55 + rng() * 35, light: 38 + rng() * 22 });
+    }
+  }
+  function pickHue() {
+    const r = rng();
+    if (r < 0.3) return 215 + rng() * 25;        /* cobalt */
+    if (r < 0.55) return 350 + rng() * 20;       /* ruby */
+    if (r < 0.78) return 40 + rng() * 18;        /* amber */
+    return 265 + rng() * 25;                     /* violet */
+  }
+
+  /* ---------- draw ---------- */
+  function draw() {
+    g.clearRect(0, 0, W, H);
+    /* stone surround */
+    g.fillStyle = "#2c2830";
+    g.fillRect(0, 0, W, H);
+    /* sun-lit grade: panels nearer the sun angle brighten */
+    panels.forEach(p => {
+      const b = polyBounds(p.pts);
+      const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+      /* sun direction: slider = angle across the window */
+      const sunX = W * sun, sunY = -40;
+      const dist = Math.hypot(cx - sunX, cy - sunY) / (H * 1.2);
+      const lit = Math.max(0.35, 1 - dist);
+      const l = p.light * (0.55 + lit * 0.75);
+      /* glass fill with radial shading */
+      const grd = g.createLinearGradient(b.x0, b.y0, b.x1, b.y1);
+      grd.addColorStop(0, "hsl(" + p.hue + "," + p.sat + "%," + Math.min(78, l + 8) + "%)");
+      grd.addColorStop(1, "hsl(" + p.hue + "," + p.sat + "%," + Math.max(18, l - 10) + "%)");
+      g.beginPath();
+      p.pts.forEach((pt, i) => i ? g.lineTo(pt[0], pt[1]) : g.moveTo(pt[0], pt[1]));
+      g.closePath();
+      g.fillStyle = grd;
+      g.fill();
+      /* glass grain */
+      g.save();
+      g.clip();
+      for (let i = 0; i < 8; i++) {
+        g.fillStyle = "rgba(255,255,255,.05)";
+        g.fillRect(b.x0 + rng() * b.w, b.y0 + rng() * b.h, 3, 3);
+      }
+      g.restore();
+      /* lead came */
+      g.strokeStyle = "#1a171e";
+      g.lineWidth = 3.4;
+      g.stroke();
+      g.strokeStyle = "rgba(90,84,100,.6)";
+      g.lineWidth = 1;
+      g.stroke();
+    });
+    /* arch outline */
+    const arch = archPath();
+    g.beginPath();
+    arch.forEach((pt, i) => i ? g.lineTo(pt[0], pt[1]) : g.moveTo(pt[0], pt[1]));
+    g.closePath();
+    g.strokeStyle = "#0e0c12";
+    g.lineWidth = 9;
+    g.stroke();
+  }
+
+  /* ---------- light shafts ---------- */
+  function shaftsRender() {
+    const sh = $("shafts");
+    sh.innerHTML = "";
+    const sunX = W * sun;
+    for (let i = 0; i < 3; i++) {
+      const d = document.createElement("div");
+      const ang = 24 + i * 8;
+      const wide = 30 + i * 26;
+      d.style.cssText =
+        "position:absolute;left:" + (sunX - 60) + "px;top:0;width:" + wide + "px;height:100%;" +
+        "background:linear-gradient(180deg, rgba(255,240,200," + (0.1 - i * 0.02) + "), transparent 72%);" +
+        "transform:rotate(" + (ang * (sun - 0.5) * 2) + "deg);transform-origin:50% 0;";
+      sh.appendChild(d);
+    }
+  }
+
+  /* ---------- motes ---------- */
+  const motes = $("motes");
+  function spawnMote() {
+    if (document.hidden) return;
+    const i = document.createElement("i");
+    i.style.left = (W * 0.2 + Math.random() * W * 0.6) + "px";
+    i.style.top = (H * 0.7 + Math.random() * H * 0.3) + "px";
+    i.style.animationDuration = (7 + Math.random() * 7) + "s";
+    motes.appendChild(i);
+    setTimeout(() => i.remove(), 15000);
+  }
+  setInterval(spawnMote, 1400);
+  for (let k = 0; k < 6; k++) setTimeout(spawnMote, k * 500);
+
+  /* ---------- organ drone (keys a–k) ---------- */
+  let AC = null, heldNodes = [];
+  function ac() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+    return AC;
+  }
+  function organDown(freq) {
+    const c = ac(); if (!c) return;
+    try {
+      const o = c.createOscillator(), o2 = c.createOscillator(), gn = c.createGain();
+      o.type = "sawtooth"; o.frequency.value = freq;
+      o2.type = "sine"; o2.frequency.value = freq * 2;
+      const f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 900;
+      gn.gain.setValueAtTime(0.0001, c.currentTime);
+      gn.gain.exponentialRampToValueAtTime(0.035, c.currentTime + 0.3);
+      o.connect(f); o2.connect(f); f.connect(gn); gn.connect(c.destination);
+      o.start(); o2.start();
+      heldNodes.push({ o, o2, gn });
+    } catch (e) {}
+  }
+  function organUp() {
+    heldNodes.forEach(n => {
+      try {
+        n.gn.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.4);
+        setTimeout(() => { try { n.o.stop(); n.o2.stop(); } catch (e) {} }, 500);
+      } catch (e) {}
+    });
+    heldNodes = [];
+  }
+  addEventListener("keydown", (e) => {
+    const idx = "asdfghjkl".indexOf(e.key.toLowerCase());
+    if (idx >= 0 && !e.repeat) organDown(110 * Math.pow(2, idx / 6));
+  });
+  addEventListener("keyup", organUp);
+
+  /* ---------- panel inspection ---------- */
+  cv.addEventListener("click", (e) => {
+    const r = cv.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    for (const p of panels) {
+      if (inPoly(x, y, p.pts)) {
+        const b = polyBounds(p.pts);
+        /* flash the panel */
+        p.light = Math.min(80, p.light + 14);
+        draw();
+        setTimeout(() => { p.light -= 14; draw(); }, 700);
+        return;
+      }
+    }
+  });
+  function inPoly(x, y, pts) {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const xi = pts[i][0], yi = pts[i][1], xj = pts[j][0], yj = pts[j][1];
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+
+  /* ---------- controls ---------- */
+  $("regenBtn").addEventListener("click", generate);
+  $("sunR").addEventListener("input", (e) => {
+    sun = parseInt(e.target.value, 10) / 100;
+    draw();
+    shaftsRender();
+  });
+
+  generate();
+  shaftsRender();
+})();
+</script>
+</body>
+</html>

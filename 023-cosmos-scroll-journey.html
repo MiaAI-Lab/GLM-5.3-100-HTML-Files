@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ONE SMALL STEP — Earth to Moon</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    background:#04060f; color:#dfe4f2;
+    font-family: system-ui, -apple-system, sans-serif;
+    overflow-x:hidden;
+  }
+  /* ---------- fixed sky ---------- */
+  .sky { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+  .sky canvas { width:100%; height:100%; display:block; }
+  .earth {
+    position:absolute; left:50%; top:64%; width:min(72vmin,680px); aspect-ratio:1; border-radius:50%;
+    transform:translate(-50%,-50%) translate(var(--px,0), var(--py,0));
+    background:
+      radial-gradient(circle at 33% 30%, rgba(120,190,255,.55), transparent 46%),
+      radial-gradient(circle at 62% 38%, #2f7d5b 0 12%, transparent 13%),
+      radial-gradient(circle at 46% 55%, #3a8f66 0 16%, transparent 17%),
+      radial-gradient(circle at 70% 62%, #2e6f8f 0 12%, transparent 13%),
+      radial-gradient(circle at 30% 68%, #357a5a 0 10%, transparent 11%),
+      radial-gradient(circle at 55% 20%, #2c6ea4 0 14%, transparent 15%),
+      radial-gradient(circle at 50% 50%, #1c4f8e 0%, #123a70 58%, #0a2447 100%);
+    box-shadow:
+      inset -30px -24px 70px rgba(2,6,18,.9),
+      inset 14px 12px 40px rgba(150,200,255,.25),
+      0 0 60px 8px rgba(90,150,255,.35),
+      0 0 140px 30px rgba(60,110,220,.22);
+    transition: transform .1s linear;
+    will-change: transform;
+  }
+  .moon {
+    position:absolute; left:50%; top:-30%; width:min(34vmin,320px); aspect-ratio:1; border-radius:50%;
+    background:
+      radial-gradient(circle at 62% 30%, rgba(255,255,255,.16), transparent 42%),
+      radial-gradient(circle at 40% 44%, #b9b4ac 0 7%, transparent 8%),
+      radial-gradient(circle at 66% 58%, #a8a49c 0 9%, transparent 10%),
+      radial-gradient(circle at 30% 66%, #b4aea4 0 5%, transparent 6%),
+      radial-gradient(circle at 52% 76%, #9e9a92 0 6%, transparent 7%),
+      radial-gradient(circle at 74% 36%, #b0aba2 0 4%, transparent 5%),
+      radial-gradient(circle at 50% 50%, #d8d3c8 0%, #b6b1a6 60%, #8d887e 100%);
+    box-shadow:
+      inset -18px -14px 44px rgba(10,12,20,.65),
+      inset 10px 8px 30px rgba(255,255,255,.14),
+      0 0 50px 6px rgba(220,225,240,.18);
+  }
+  /* ---------- content ---------- */
+  main { position:relative; z-index:2; }
+  .chapter {
+    min-height:105vh; display:flex; align-items:center; padding:12vh 8vw;
+  }
+  .chapter .inner { max-width:520px; }
+  .chapter:nth-child(even) .inner { margin-left:auto; text-align:right; }
+  .chapter .k {
+    font-size:11px; letter-spacing:.5em; text-transform:uppercase; color:#7d89b5; margin-bottom:18px;
+  }
+  .chapter h2 {
+    font-size:clamp(30px, 5vw, 54px); font-weight:300; line-height:1.12; letter-spacing:.01em;
+    color:#f2f5ff; margin-bottom:20px;
+  }
+  .chapter h2 b { font-weight:600; color:#ffd9a0; }
+  .chapter p { font-size:15.5px; line-height:1.85; color:#a9b2d2; font-weight:300; }
+  .chapter .stat {
+    margin-top:26px; display:inline-flex; gap:26px; padding:16px 22px;
+    border:1px solid rgba(150,170,230,.18); border-radius:14px;
+    background:rgba(10,16,38,.42); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  }
+  .chapter:nth-child(even) .stat { flex-direction:row-reverse; }
+  .chapter .stat div { text-align:center; }
+  .chapter .stat b { display:block; font-size:22px; font-weight:600; color:#ffe9c4; font-variant-numeric:tabular-nums; }
+  .chapter .stat span { font-size:9.5px; letter-spacing:.24em; text-transform:uppercase; color:#7d89b5; }
+  .reveal { opacity:0; transform:translateY(34px); transition:opacity .9s ease, transform .9s ease; }
+  .reveal.in { opacity:1; transform:none; }
+  .reveal.d1 { transition-delay:.12s } .reveal.d2 { transition-delay:.24s } .reveal.d3 { transition-delay:.36s }
+
+  /* landing finale */
+  .finale { min-height:120vh; align-items:flex-end; padding-bottom:16vh; position:relative; }
+  .dust { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+  .dust i {
+    position:absolute; bottom:-4%; width:5px; height:5px; border-radius:50%; background:#c9c2b2; opacity:0;
+  }
+  .dust i.go { animation:poof 1.4s ease-out forwards; }
+  @keyframes poof {
+    0% { opacity:.9; transform:translate(0,0) scale(1); }
+    100% { opacity:0; transform:translate(var(--dx),-14vh) scale(2.4); }
+  }
+  .flags { display:flex; gap:6px; margin-top:30px; justify-content:flex-end; }
+  .flags i { width:3px; height:26px; background:#8d887e; position:relative; }
+  .flags i::after {
+    content:""; position:absolute; top:0; left:3px; border-style:solid; border-width:5px 0 5px 12px;
+    border-color:transparent transparent transparent #c33; transform-origin:left; animation:flap 2.4s ease-in-out infinite;
+  }
+  @keyframes flap { 0%,100% { transform:skewY(0deg); } 50% { transform:skewY(-6deg); } }
+  .touchdown { font-size:clamp(34px,6vw,64px); font-weight:200; letter-spacing:.04em; color:#fff; }
+  .touchdown b { font-weight:600; color:#ffd9a0; }
+
+  /* ---------- progress rocket ---------- */
+  .rail {
+    position:fixed; right:26px; top:50%; transform:translateY(-50%); z-index:10;
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+  }
+  .rail .track { width:2px; height:44vh; background:rgba(150,170,230,.2); position:relative; border-radius:2px; }
+  .rail .track i {
+    position:absolute; top:0; left:-1px; width:4px; border-radius:4px;
+    background:linear-gradient(180deg,#ffd9a0,#ff9d42); height:0%;
+    box-shadow:0 0 10px rgba(255,157,66,.7);
+  }
+  .rail .rocket {
+    position:absolute; left:50%; top:0%; transform:translate(-50%,-50%) rotate(135deg);
+    width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent;
+    border-bottom:14px solid #ffe9c4; filter:drop-shadow(0 0 6px rgba(255,200,120,.9));
+  }
+  .rail .rocket::after {
+    content:""; position:absolute; left:-3px; top:13px; width:6px; height:12px;
+    background:linear-gradient(180deg, rgba(255,157,66,.9), transparent);
+    animation:flame .18s linear infinite alternate;
+  }
+  @keyframes flame { to { height:20px; opacity:.6; } }
+  .rail .dots { display:flex; flex-direction:column; gap:12px; }
+  .rail .dots button {
+    width:9px; height:9px; border-radius:50%; border:1px solid rgba(160,180,240,.5);
+    background:transparent; cursor:pointer; padding:0; transition:all .3s;
+  }
+  .rail .dots button.on { background:#ffd9a0; box-shadow:0 0 10px #ffd9a0; border-color:#ffd9a0; }
+  .alt { position:fixed; left:26px; bottom:24px; z-index:10; font-size:10px; letter-spacing:.28em;
+    text-transform:uppercase; color:#7d89b5; font-variant-numeric:tabular-nums; }
+  .alt b { color:#ffe9c4; font-weight:600; }
+
+  @media (max-width:640px) {
+    .rail { right:12px; }
+    .rail .dots { gap:8px; }
+    .alt { left:14px; bottom:14px; }
+    .chapter { padding:10vh 7vw; }
+    .chapter:nth-child(even) .inner { text-align:left; margin-left:0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .flags i::after, .rail .rocket::after { animation:none; }
+    html { scroll-behavior:auto; }
+    .reveal { transition:none; opacity:1; transform:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="sky" aria-hidden="true">
+    <canvas id="stars"></canvas>
+    <div class="earth" id="earth"></div>
+    <div class="moon" id="moon"></div>
+  </div>
+
+  <main>
+    <section class="chapter" id="c1">
+      <div class="inner">
+        <div class="k reveal">t-minus everything</div>
+        <h2 class="reveal d1">We pointed a <b>tower of fire</b> at the sky and climbed it.</h2>
+        <p class="reveal d2">Three days. Three hundred and eighty-four thousand kilometres.
+          No petrol stations, no guardrails, no turning back. This page is that journey —
+          scroll to travel the distance.</p>
+        <div class="stat reveal d3">
+          <div><b>39,000</b><span>km/h</span></div>
+          <div><b>384,400</b><span>km to go</span></div>
+          <div><b>3</b><span>days</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="c2">
+      <div class="inner">
+        <div class="k reveal">+02:41 · trans-lunar coast</div>
+        <h2 class="reveal d1">The Earth becomes a <b>place</b>, not a home.</h2>
+        <p class="reveal d2">By the second day the planet fits behind a thumbnail at arm's length.
+          Weather systems swirl like cream in coffee. Every war, every birthday,
+          every ocean — back there, on that blue coin.</p>
+        <div class="stat reveal d3">
+          <div><b>148,000</b><span>km travelled</span></div>
+          <div><b>−54°C</b><span>in shadow</span></div>
+          <div><b>+120°C</b><span>in sun</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="c3">
+      <div class="inner">
+        <div class="k reveal">+02:58 · loss of signal</div>
+        <h2 class="reveal d1">Behind the Moon, <b>silence</b> is total.</h2>
+        <p class="reveal d2">No radio can reach around a quarter of a million tonne of rock.
+          For forty-five minutes the crew belongs to nobody — not Houston,
+          not Earth, not history. Only the far side, cratered like a forgotten face.</p>
+        <div class="stat reveal d3">
+          <div><b>45</b><span>min of quiet</span></div>
+          <div><b>3,474</b><span>km across</span></div>
+          <div><b>1.62</b><span>m/s² gravity</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter finale" id="c4">
+      <div class="inner">
+        <div class="k reveal">+75:59 · the quiet approach</div>
+        <h2 class="touchdown reveal d1">Contact light. Engine stop.<br><b>Tranquility Base here.</b></h2>
+        <p class="reveal d2">The dust flies outward in perfect arcs and falls straight back —
+          no air to carry it, no wind to keep it. A bootprint will outlast every city on Earth.</p>
+        <div class="flags reveal d3" aria-hidden="true">
+          <i></i><i style="animation-delay:.4s"></i><i style="animation-delay:.9s"></i><i style="animation-delay:1.3s"></i>
+        </div>
+      </div>
+      <div class="dust" id="dust" aria-hidden="true"></div>
+    </section>
+  </main>
+
+  <div class="rail" aria-hidden="true">
+    <div class="track"><i id="railFill"></i><div class="rocket" id="rocket"></div></div>
+    <div class="dots" id="dots"></div>
+  </div>
+  <div class="alt">distance&nbsp;·&nbsp;<b id="altV">384,400 km</b></div>
+
+<script>
+(() => {
+  "use strict";
+  /* ---------- starfield (3 parallax layers) ---------- */
+  const cv = document.getElementById("stars");
+  const ctx = cv.getContext("2d");
+  let W, H, stars = [], mx = 0, my = 0;
+  function seed() {
+    W = cv.width = innerWidth * devicePixelRatio;
+    H = cv.height = innerHeight * devicePixelRatio;
+    cv.style.width = innerWidth + "px"; cv.style.height = innerHeight + "px";
+    stars = [];
+    const n = Math.min(340, Math.floor(innerWidth * innerHeight / 4200));
+    for (let i = 0; i < n; i++) {
+      stars.push({
+        x: Math.random() * W, y: Math.random() * H,
+        z: 0.3 + Math.random() * 0.7, tw: Math.random() * 6.28,
+        r: (Math.random() < 0.08 ? 1.6 : 0.7) * devicePixelRatio,
+      });
+    }
+  }
+  seed();
+  window.addEventListener("resize", seed);
+
+  let sy = 0; /* scroll progress 0..1 */
+  addEventListener("scroll", () => { sy = scrollY / Math.max(1, document.body.scrollHeight - innerHeight); }, { passive:true });
+
+  function draw(t) {
+    if (!document.hidden) {
+      ctx.clearRect(0, 0, W, H);
+      const drift = sy * H * 0.9;
+      for (const s of stars) {
+        const px2 = s.x + mx * 26 * s.z * devicePixelRatio;
+        let y = (s.y - drift * s.z) % H; if (y < 0) y += H;
+        const tw = 0.55 + 0.45 * Math.sin(t / 900 + s.tw);
+        ctx.globalAlpha = tw * s.z;
+        ctx.fillStyle = s.r > 1.2 * devicePixelRatio ? "#ffe9c4" : "#dfe6ff";
+        ctx.beginPath(); ctx.arc(px2, y, s.r, 0, 6.283); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+  addEventListener("pointermove", (e) => {
+    mx = (e.clientX / innerWidth - 0.5) * 2;
+    my = (e.clientY / innerHeight - 0.5) * 2;
+    earth.style.setProperty("--px", (-mx * 18) + "px");
+    earth.style.setProperty("--py", (-my * 12) + "px");
+  }, { passive:true });
+
+  /* ---------- earth recede / moon approach ---------- */
+  const earth = document.getElementById("earth");
+  const moon = document.getElementById("moon");
+  function scene() {
+    const p = sy;
+    /* earth: recedes and sinks */
+    const scale = Math.max(0.12, 1 - p * 0.85);
+    earth.style.transform =
+      "translate(-50%,-50%) translate(var(--px,0),var(--py,0)) scale(" + scale + ")";
+    earth.style.top = (64 + p * 130) + "%";
+    earth.style.opacity = String(Math.max(0, 1 - Math.max(0, p - 0.55) * 2.2));
+    /* moon: approaches from top */
+    const mp = Math.max(0, Math.min(1, (p - 0.25) / 0.75));
+    moon.style.top = (-30 + mp * 118) + "%";
+    moon.style.transform = "translateX(-50%) scale(" + (0.5 + mp * 0.9) + ")";
+  }
+  addEventListener("scroll", scene, { passive:true });
+  scene();
+
+  /* ---------- progress rail ---------- */
+  const railFill = document.getElementById("railFill");
+  const rocket = document.getElementById("rocket");
+  const altV = document.getElementById("altV");
+  function rail() {
+    railFill.style.height = (sy * 100) + "%";
+    rocket.style.top = (sy * 100) + "%";
+    const km = Math.round(384400 * (1 - sy));
+    altV.textContent = km.toLocaleString("en-US") + " km";
+    /* dots */
+    const secs = document.querySelectorAll(".chapter");
+    let active = 0;
+    secs.forEach((s, i) => {
+      const r = s.getBoundingClientRect();
+      if (r.top < innerHeight * 0.55) active = i;
+    });
+    dotBtns.forEach((b, i) => b.classList.toggle("on", i === active));
+  }
+  const dots = document.getElementById("dots");
+  const dotBtns = [];
+  document.querySelectorAll(".chapter").forEach((s, i) => {
+    const b = document.createElement("button");
+    b.setAttribute("aria-label", "chapter " + (i + 1));
+    b.addEventListener("click", () => s.scrollIntoView({ behavior:"smooth" }));
+    dots.appendChild(b); dotBtns.push(b);
+  });
+  addEventListener("scroll", rail, { passive:true });
+  rail();
+
+  /* ---------- reveals ---------- */
+  const io = new IntersectionObserver((ents) => {
+    ents.forEach(en => { if (en.isIntersecting) en.target.classList.add("in"); });
+  }, { threshold: 0.25 });
+  document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+
+  /* ---------- touchdown dust poof ---------- */
+  const dustBox = document.getElementById("dust");
+  let poofed = false;
+  const io2 = new IntersectionObserver((ents) => {
+    ents.forEach(en => {
+      if (en.isIntersecting && !poofed) {
+        poofed = true;
+        for (let i = 0; i < 36; i++) {
+          const d = document.createElement("i");
+          d.style.left = (30 + Math.random() * 45) + "%";
+          d.style.bottom = (6 + Math.random() * 10) + "%";
+          d.style.setProperty("--dx", (Math.random() * 160 - 80) + "px");
+          d.style.animationDelay = (Math.random() * 0.6) + "s";
+          dustBox.appendChild(d);
+          requestAnimationFrame(() => d.classList.add("go"));
+        }
+      }
+    });
+  }, { threshold: 0.5 });
+  io2.observe(document.querySelector(".finale"));
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THE OBSERVATORY</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background:#020308; color:#c9d2e8; touch-action:none; user-select:none; -webkit-user-select:none;
+  }
+  /* red flashlight mode */
+  body.red { filter:hue-rotate(0deg); }
+  body.red .ui, body.red .panel { color:#ff6a5a !important; }
+  body.red .panel .lab, body.red .ui .lab { color:#c95a4e !important; }
+
+  #sky { position:fixed; inset:0; cursor:crosshair; }
+  .dome {
+    position:fixed; inset:0; pointer-events:none; z-index:30;
+    background:
+      radial-gradient(ellipse 140% 60% at 50% 108%, #0a0d18 0%, transparent 60%),
+      radial-gradient(ellipse at 50% -35%, rgba(30,36,60,.5), transparent 55%);
+  }
+  .dome::after {
+    content:""; position:absolute; inset:0;
+    box-shadow:inset 0 -80px 120px rgba(0,0,0,.8), inset 0 60px 140px rgba(0,0,0,.85);
+  }
+  /* telescope silhouette bottom */
+  .scope {
+    position:fixed; bottom:-4%; left:50%; transform:translateX(-50%); z-index:20; pointer-events:none;
+    width:420px; height:200px; opacity:.9;
+  }
+
+  /* UI */
+  .ui { position:fixed; left:18px; top:16px; z-index:40; display:flex; flex-direction:column; gap:8px; }
+  .ui h1 { font-size:13px; font-weight:300; letter-spacing:.44em; text-transform:uppercase; color:#dfe6f5; }
+  .ui .lab { font-size:9px; letter-spacing:.24em; color:#67729a; text-transform:uppercase; }
+  .ui .readout { font-family:"Courier New", monospace; font-size:11px; color:#9fb0d8; letter-spacing:.06em; line-height:1.8; }
+
+  .searchbox { margin-top:6px; }
+  .searchbox input {
+    background:rgba(6,10,20,.8); border:1px solid #2a3350; color:#dfe6f5; font:inherit;
+    font-size:12px; padding:8px 12px; border-radius:8px; outline:none; width:180px; letter-spacing:.08em;
+  }
+  .searchbox input:focus { border-color:#7d92c9; }
+
+  .panel {
+    position:fixed; right:18px; top:16px; z-index:40; width:230px;
+    background:rgba(6,10,20,.72); border:1px solid rgba(120,140,200,.18); border-radius:12px;
+    padding:14px 16px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    opacity:0; transform:translateY(-8px); transition:all .3s; pointer-events:none;
+  }
+  .panel.show { opacity:1; transform:none; pointer-events:auto; }
+  .panel .lab { font-size:8.5px; letter-spacing:.28em; color:#67729a; text-transform:uppercase; margin-bottom:8px; }
+  .panel h2 { font-size:19px; font-weight:400; letter-spacing:.08em; color:#e8eefb; }
+  .panel .type { font-size:9px; letter-spacing:.2em; color:#8fa0c8; text-transform:uppercase; margin:4px 0 10px; }
+  .panel .kv { display:flex; justify-content:space-between; font-size:10.5px; color:#9fb0d8; margin-bottom:5px; }
+  .panel .kv b { font-weight:400; color:#dfe6f5; }
+  .panel .myth { margin-top:10px; font-size:11px; line-height:1.7; color:#8fa0c8; font-style:italic; border-top:1px solid rgba(120,140,200,.15); padding-top:10px; }
+
+  .bottombar {
+    position:fixed; left:0; right:0; bottom:0; z-index:40;
+    display:flex; gap:14px; align-items:center; padding:10px 18px; flex-wrap:wrap;
+    background:linear-gradient(180deg, transparent, rgba(2,3,8,.9) 40%);
+  }
+  .bottombar .btns { display:flex; gap:8px; flex-wrap:wrap; }
+  .bottombar button {
+    background:rgba(120,140,200,.08); color:#9fb0d8; border:1px solid rgba(120,140,200,.28);
+    font:inherit; font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; padding:8px 14px;
+    border-radius:99px; cursor:pointer; transition:all .15s;
+  }
+  .bottombar button:hover { background:rgba(120,140,200,.2); }
+  .bottombar button.on { background:#8fa0c8; color:#060a14; border-color:#8fa0c8; }
+  .bottombar .hint { margin-left:auto; font-size:9px; letter-spacing:.2em; color:#4a5478; text-transform:uppercase; }
+
+  @media (max-width:640px) {
+    .panel { right:10px; top:10px; width:200px; }
+    .scope { width:300px; }
+    .bottombar .hint { display:none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .tw { animation:none !important; } }
+</style>
+</head>
+<body>
+  <canvas id="sky"></canvas>
+  <div class="dome"></div>
+
+  <svg class="scope" viewBox="0 0 420 200" aria-hidden="true">
+    <rect x="150" y="120" width="14" height="80" fill="#0c1020"/>
+    <rect x="60" y="60" width="240" height="34" rx="10" fill="#0e1326"/>
+    <rect x="80" y="46" width="30" height="62" rx="8" fill="#121834"/>
+    <circle cx="290" cy="77" r="26" fill="#0a0f22" stroke="#1c2648" stroke-width="4"/>
+    <circle cx="290" cy="77" r="16" fill="#050810"/>
+    <rect x="200" y="94" width="40" height="10" rx="3" fill="#1c2648"/>
+  </svg>
+
+  <div class="ui">
+    <h1>The Observatory</h1>
+    <span class="lab">slit · zenith 41°n</span>
+    <div class="readout" id="readout">ra — · dec —<br>fov 90° · mag 6.5</div>
+    <div class="searchbox">
+      <input type="text" id="searchIn" placeholder="slew to: orion…" autocomplete="off" spellcheck="false" aria-label="search constellation">
+    </div>
+  </div>
+
+  <div class="panel" id="panel">
+    <div class="lab">object card</div>
+    <h2 id="pName">—</h2>
+    <div class="type" id="pType">—</div>
+    <div class="kv"><span>magnitude</span><b id="pMag">—</b></div>
+    <div class="kv"><span>distance</span><b id="pDist">—</b></div>
+    <div class="kv"><span>color</span><b id="pColor">—</b></div>
+    <div class="myth" id="pMyth">—</div>
+  </div>
+
+  <div class="bottombar">
+    <div class="btns">
+      <button id="constBtn" class="on">constellations</button>
+      <button id="deepBtn">deep sky</button>
+      <button id="redBtn">red light</button>
+      <button id="shootBtn">meteor shower</button>
+    </div>
+    <span class="hint">drag to pan · scroll to zoom · click a star</span>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const cv = $("sky"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let panX = 0, panY = 0, zoom = 1;
+  let showConst = true, showDeep = false, redMode = false;
+
+  /* ---------- star catalog (procedural, stable) ---------- */
+  function mulberry(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const rnd = mulberry(1977);
+  const stars = [];
+  /* realistic magnitude distribution: many faint, few bright */
+  for (let i = 0; i < 900; i++) {
+    const u = rnd();
+    const mag = u < 0.6 ? 5 + rnd() * 1.5 : u < 0.87 ? 3.8 + rnd() * 1.2 : u < 0.97 ? 2.4 + rnd() * 1.4 : 0.4 + rnd() * 2;
+    /* color temperature classes */
+    const cls = rnd();
+    const color = cls < 0.08 ? "#9db4ff" : cls < 0.2 ? "#aabfff" : cls < 0.45 ? "#dfe6ff" : cls < 0.72 ? "#fff4ea" : cls < 0.9 ? "#ffd2a1" : "#ffb56b";
+    stars.push({ x: rnd() * 2000 - 1000, y: rnd() * 1200 - 600, mag, color, tw: rnd() * 6.28, name: null });
+  }
+  /* milky way band: dense faint stars along a diagonal */
+  for (let i = 0; i < 1400; i++) {
+    const t = rnd() * 2 - 1;
+    const along = rnd() * 2400 - 1200;
+    const spread = (rnd() + rnd() + rnd() - 1.5) * 150;
+    stars.push({
+      x: along, y: along * 0.32 + spread - 300,
+      mag: 5.4 + rnd() * 1.6,
+      color: "#e8ecff",
+      tw: rnd() * 6.28, mw: true,
+    });
+  }
+
+  /* constellations */
+  const CONST = [
+    { name: "Orion", myth: "The hunter, blinded then healed, set in the sky where Scorpio forever chases him.", stars: [[-320, -80], [-260, -40], [-200, -90], [-140, -50], [-220, 40], [-160, 90], [-90, 130], [-280, 150]] },
+    { name: "Cygnus", myth: "The swan — a god in disguise, or a friend transformed, depending on who tells it.", stars: [[180, -260], [220, -180], [260, -110], [300, -40], [200, -140], [160, -60]] },
+    { name: "Lyra", myth: "The lyre of Orpheus. After the maenads, the river carried it here.", stars: [[420, 40], [460, 90], [500, 60], [455, 20]] },
+    { name: "Ursa Major", myth: "The great bear — callisto, saved from hunting by being made unkillable and eternal.", stars: [[-600, 300], [-540, 340], [-480, 330], [-420, 360], [-370, 400], [-330, 450], [-260, 440], [-300, 380]] },
+    { name: "Scorpius", myth: "The scorpion that ended the hunter. They share the sky but never the hour.", stars: [[520, 320], [560, 360], [590, 410], [600, 460], [580, 510], [540, 540], [500, 520]] },
+  ];
+  /* deep sky */
+  const DEEP = [
+    { name: "M42 · Orion Nebula", type: "diffuse nebula", mag: 4.0, dist: "1,344 ly", at: [-240, 10], r: 26, color: "rgba(150,120,190,.5)" },
+    { name: "M31 · Andromeda", type: "spiral galaxy", mag: 3.4, dist: "2.5 Mly", at: [-700, -320], r: 34, color: "rgba(190,190,210,.4)" },
+    { name: "M13 · Hercules Cluster", type: "globular cluster", mag: 5.8, dist: "22,200 ly", at: [140, 420], r: 16, color: "rgba(200,200,230,.45)" },
+    { name: "M57 · Ring Nebula", type: "planetary nebula", mag: 8.8, dist: "2,300 ly", at: [640, -180], r: 10, color: "rgba(120,200,190,.5)" },
+  ];
+  /* named bright stars for clicking */
+  const NAMED = [
+    { name: "Betelgeuse", type: "red supergiant", mag: 0.5, dist: "548 ly", color: "#ffb56b", at: [-320, -80], myth: "A dying giant, expected to go supernova 'any time' within the next hundred thousand years." },
+    { name: "Rigel", type: "blue supergiant", mag: 0.13, dist: "863 ly", color: "#9db4ff", at: [-90, 130], myth: "The hunter's left foot, seventy-six thousand times brighter than the sun." },
+    { name: "Vega", type: "main sequence A0", mag: 0.03, dist: "25 ly", color: "#dfe6ff", at: [455, 20], myth: "Once the pole star, and will be again in twelve thousand years. The sky keeps its appointments." },
+    { name: "Deneb", type: "supergiant", mag: 1.25, dist: "2,615 ly", color: "#fff4ea", at: [300, -40], myth: "Among the most luminous stars visible to the eye. If placed where Vega is, it would cast shadows." },
+    { name: "Antares", type: "red supergiant", mag: 1.09, dist: "550 ly", color: "#ff9d5c", at: [520, 320], myth: "'Rival of Mars' — a scorpion's heart burning at the speed of a slow fuse." },
+  ];
+
+  /* ---------- projection ---------- */
+  function project(x, y) {
+    return {
+      x: W / 2 + (x - panX) * zoom,
+      y: H / 2 + (y - panY) * zoom,
+    };
+  }
+  function unproject(px, py) {
+    return { x: (px - W / 2) / zoom + panX, y: (py - H / 2) / zoom + panY };
+  }
+
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  /* ---------- input ---------- */
+  let dragging = false, lx = 0, ly = 0;
+  cv.addEventListener("pointerdown", (e) => { dragging = true; lx = e.clientX; ly = e.clientY; });
+  addEventListener("pointermove", (e) => {
+    if (dragging) {
+      panX -= (e.clientX - lx) / zoom;
+      panY -= (e.clientY - ly) / zoom;
+      lx = e.clientX; ly = e.clientY;
+      updateReadout();
+    }
+  });
+  addEventListener("pointerup", () => { dragging = false; });
+  cv.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    zoom = Math.max(0.4, Math.min(6, zoom * (e.deltaY < 0 ? 1.15 : 0.87)));
+    updateReadout();
+  }, { passive: false });
+
+  /* click star → card */
+  cv.addEventListener("click", (e) => {
+    const w = unproject(e.clientX, e.clientY);
+    /* named stars first */
+    for (const n of NAMED) {
+      if (Math.hypot(n.at[0] - w.x, n.at[1] - w.y) < 10 / zoom + 4) return showCard(n);
+    }
+    for (const d of DEEP) {
+      if (Math.hypot(d.at[0] - w.x, d.at[1] - w.y) < d.r / zoom + 4) return showCard(d);
+    }
+    $("panel").classList.remove("show");
+  });
+  function showCard(o) {
+    $("pName").textContent = o.name;
+    $("pType").textContent = o.type || "star";
+    $("pMag").textContent = o.mag !== undefined ? o.mag.toFixed(2) : "—";
+    $("pDist").textContent = o.dist || "—";
+    $("pColor").textContent = o.color && o.color[0] === "#" ? o.color : "—";
+    $("pMyth").textContent = o.myth || "";
+    $("panel").classList.add("show");
+  }
+
+  /* search slew */
+  $("searchIn").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const q = e.target.value.trim().toLowerCase();
+    const all = [...NAMED, ...DEEP];
+    const hit = all.find(o => o.name.toLowerCase().includes(q)) ||
+      CONST.find(c => c.name.toLowerCase().includes(q));
+    if (hit) {
+      const target = hit.at || hit.stars[0];
+      /* glide slew */
+      const fromX = panX, fromY = panY;
+      const toX = Array.isArray(target) ? target[0] : target.x;
+      const toY = Array.isArray(target) ? target[1] : target.y;
+      const t0 = performance.now();
+      const glide = (now) => {
+        const p = Math.min(1, (now - t0) / 900);
+        panX = fromX + (toX - fromX) * (1 - Math.pow(1 - p, 3));
+        panY = fromY + (toY - fromY) * (1 - Math.pow(1 - p, 3));
+        updateReadout();
+        if (p < 1) requestAnimationFrame(glide);
+        else if (hit.myth || hit.type) showCard(hit);
+      };
+      requestAnimationFrame(glide);
+      e.target.value = "";
+    }
+  });
+
+  /* buttons */
+  $("constBtn").addEventListener("click", function () { showConst = !showConst; this.classList.toggle("on", showConst); });
+  $("deepBtn").addEventListener("click", function () { showDeep = !showDeep; this.classList.toggle("on", showDeep); });
+  $("redBtn").addEventListener("click", function () {
+    redMode = !redMode;
+    this.classList.toggle("on", redMode);
+    document.body.classList.toggle("red", redMode);
+  });
+
+  /* meteors */
+  let meteors = [];
+  $("shootBtn").addEventListener("click", () => {
+    for (let i = 0; i < 6; i++) {
+      setTimeout(() => spawnMeteor(), i * 700 + Math.random() * 500);
+    }
+  });
+  function spawnMeteor() {
+    const a = Math.random() * 6.283;
+    const sx = panX + (Math.random() - 0.5) * 1600;
+    const sy = panY + (Math.random() - 0.5) * 1000;
+    meteors.push({ x: sx, y: sy, vx: Math.cos(a) * 7, vy: Math.sin(a) * 7, life: 1 });
+  }
+
+  function updateReadout() {
+    $("readout").innerHTML =
+      "ra " + (panX / 40).toFixed(1) + "h · dec " + (panY / 12).toFixed(1) + "°<br>" +
+      "fov " + (90 / zoom).toFixed(1) + "° · mag " + (6.5 + zoom * 0.4).toFixed(1);
+  }
+  updateReadout();
+
+  /* ---------- render ---------- */
+  function draw(t) {
+    requestAnimationFrame(draw);
+    if (document.hidden) return;
+    g.fillStyle = redMode ? "#0a0203" : "#020308";
+    g.fillRect(0, 0, W, H);
+
+    /* stars */
+    const lim = 7.2 - zoom * 0.1;
+    for (const s of stars) {
+      if (s.mag > lim && !s.mw) continue;
+      if (s.mw && zoom > 3.5) continue;
+      const p = project(s.x, s.y);
+      if (p.x < -20 || p.x > W + 20 || p.y < -20 || p.y > H + 20) continue;
+      const r = Math.max(0.4, (6.8 - s.mag) * 0.55 * Math.min(zoom, 2.2));
+      const tw = 0.7 + 0.3 * Math.sin(t / 700 + s.tw);
+      g.globalAlpha = Math.min(1, (6.8 - s.mag) / 3) * tw;
+      g.fillStyle = redMode ? "#ff8a76" : s.color;
+      g.beginPath();
+      g.arc(p.x, p.y, r, 0, 6.283);
+      g.fill();
+      /* diffraction spikes on bright ones */
+      if (s.mag < 1.8 && zoom > 0.8) {
+        g.globalAlpha *= 0.5;
+        g.fillRect(p.x - r * 3, p.y - 0.4, r * 6, 0.8);
+        g.fillRect(p.x - 0.4, p.y - r * 3, 0.8, r * 6);
+      }
+    }
+    g.globalAlpha = 1;
+
+    /* milky way haze */
+    g.globalAlpha = 0.05;
+    const mw = g.createLinearGradient(0, project(0, -300).y, W, project(2000, 700).y);
+    mw.addColorStop(0, redMode ? "rgba(120,30,20,0)" : "rgba(150,170,220,0)");
+    mw.addColorStop(0.5, redMode ? "rgba(120,30,20,.8)" : "rgba(150,170,220,.8)");
+    mw.addColorStop(1, redMode ? "rgba(120,30,20,0)" : "rgba(150,170,220,0)");
+    g.fillStyle = mw;
+    g.fillRect(0, 0, W, H);
+    g.globalAlpha = 1;
+
+    /* constellations */
+    if (showConst) {
+      CONST.forEach(c => {
+        const pts = c.stars.map(s => project(s[0], s[1]));
+        /* skip if offscreen */
+        if (pts.every(p => p.x < -50 || p.x > W + 50) ) return;
+        g.strokeStyle = redMode ? "rgba(200,90,70,.5)" : "rgba(140,160,220,.4)";
+        g.lineWidth = 1;
+        g.setLineDash([4, 5]);
+        g.beginPath();
+        pts.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y));
+        g.stroke();
+        g.setLineDash([]);
+        /* label */
+        const mid = pts[Math.floor(pts.length / 2)];
+        g.fillStyle = redMode ? "rgba(220,110,90,.8)" : "rgba(150,170,220,.7)";
+        g.font = "10px system-ui, sans-serif";
+        g.fillText(c.name.toUpperCase(), mid.x + 10, mid.y - 8);
+      });
+      /* highlight constellation stars */
+      CONST.forEach(c => {
+        c.stars.forEach(s => {
+          const p = project(s[0], s[1]);
+          g.fillStyle = redMode ? "#ff9d84" : "#e8eeff";
+          g.beginPath(); g.arc(p.x, p.y, 2.4, 0, 6.283); g.fill();
+        });
+      });
+    }
+
+    /* deep sky */
+    if (showDeep) {
+      DEEP.forEach(d => {
+        const p = project(d.at[0], d.at[1]);
+        const rg = g.createRadialGradient(p.x, p.y, 1, p.x, p.y, d.r * zoom);
+        rg.addColorStop(0, redMode ? "rgba(255,120,90,.5)" : d.color);
+        rg.addColorStop(1, "rgba(0,0,0,0)");
+        g.fillStyle = rg;
+        g.beginPath(); g.arc(p.x, p.y, d.r * zoom, 0, 6.283); g.fill();
+        g.strokeStyle = "rgba(140,160,220,.25)";
+        g.setLineDash([2, 3]);
+        g.beginPath(); g.arc(p.x, p.y, d.r * zoom + 6, 0, 6.283); g.stroke();
+        g.setLineDash([]);
+        g.fillStyle = "rgba(150,170,220,.55)";
+        g.font = "9px system-ui";
+        g.fillText(d.name, p.x + d.r * zoom + 10, p.y + 3);
+      });
+    }
+
+    /* named stars glow */
+    NAMED.forEach(n => {
+      const p = project(n.at[0], n.at[1]);
+      const rg = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, 14 * Math.min(zoom, 2));
+      rg.addColorStop(0, redMode ? "rgba(255,120,90,.5)" : "rgba(200,215,255,.45)");
+      rg.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = rg;
+      g.beginPath(); g.arc(p.x, p.y, 14 * Math.min(zoom, 2), 0, 6.283); g.fill();
+    });
+
+    /* meteors */
+    meteors = meteors.filter(m => m.life > 0);
+    meteors.forEach(m => {
+      m.x += m.vx / zoom; m.y += m.vy / zoom; m.life -= 0.02;
+      const p = project(m.x, m.y);
+      const p2 = project(m.x - m.vx * 4, m.y - m.vy * 4);
+      g.strokeStyle = "rgba(255,255,255," + m.life + ")";
+      g.lineWidth = 1.6;
+      g.beginPath(); g.moveTo(p2.x, p2.y); g.lineTo(p.x, p.y); g.stroke();
+    });
+  }
+  requestAnimationFrame(draw);
+
+  /* ambient shooting star */
+  setInterval(() => { if (!document.hidden && Math.random() < 0.25) spawnMeteor(); }, 6000);
+})();
+</script>
+</body>
+</html>

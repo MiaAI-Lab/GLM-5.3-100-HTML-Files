@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HORTUS — a closed world</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:radial-gradient(ellipse at 50% 30%, #1c2418, #10160c 75%);
+    display:flex; align-items:center; justify-content:center; gap:36px;
+    color:#c9d8b8; padding:18px; flex-wrap:wrap; user-select:none; -webkit-user-select:none;
+  }
+  /* jar */
+  .jarwrap { position:relative; }
+  .jar {
+    position:relative; width:min(300px, 60vw); height:min(480px, 74vh);
+    border-radius:40px 40px 26px 26px / 60px 60px 20px 20px;
+    background:
+      linear-gradient(100deg, rgba(255,255,255,.13) 0 6%, rgba(255,255,255,.02) 24%, rgba(0,0,0,.12) 88%);
+    box-shadow:
+      inset 0 0 40px rgba(180,220,170,.14),
+      inset 3px 0 10px rgba(255,255,255,.14),
+      0 30px 80px rgba(0,0,0,.7);
+    overflow:hidden;
+  }
+  .jar .lid {
+    position:absolute; left:-10px; right:-10px; top:-14px; height:44px;
+    background:linear-gradient(180deg, #6a5a3a, #4a3e28);
+    border-radius:16px 16px 6px 6px; z-index:8;
+    box-shadow:inset 0 2px 0 rgba(255,255,255,.15);
+  }
+  .jar .lid::after { content:""; position:absolute; bottom:-6px; left:8px; right:8px; height:8px;
+    background:#3a3020; border-radius:4px; }
+  .jar .glassglint { position:absolute; left:8%; top:6%; bottom:10%; width:14px; border-radius:99px;
+    background:linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,.05) 65%, transparent); z-index:7; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; }
+  /* mist on glass */
+  .condens {
+    position:absolute; inset:0; z-index:6; pointer-events:none; opacity:.6;
+    background:
+      radial-gradient(circle at 30% 20%, rgba(255,255,255,.1) 0 8%, transparent 9%),
+      radial-gradient(circle at 70% 30%, rgba(255,255,255,.08) 0 6%, transparent 7%),
+      radial-gradient(circle at 40% 60%, rgba(255,255,255,.07) 0 10%, transparent 11%),
+      radial-gradient(circle at 66% 80%, rgba(255,255,255,.09) 0 7%, transparent 8%);
+  }
+
+  /* field journal */
+  .journal { width:270px; display:flex; flex-direction:column; gap:18px; }
+  h1 { font-size:19px; font-weight:400; letter-spacing:.46em; text-transform:uppercase; color:#dce8c8; }
+  .sub { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.3em; color:#7d9068; text-transform:uppercase; }
+  .meters { display:flex; flex-direction:column; gap:10px; font-family:"Courier New", monospace; font-size:11px; color:#9ab088; }
+  .meter .lab { display:flex; justify-content:space-between; margin-bottom:4px; }
+  .meter .lab b { color:#dce8c8; font-weight:400; }
+  .meter .bar { height:5px; background:rgba(180,220,170,.14); border-radius:99px; overflow:hidden; }
+  .meter .bar i { display:block; height:100%; background:#7db86a; transition:width .5s; }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; }
+  .btns button {
+    flex:1; min-width:80px; background:rgba(180,220,170,.07); color:#c9d8b8; border:1px solid rgba(180,220,170,.3);
+    font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.16em; text-transform:uppercase;
+    padding:10px 8px; border-radius:10px; cursor:pointer; transition:all .15s;
+  }
+  .btns button:hover { background:rgba(180,220,170,.18); }
+  .note { font-size:11px; font-style:italic; color:#8a9a78; line-height:1.75; }
+  @media (max-width:680px) { body { flex-direction:column; gap:18px; } .jar { height:48vh; } .journal { width:min(340px, 92vw); } }
+</style>
+</head>
+<body>
+  <div class="jarwrap">
+    <div class="jar">
+      <div class="lid"></div>
+      <div class="glassglint"></div>
+      <canvas id="c"></canvas>
+      <div class="condens" id="condens"></div>
+    </div>
+  </div>
+
+  <div class="journal">
+    <div>
+      <h1>Hortus</h1>
+      <div class="sub" style="margin-top:6px;">sealed since day 0 · a closed world</div>
+    </div>
+    <div class="meters">
+      <div class="meter"><div class="lab"><span>humidity</span><b id="humV">72%</b></div><div class="bar"><i id="humB" style="width:72%"></i></div></div>
+      <div class="meter"><div class="lab"><span>growth</span><b id="groV">31%</b></div><div class="bar"><i id="groB" style="width:31%"></i></div></div>
+      <div class="meter"><div class="lab"><span>day</span><b id="dayV">34</b></div><div class="bar"><i id="dayB" style="width:12%"></i></div></div>
+    </div>
+    <div class="btns">
+      <button id="lampBtn">swing lamp</button>
+      <button id="mistBtn">make it rain</button>
+      <button id="trimBtn">prune fern</button>
+      <button id="tlBtn">time-lapse</button>
+    </div>
+    <p class="note">Nothing enters, nothing leaves. The moss drinks the mist; the mist drinks the glass; the glass returns it by night. The springtails keep the books.</p>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById($id(id));
+  function $id(id) { return id; }
+  const cv = $("c"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let day = 34, growth = 0.31, humidity = 0.72;
+  let lampAngle = -0.5, lampTarget = -0.5;
+  let drops = [], mist = [];
+  let fronds = [];
+  let tlMode = false;
+
+  function buildFronds() {
+    fronds = [];
+    for (let i = 0; i < 7; i++) {
+      fronds.push({
+        baseX: W * (0.3 + Math.random() * 0.4),
+        baseY: H - 30 - Math.random() * 26,
+        ang: -1.57 + (Math.random() - 0.5) * 1.1,
+        len: 60 + Math.random() * 90,
+        curl: 0.4 + Math.random() * 0.8,
+        leafAt: Math.random(),
+        sway: Math.random() * 6.28,
+      });
+    }
+  }
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    const r = cv.getBoundingClientRect();
+    W = r.width; H = r.height;
+    cv.width = W * DPR; cv.height = H * DPR;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (!fronds.length) buildFronds();
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  /* moss mounds */
+  const mounds = [];
+  for (let i = 0; i < 9; i++) mounds.push({ x: Math.random(), r: 16 + Math.random() * 26, h: 7 + Math.random() * 12 });
+  /* springtails */
+  const bugs = [];
+  for (let i = 0; i < 6; i++) bugs.push({ x: Math.random() * W, y: H - 40 + Math.random() * 26, vx: 0, ph: Math.random() * 6.28 });
+
+  /* ---------- lamp ---------- */
+  cv.addEventListener("pointerdown", (e) => {
+    const r = cv.getBoundingClientRect();
+    lampTarget = ((e.clientX - r.left) / r.width - 0.5) * 1.6;
+  });
+  cv.addEventListener("pointermove", (e) => {
+    /* lamp follows drag */
+  });
+  $("lampBtn").addEventListener("click", () => {
+    lampTarget = (Math.random() - 0.5) * 1.6;
+  });
+
+  /* ---------- rain ---------- */
+  $("mistBtn").addEventListener("click", () => {
+    humidity = Math.min(1, humidity + 0.14);
+    for (let i = 0; i < 26; i++) {
+      drops.push({ x: Math.random() * W, y: -10 - Math.random() * 60, vy: 1.6 + Math.random() * 1.6 });
+    }
+  });
+
+  /* ---------- prune ---------- */
+  $("trimBtn").addEventListener("click", () => {
+    const f = fronds[Math.floor(Math.random() * fronds.length)];
+    f.len = 40 + Math.random() * 40;
+    f.leafAt = Math.random();
+  });
+
+  /* ---------- time lapse ---------- */
+  $("tlBtn").addEventListener("click", function () {
+    tlMode = !tlMode;
+    this.classList.toggle("on", tlMode);
+  });
+
+  /* ---------- sim loop ---------- */
+  let t = 0;
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+    const dt = 1;
+    t++;
+    /* time-lapse: months in seconds */
+    const dayRate = tlMode ? 0.5 : 0.002;
+    day += dayRate;
+    growth = Math.min(1, growth + dayRate * 0.006);
+    humidity = Math.max(0.3, humidity - dayRate * 0.004);
+    /* meters */
+    $("dayV").textContent = Math.floor(day);
+    $("dayB").style.width = ((day % 100) / 100 * 100) + "%";
+    $("groV").textContent = Math.round(growth * 100) + "%";
+    $("groB").style.width = (growth * 100) + "%";
+    $("humV").textContent = Math.round(humidity * 100) + "%";
+    $("humB").style.width = (humidity * 100) + "%";
+
+    /* lamp easing */
+    lampAngle += (lampTarget - lampAngle) * 0.04;
+
+    /* drops fall */
+    drops = drops.filter(d => d.y < H - 26);
+    drops.forEach(d => { d.y += d.vy; if (d.y > H - 30) humidity = Math.min(1, humidity + 0.0004); });
+    /* condensation droplets run down when humid */
+    if (humidity > 0.8 && Math.random() < 0.06) {
+      mist.push({ x: Math.random() * W, y: 10, vy: 0.3 });
+    }
+    mist = mist.filter(m => m.y < H - 20);
+    mist.forEach(m => m.y += m.vy);
+
+    /* bugs wander */
+    bugs.forEach(b => {
+      b.ph += 0.05;
+      b.vx += (Math.random() - 0.5) * 0.1;
+      b.vx *= 0.92;
+      b.x += b.vx;
+      if (b.x < 10 || b.x > W - 10) b.vx *= -1;
+    });
+
+    render(now);
+  }
+  requestAnimationFrame(loop);
+
+  /* ---------- render ---------- */
+  function render(now) {
+    /* interior air */
+    const air = g.createLinearGradient(0, 0, 0, H);
+    air.addColorStop(0, "rgba(200,230,190,.08)");
+    air.addColorStop(1, "rgba(140,180,130,.14)");
+    g.fillStyle = air;
+    g.fillRect(0, 0, W, H);
+
+    /* substrate layers */
+    g.fillStyle = "#3a2c1a";
+    g.fillRect(0, H - 34, W, 34);          /* soil */
+    g.fillStyle = "#4a3a24";
+    g.fillRect(0, H - 44, W, 12);          /* grit */
+    g.fillStyle = "#5a4a30";
+    for (let i = 0; i < 40; i++) {
+      g.fillRect((i * 37) % W, H - 42 + ((i * 13) % 8), 3, 3);
+    }
+
+    /* lamp light from upper angle */
+    const lx = W / 2 + lampAngle * W * 0.5, ly = -20;
+    const light = g.createRadialGradient(lx, ly, 10, lx, ly, H * 1.2);
+    light.addColorStop(0, "rgba(255,240,190,.24)");
+    light.addColorStop(0.5, "rgba(255,240,190,.08)");
+    light.addColorStop(1, "transparent");
+    g.fillStyle = light;
+    g.fillRect(0, 0, W, H);
+    /* lamp arm */
+    g.strokeStyle = "#6a5a3a";
+    g.lineWidth = 4;
+    g.beginPath();
+    g.moveTo(lx - lampAngle * 40, -16);
+    g.lineTo(lx, 16);
+    g.stroke();
+    g.fillStyle = "#ffe9b0";
+    g.beginPath(); g.arc(lx, 18, 7, 0, 6.283); g.fill();
+
+    /* moss mounds */
+    mounds.forEach((m, i) => {
+      const mx = m.x * W;
+      const my = H - 42;
+      const k = 0.5 + growth * 0.7;
+      g.fillStyle = i % 3 === 0 ? "#4a6a3a" : "#5a7a48";
+      g.beginPath();
+      g.ellipse(mx, my, m.r * k, m.h * k, 0, Math.PI, 0);
+      g.fill();
+      /* speckles */
+      g.fillStyle = "rgba(200,230,170,.3)";
+      for (let s = 0; s < 5; s++) {
+        g.fillRect(mx - m.r * k * 0.6 + s * 7, my - m.h * k * 0.6, 1.6, 1.6);
+      }
+    });
+
+    /* ferns */
+    fronds.forEach(f => {
+      const sway = Math.sin(now / 1400 + f.sway) * 0.05;
+      const a = f.ang + sway;
+      const growK = 0.35 + growth * 0.8;
+      const L = f.len * growK;
+      /* stem: quadratic curl */
+      const tipX = f.baseX + Math.cos(a) * L + Math.sin(a) * f.curl * 18;
+      const tipY = f.baseY + Math.sin(a) * L;
+      const cpX = f.baseX + Math.cos(a) * L * 0.55;
+      const cpY = f.baseY + Math.sin(a) * L * 0.55 - f.curl * 22;
+      g.strokeStyle = "#3e5a34";
+      g.lineWidth = 2.4;
+      g.beginPath();
+      g.moveTo(f.baseX, f.baseY);
+      g.quadraticCurveTo(cpX, cpY, tipX, tipY);
+      g.stroke();
+      /* leaflets */
+      const steps = 7;
+      for (let s2 = 1; s2 <= steps; s2++) {
+        const tt = s2 / (steps + 1);
+        const qx = (1 - tt) * (1 - tt) * f.baseX + 2 * (1 - tt) * tt * cpX + tt * tt * tipX;
+        const qy = (1 - tt) * (1 - tt) * f.baseY + 2 * (1 - tt) * tt * cpY + tt * tt * tipY;
+        const leaf = tt < f.leafAt ? 1 : 0.3;
+        g.strokeStyle = "#4e7040";
+        g.lineWidth = 1.6;
+        for (const side of [-1, 1]) {
+          g.beginPath();
+          g.moveTo(qx, qy);
+          g.lineTo(qx + side * 8 * leaf, qy - 5 * leaf);
+          g.stroke();
+        }
+      }
+    });
+
+    /* rain drops */
+    g.strokeStyle = "rgba(190,220,240,.6)";
+    g.lineWidth = 1.4;
+    drops.forEach(d => {
+      g.beginPath();
+      g.moveTo(d.x, d.y);
+      g.lineTo(d.x, d.y + 7);
+      g.stroke();
+    });
+    /* condensation runners */
+    g.fillStyle = "rgba(210,235,220,.5)";
+    mist.forEach(m => g.fillRect(m.x, m.y, 1.6, 5));
+
+    /* springtails */
+    bugs.forEach(b => {
+      g.fillStyle = "rgba(230,240,220,.85)";
+      g.fillRect(b.x, b.y + Math.sin(b.ph) * 1.2, 2.4, 1.6);
+    });
+
+    /* night veil */
+    const dayCycle = (Math.sin(day * 0.2) + 1) / 2;
+    if (dayCycle < 0.5) {
+      g.fillStyle = "rgba(10,16,28," + ((0.5 - dayCycle) * 0.5) + ")";
+      g.fillRect(0, 0, W, H);
+    }
+  }
+})();
+</script>
+</body>
+</html>

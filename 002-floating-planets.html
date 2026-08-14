@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>wander. — a daydream of planets</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: linear-gradient(160deg, #f6efe7 0%, #efe4ef 45%, #e3e9f6 100%);
+    position:relative; touch-action:none; user-select:none; -webkit-user-select:none;
+  }
+  /* ---------- nebula blobs ---------- */
+  .neb { position:absolute; border-radius:50%; filter:blur(70px); opacity:.75; pointer-events:none; }
+  .n1 { width:55vmin; height:55vmin; left:-12vmin; top:-14vmin; background:radial-gradient(circle at 40% 40%, #ffd3b6, rgba(255,211,182,0)); animation:blob1 46s ease-in-out infinite alternate; }
+  .n2 { width:48vmin; height:48vmin; right:-10vmin; top:6vmin; background:radial-gradient(circle at 60% 40%, #ffc9d9, rgba(255,201,217,0)); animation:blob2 38s ease-in-out infinite alternate; }
+  .n3 { width:50vmin; height:50vmin; left:12vw; bottom:-18vmin; background:radial-gradient(circle at 50% 40%, #c9f0dc, rgba(201,240,220,0)); animation:blob3 52s ease-in-out infinite alternate; }
+  .n4 { width:38vmin; height:38vmin; right:14vw; bottom:4vmin; background:radial-gradient(circle at 50% 50%, #ffedc2, rgba(255,237,194,0)); animation:blob1 44s ease-in-out infinite alternate-reverse; }
+  @keyframes blob1 { to { transform:translate(9vmin,7vmin) scale(1.15); } }
+  @keyframes blob2 { to { transform:translate(-8vmin,9vmin) scale(1.12); } }
+  @keyframes blob3 { to { transform:translate(6vmin,-9vmin) scale(1.08); } }
+  /* distant stars = tiny soft dots */
+  .dust { position:absolute; inset:0; pointer-events:none;
+    background-image:
+      radial-gradient(1.5px 1.5px at 12% 22%, rgba(120,90,140,.35), transparent),
+      radial-gradient(2px 2px at 78% 18%, rgba(140,110,120,.3), transparent),
+      radial-gradient(1.5px 1.5px at 33% 74%, rgba(110,120,150,.32), transparent),
+      radial-gradient(2px 2px at 88% 66%, rgba(150,100,110,.28), transparent),
+      radial-gradient(1.5px 1.5px at 55% 40%, rgba(120,110,140,.25), transparent),
+      radial-gradient(1.5px 1.5px at 8% 82%, rgba(130,120,150,.3), transparent),
+      radial-gradient(2px 2px at 66% 88%, rgba(140,120,130,.26), transparent),
+      radial-gradient(1.5px 1.5px at 44% 8%, rgba(120,100,140,.3), transparent);
+  }
+  /* ---------- planets ---------- */
+  .planet { position:absolute; cursor:grab; transition: box-shadow .4s; will-change:transform; }
+  .planet:active { cursor:grabbing; }
+  .p-body { border-radius:50%; position:relative; box-shadow: inset -14px -18px 34px rgba(70,40,80,.28), inset 10px 12px 26px rgba(255,255,255,.5), 0 18px 40px rgba(90,60,110,.18); }
+  .p-body::after { /* atmosphere rim */
+    content:""; position:absolute; inset:-6%; border-radius:50%;
+    box-shadow: inset 0 0 18px 6px rgba(255,255,255,.35); pointer-events:none;
+  }
+  /* gas giant with bands */
+  .pl1 { width:170px; height:170px; left:12%; top:16%; animation:bob1 9s ease-in-out infinite; }
+  .pl1 .p-body {
+    background:
+      radial-gradient(circle at 32% 28%, rgba(255,255,255,.55), rgba(255,255,255,0) 42%),
+      repeating-linear-gradient(-14deg, #f7c88f 0 14%, #f2b27a 14% 26%, #fbd9ab 26% 38%, #eeb583 38% 46%, #f9d29c 46% 60%);
+    overflow:hidden;
+  }
+  .pl1 .p-body::before { /* great storm */
+    content:""; position:absolute; left:22%; top:56%; width:34%; height:20%; border-radius:50%;
+    background:radial-gradient(circle at 40% 40%, #e58f6d, #d9765a 70%, rgba(217,118,90,0));
+    box-shadow:2px 2px 6px rgba(120,60,40,.3); transform:rotate(-8deg);
+  }
+  /* mossy crater planet */
+  .pl2 { width:120px; height:120px; left:66%; top:12%; animation:bob2 11s ease-in-out infinite; }
+  .pl2 .p-body {
+    background:
+      radial-gradient(circle at 30% 26%, rgba(255,255,255,.5), rgba(255,255,255,0) 40%),
+      radial-gradient(circle at 62% 40%, rgba(90,140,105,.5) 0 7%, rgba(90,140,105,0) 8%),
+      radial-gradient(circle at 42% 66%, rgba(80,130,95,.55) 0 9%, rgba(80,130,95,0) 10%),
+      radial-gradient(circle at 74% 70%, rgba(95,145,110,.45) 0 5%, rgba(95,145,110,0) 6%),
+      radial-gradient(circle at 50% 60%, #a8d8b2 0%, #8ec49c 55%, #6fa882 100%);
+  }
+  /* ringed rose planet */
+  .pl3 { width:105px; height:105px; left:74%; top:56%; animation:bob3 13s ease-in-out infinite; }
+  .pl3 .p-body { background:
+      radial-gradient(circle at 34% 30%, rgba(255,255,255,.55), rgba(255,255,255,0) 44%),
+      radial-gradient(circle at 50% 62%, #f2a7c3 0%, #e284a8 55%, #c05f8a 100%);
+  }
+  .ring { position:absolute; left:50%; top:50%; width:190%; height:44%;
+    transform:translate(-50%,-50%) rotate(-18deg); border-radius:50%; pointer-events:none;
+    border:7px solid rgba(240,214,166,.75);
+    box-shadow: inset 0 0 8px rgba(180,140,90,.5), 0 0 12px rgba(240,214,166,.5);
+    border-top-color:rgba(255,240,210,.95);
+  }
+  .ring::after { content:""; position:absolute; inset:-11px; border-radius:50%; border:2px solid rgba(230,200,150,.4); }
+  /* tiny moon planet */
+  .pl4 { width:78px; height:78px; left:30%; top:62%; animation:bob4 10s ease-in-out infinite; }
+  .pl4 .p-body { background:
+      radial-gradient(circle at 32% 28%, rgba(255,255,255,.6), rgba(255,255,255,0) 45%),
+      radial-gradient(circle at 60% 58%, rgba(110,140,190,.5) 0 8%, rgba(110,140,190,0) 9%),
+      radial-gradient(circle at 50% 62%, #bcd6f2 0%, #93b4de 55%, #6d8fc4 100%);
+  }
+  .moon-orbit { position:absolute; inset:-46px; animation:spin 12s linear infinite; pointer-events:none; }
+  .moon { position:absolute; left:50%; top:-7px; width:16px; height:16px; margin-left:-8px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #fff, #d8cfc4 60%, #b8ab9c);
+    box-shadow:0 0 6px rgba(255,255,255,.8);
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @keyframes bob1 { 0%,100% { transform:translateY(0) rotate(-1deg);} 50% { transform:translateY(-22px) rotate(1.5deg);} }
+  @keyframes bob2 { 0%,100% { transform:translateY(0);} 50% { transform:translateY(16px);} }
+  @keyframes bob3 { 0%,100% { transform:translateY(0) rotate(1deg);} 50% { transform:translateY(-14px) rotate(-1deg);} }
+  @keyframes bob4 { 0%,100% { transform:translateY(0);} 50% { transform:translateY(-18px);} }
+  /* ---------- caption bubble ---------- */
+  .cap {
+    position:absolute; left:50%; top:calc(100% + 14px); transform:translateX(-50%) scale(.85);
+    background:rgba(255,255,255,.82); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    border:1px solid rgba(255,255,255,.9); border-radius:16px; padding:10px 16px;
+    font-size:13px; color:#6b5580; white-space:nowrap; opacity:0; pointer-events:none;
+    transition:opacity .35s, transform .35s; box-shadow:0 8px 24px rgba(120,90,140,.18);
+    font-style:italic; z-index:5;
+  }
+  .cap::before { content:""; position:absolute; left:50%; top:-6px; margin-left:-6px;
+    border:6px solid transparent; border-bottom-color:rgba(255,255,255,.9); border-top:0; }
+  .planet.open .cap { opacity:1; transform:translateX(-50%) scale(1); }
+  .planet.open .p-body { box-shadow: inset -14px -18px 34px rgba(70,40,80,.28), inset 10px 12px 26px rgba(255,255,255,.5), 0 0 0 3px rgba(255,255,255,.7), 0 18px 46px rgba(150,100,180,.35); }
+  /* ---------- shooting star ---------- */
+  .shoot { position:absolute; width:140px; height:2px; border-radius:2px; top:12%;
+    background:linear-gradient(90deg, rgba(255,255,255,0), #fff 60%, #fff);
+    box-shadow:0 0 8px 2px rgba(255,255,255,.8); opacity:0; pointer-events:none;
+    transform:rotate(24deg);
+  }
+  .shoot.go { animation:shoot 1.4s ease-out forwards; }
+  @keyframes shoot {
+    0% { opacity:0; transform:rotate(24deg) translateX(0); }
+    12% { opacity:1; }
+    100% { opacity:0; transform:rotate(24deg) translateX(60vw); }
+  }
+  /* ---------- chrome ---------- */
+  .wordmark { position:fixed; left:26px; bottom:22px; font-size:26px; letter-spacing:.5px; color:#7a6488; font-weight:300; z-index:10; }
+  .wordmark b { font-weight:600; color:#9a7fae; }
+  .hint { position:fixed; right:26px; bottom:26px; font-size:12px; color:#a08eae; letter-spacing:.12em; text-transform:uppercase; z-index:10; }
+  .snd { position:fixed; right:26px; top:22px; z-index:10; font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+    color:#8d7aa0; background:rgba(255,255,255,.6); border:1px solid rgba(255,255,255,.9); border-radius:999px;
+    padding:6px 14px; cursor:pointer; transition:all .3s; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+  .snd.off { opacity:.55; }
+  @media (max-width:640px) {
+    .pl1 { width:110px; height:110px; } .pl2 { width:88px; height:88px; }
+    .pl3 { width:76px; height:76px; } .pl4 { width:58px; height:58px; }
+    .pl3 .ring { border-width:5px; }
+    .cap { font-size:11px; white-space:normal; width:170px; text-align:center; }
+    .wordmark { font-size:20px; left:16px; bottom:16px; }
+    .hint { display:none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .neb, .planet, .moon-orbit { animation:none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="neb n1"></div><div class="neb n2"></div><div class="neb n3"></div><div class="neb n4"></div>
+  <div class="dust"></div>
+
+  <div class="planet pl1" data-note="392" data-line="&ldquo;I am mostly weather. Stay for the storm.&rdquo;">
+    <div class="p-body"></div><div class="cap"></div>
+  </div>
+  <div class="planet pl2" data-note="523.25" data-line="&ldquo;Craters are just places where I kept things.&rdquo;">
+    <div class="p-body"></div><div class="cap"></div>
+  </div>
+  <div class="planet pl3" data-note="659.25" data-line="&ldquo;The ring was a gift. I never take it off.&rdquo;">
+    <div class="p-body"></div><div class="ring"></div><div class="cap"></div>
+  </div>
+  <div class="planet pl4" data-note="783.99" data-line="&ldquo;My moon comes back. Everything does.&rdquo;">
+    <div class="p-body"></div><div class="moon-orbit"><div class="moon"></div></div><div class="cap"></div>
+  </div>
+
+  <div class="shoot" id="shoot"></div>
+  <div class="wordmark">wan<b>der.</b></div>
+  <div class="hint">drag to move · tap to listen</div>
+  <button class="snd" id="snd">sound on</button>
+
+<script>
+(() => {
+  "use strict";
+  let audio = null, soundOn = true;
+  const sndBtn = document.getElementById("snd");
+
+  function ensureAudio() {
+    if (!audio) {
+      try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; }
+    }
+    if (audio && audio.state === "suspended") { audio.resume().catch(() => {}); }
+    return audio;
+  }
+  function chime(freq) {
+    if (!soundOn) return;
+    const ctx = ensureAudio(); if (!ctx) return;
+    try {
+      const t = ctx.currentTime;
+      [freq, freq * 2, freq * 3].forEach((f, i) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = i ? "sine" : "triangle"; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(i ? 0.05 : 0.12, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6 - i * 0.3);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(t); o.stop(t + 1.8);
+      });
+    } catch (e) { /* audio best-effort */ }
+  }
+  sndBtn.addEventListener("click", () => {
+    soundOn = !soundOn;
+    sndBtn.textContent = soundOn ? "sound on" : "sound off";
+    sndBtn.classList.toggle("off", !soundOn);
+    if (soundOn) { ensureAudio(); chime(523.25); }
+  });
+
+  /* ---------- captions ---------- */
+  document.querySelectorAll(".planet").forEach(p => {
+    const cap = p.querySelector(".cap");
+    if (cap) cap.innerHTML = p.dataset.line || "";
+  });
+
+  /* ---------- drag + tap ---------- */
+  document.querySelectorAll(".planet").forEach(planet => {
+    let dragging = false, moved = false, startX = 0, startY = 0;
+    let baseX = 0, baseY = 0, curX = 0, curY = 0;
+
+    const setPos = (x, y) => {
+      planet.style.left = x + "px"; planet.style.top = y + "px";
+      planet.style.right = "auto"; planet.style.bottom = "auto";
+    };
+    const down = (e) => {
+      dragging = true; moved = false;
+      const pt = e.touches ? e.touches[0] : e;
+      startX = pt.clientX; startY = pt.clientY;
+      const r = planet.getBoundingClientRect();
+      baseX = r.left; baseY = r.top;
+      planet.style.animation = "none";
+      planet.style.transition = "none";
+      e.preventDefault();
+    };
+    const move = (e) => {
+      if (!dragging) return;
+      const pt = e.touches ? e.touches[0] : e;
+      const dx = pt.clientX - startX, dy = pt.clientY - startY;
+      if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
+      curX = Math.min(Math.max(baseX + dx, -30), innerWidth - 60);
+      curY = Math.min(Math.max(baseY + dy, -30), innerHeight - 60);
+      planet.style.transform = "translate(" + dx * 0 + "px," + 0 + "px)"; /* keep transform untouched */
+      setPos(curX, curY);
+    };
+    const up = () => {
+      if (!dragging) return;
+      dragging = false;
+      planet.style.transition = "left .5s cubic-bezier(.2,1.6,.4,1), top .5s cubic-bezier(.2,1.6,.4,1)";
+      requestAnimationFrame(() => { planet.style.animation = ""; });
+      if (!moved) {
+        const wasOpen = planet.classList.contains("open");
+        document.querySelectorAll(".planet.open").forEach(o => o.classList.remove("open"));
+        if (!wasOpen) {
+          planet.classList.add("open");
+          chime(parseFloat(planet.dataset.note) || 440);
+          setTimeout(() => planet.classList.remove("open"), 4200);
+        }
+      }
+    };
+    planet.addEventListener("pointerdown", down);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    planet.addEventListener("touchstart", down, { passive:false });
+    window.addEventListener("touchmove", move, { passive:false });
+    window.addEventListener("touchend", up);
+  });
+
+  /* ---------- shooting star ---------- */
+  const shoot = document.getElementById("shoot");
+  function fireStar() {
+    shoot.style.left = (5 + Math.random() * 30) + "vw";
+    shoot.style.top = (6 + Math.random() * 30) + "vh";
+    shoot.classList.remove("go");
+    void shoot.offsetWidth;
+    shoot.classList.add("go");
+    schedule();
+  }
+  function schedule() { setTimeout(fireStar, 14000 + Math.random() * 12000); }
+  setTimeout(fireStar, 3000);
+})();
+</script>
+</body>
+</html>

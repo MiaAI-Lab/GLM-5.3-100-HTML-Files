@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DRAFTING ROOM — CASA LUMEN · A-101</title>
+<style>
+:root{
+  --paper:#f3ecd9; --paper2:#ece3cb; --ink:#2b2620; --faint:#8d8264;
+  --grid:rgba(93,118,146,.16); --grid2:rgba(93,118,146,.30);
+  --red:#b3412b; --washS:rgba(196,168,106,.30); --washK:rgba(150,178,140,.32);
+  --washQ:rgba(190,140,120,.28); --washSv:rgba(140,160,180,.30);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{background:#221d15}
+body{
+  font-family:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
+  color:var(--ink);min-height:100vh;display:flex;justify-content:center;
+  padding:clamp(10px,2.5vw,36px);
+  background:
+    radial-gradient(120% 90% at 50% 0%,#3a332a 0%,#221d15 60%,#181410 100%);
+}
+.desk{width:100%;max-width:1240px}
+.sheet{
+  position:relative;background:var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px),
+    linear-gradient(var(--grid2) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid2) 1px,transparent 1px);
+  background-size:8px 8px,8px 8px,80px 80px,80px 80px;
+  border:1px solid #c8bb98;
+  box-shadow:0 24px 60px rgba(0,0,0,.55), 0 2px 0 rgba(255,255,255,.06) inset;
+  overflow:hidden;
+}
+/* paper warmth + vignette */
+.sheet::before{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:6;
+  background:
+    radial-gradient(90% 70% at 50% 30%,rgba(255,250,230,.32),transparent 70%),
+    radial-gradient(140% 110% at 50% 50%,transparent 62%,rgba(120,90,40,.18) 100%);
+}
+.sheet::after{ /* pin holes */
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:7;
+  background:
+    radial-gradient(circle 5px at 26px 26px,#181410 0 3px,rgba(0,0,0,.35) 3px 5px,transparent 5px),
+    radial-gradient(circle 5px at calc(100% - 26px) 26px,#181410 0 3px,rgba(0,0,0,.35) 3px 5px,transparent 5px);
+}
+.toolbar{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:12px 14px;margin-bottom:14px;
+  background:rgba(243,236,217,.06);border:1px solid rgba(243,236,217,.16);
+}
+.toolbar .brand{color:#e8ddc2;font-size:.72rem;letter-spacing:.3em;margin-right:auto}
+.toolbar .brand b{color:var(--red);letter-spacing:.12em}
+button{font:inherit;cursor:pointer}
+.tbtn{
+  background:transparent;border:1px solid rgba(243,236,217,.35);color:#e8ddc2;
+  font-size:.62rem;letter-spacing:.2em;padding:.5rem .8rem;text-transform:uppercase;
+  transition:background .2s,color .2s;
+}
+.tbtn:hover{background:rgba(243,236,217,.12)}
+.tbtn[aria-pressed="true"]{background:#e8ddc2;color:#221d15;border-color:#e8ddc2}
+.tbtn.act{background:var(--red);border-color:var(--red);color:#fff}
+.sliderbox{display:flex;align-items:center;gap:10px;color:#cbbfa0;font-size:.62rem;
+  letter-spacing:.18em}
+input[type=range]{-webkit-appearance:none;appearance:none;width:150px;height:22px;
+  background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:3px;background:#8d8264}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:20px;
+  background:#e8ddc2;border:1px solid #221d15;margin-top:-9px}
+input[type=range]::-moz-range-track{height:3px;background:#8d8264}
+input[type=range]::-moz-range-thumb{width:12px;height:20px;background:#e8ddc2;
+  border:1px solid #221d15;border-radius:0}
+/* plan stage */
+.stage{position:relative;width:100%;aspect-ratio:1240/760;min-height:420px}
+#plan{position:absolute;inset:0;width:100%;height:100%;display:block;
+  cursor:crosshair;touch-action:none}
+.statusbar{
+  position:absolute;left:0;right:0;bottom:0;z-index:5;
+  display:flex;gap:18px;align-items:center;flex-wrap:wrap;
+  padding:7px 16px;font-size:.58rem;letter-spacing:.16em;color:var(--faint);
+  background:rgba(243,236,217,.85);border-top:1px solid #c8bb98;
+}
+.statusbar b{color:var(--ink);font-weight:700}
+#roomname{color:var(--red)}
+/* title block */
+.tblock{
+  position:absolute;right:18px;top:18px;z-index:5;width:230px;
+  background:rgba(243,236,217,.94);border:1.6px solid var(--ink);
+  font-size:.6rem;box-shadow:4px 4px 0 rgba(43,38,32,.18);
+}
+.tblock .row{display:flex;border-bottom:1px solid var(--ink)}
+.tblock .row:last-child{border-bottom:none}
+.tblock .c{flex:1;padding:5px 8px;border-right:1px solid var(--ink)}
+.tblock .c:last-child{border-right:none}
+.tblock .lab{display:block;font-size:.5rem;letter-spacing:.22em;color:var(--faint)}
+.tblock .val{font-size:.72rem;font-weight:700;letter-spacing:.06em}
+.tblock .val.big{font-size:1.1rem}
+.tblock .stamp{color:var(--red);font-weight:700}
+.note{
+  position:absolute;left:18px;bottom:44px;z-index:5;max-width:300px;
+  font-size:.6rem;line-height:1.7;color:#5c5340;font-style:italic;
+  border-left:2px solid var(--red);padding-left:10px;
+  background:rgba(243,236,217,.7);
+}
+@media (max-width:760px){
+  .tblock{width:180px;right:10px;top:10px}
+  .tblock .val.big{font-size:.9rem}
+  .note{display:none}
+  .stage{aspect-ratio:auto;height:70vh}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+}
+</style>
+</head>
+<body>
+<div class="desk">
+  <div class="toolbar">
+    <span class="brand">DRAFTING ROOM — <b>CASA LUMEN</b></span>
+    <button class="tbtn" id="bFurn" aria-pressed="true">Furniture</button>
+    <button class="tbtn" id="bElec" aria-pressed="false">Electrical</button>
+    <button class="tbtn" id="bDim" aria-pressed="true">Dims</button>
+    <button class="tbtn" id="bMeasure">Measure</button>
+    <button class="tbtn" id="bRevise">Revise</button>
+    <span class="sliderbox">SECTION
+      <input id="cutslider" type="range" min="0" max="100" value="46" aria-label="section cut position">
+    </span>
+  </div>
+
+  <div class="sheet">
+    <div class="stage">
+      <canvas id="plan"></canvas>
+
+      <div class="tblock" aria-label="title block">
+        <div class="row">
+          <div class="c" style="flex:2"><span class="lab">PROJECT</span>
+            <span class="val">CASA LUMEN</span></div>
+          <div class="c"><span class="lab">SHEET</span>
+            <span class="val big">A-101</span></div>
+        </div>
+        <div class="row">
+          <div class="c"><span class="lab">SCALE</span><span class="val">1 : 100</span></div>
+          <div class="c"><span class="lab">DATE</span><span class="val">14.08</span></div>
+          <div class="c"><span class="lab">REV</span><span class="val stamp" id="revno">—</span></div>
+        </div>
+        <div class="row">
+          <div class="c"><span class="lab">DRAWN</span><span class="val">L. AZEVEDO</span></div>
+          <div class="c"><span class="lab">CHECK</span><span class="val">M. OKAFOR</span></div>
+        </div>
+      </div>
+
+      <div class="note" id="notebox">
+        trace over grid — do not erase construction lines.
+        section arrow A–A′ sweeps west→east. hover rooms for areas.
+      </div>
+
+      <div class="statusbar">
+        <span>CURSOR <b id="coord">—</b></span>
+        <span>ROOM <b id="roomname">—</b></span>
+        <span>AREA <b id="roomarea">—</b></span>
+        <span style="margin-left:auto" id="modehint">LAYERS: FURN + DIMS</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============ DRAFTING ROOM — CASA LUMEN A-101 ============ */
+var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+var cv = document.getElementById("plan"), ctx = cv.getContext("2d");
+var W=0,H=0,S=30,OX=0,OY=0;
+var WW=14, WH=9;                       // world size, metres
+function resize(){
+  var d = Math.min(window.devicePixelRatio||1, 2);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.round(W*d); cv.height = Math.round(H*d);
+  ctx.setTransform(d,0,0,d,0,0);
+  S = Math.min((W-140)/WW, (H-170)/WH);
+  OX = (W - WW*S)/2 + 34;
+  OY = (H - WH*S)/2 - 8;
+}
+window.addEventListener("resize", resize, {passive:true});
+function X(x){ return OX + x*S; }
+function Y(y){ return OY + y*S; }
+
+/* ---------- palette ---------- */
+var INK="#2b2620", FAINT="#8d8264", RED="#b3412b", PAPER="#f3ecd9";
+var WASH = {
+  "SALA":"rgba(196,168,106,.30)","COZINHA":"rgba(150,178,140,.32)",
+  "QUARTO":"rgba(190,140,120,.28)","BANHO":"rgba(140,160,180,.30)",
+  "SERVIÇO":"rgba(170,150,120,.25)"
+};
+/* ---------- geometry ---------- */
+var WALL_T = 0.24;
+var walls = [
+  /* north */
+  [0,0,1,0,"w"],[3.2,0,4.6,0,"w"],[4.6,0,8.9,0],[11.4,0,14,0,"w"],
+  /* east */ [14,0,14,9],
+  /* south */ [0,9,2.5,9],[3.7,9,14,9,"e"],
+  /* west */ [0,0,0,6.6],[0,8.4,0,9,"w"],
+  /* interior */
+  [7,0,7,1.4],[7,2.5,7,5.2],
+  [0,5.2,1.4,5.2],[2.5,5.2,8.2,5.2],[9.3,5.2,14,5.2],
+  [7,5.2,7,9],[10,5.2,10,9]
+];
+var rooms = [
+  {n:"SALA", x:.12,y:.12,w:6.76,h:4.96},
+  {n:"COZINHA", x:7.12,y:.12,w:6.76,h:4.96},
+  {n:"QUARTO", x:.12,y:5.32,w:6.76,h:3.56},
+  {n:"BANHO", x:7.12,y:5.32,w:2.76,h:3.56},
+  {n:"SERVIÇO", x:10.12,y:5.32,w:3.76,h:3.56}
+];
+var winGaps = [
+  {x1:1,y1:0,x2:3.2,y2:0},{x1:8.9,y1:0,x2:11.4,y2:0},{x1:0,y1:6.6,x2:0,y2:8.4}
+];
+var doors = [
+  {cx:7, cy:1.95, horiz:false,   /* sala—cozinha */
+   ax:2.5, ay:1.95, sweep:1},
+  {cx:1.95, cy:5.2, horiz:true,  /* sala—quarto */
+   ax:1.95, ay:5.2, sweep:-1},
+  {cx:8.75, cy:5.2, horiz:true,  /* cozinha—banho */
+   ax:8.75, ay:5.2, sweep:-1},
+  {cx:3.1, cy:9, horiz:true,     /* entry */
+   ax:3.7, ay:9, sweep:-1}
+];
+/* furniture: [x,y,w,h,kind,label?] circles: {c:1,x,y,r} */
+var furn = [
+  [0.7,1.6,3.4,1.0,"sofa"],
+  {c:1,x:2.6,y:3.4,r:0.55},
+  [0.6,0.35,5.0,0.12,"tv"],
+  [8.6,2.4,2.6,1.4,"dtable"],
+  [7.7,0.5,5.9,0.65,"counter"],
+  [12.9,1.15,0.65,3.6,"counter"],
+  {c:1,x:9.6,y:0.82,r:0.22},
+  {c:1,x:10.6,y:0.82,r:0.22},
+  [0.9,6.0,1.7,2.2,"bed"],
+  [4.6,8.3,2.2,0.55,"ward"],
+  {c:1,x:8.3,y:6.2,r:0.3},
+  [8.05,7.6,0.55,0.9,"wc"],
+  [9.2,5.5,0.6,0.6,"shower"],
+  [10.5,5.6,0.85,0.85,"washer"],
+  {c:1,x:13.3,y:7.6,r:0.3}
+];
+/* electrical: lights (cross circles), sockets, switches */
+var lights = [
+  {x:3.5,y:2.6},{x:10.5,y:2.6},{x:3.5,y:7.1},{x:8.5,y:7.1},{x:12,y:7.1}
+];
+var sockets = [
+  {x:0.3,y:3.4,v:1},{x:6.7,y:1.0,v:-1},{x:13.7,y:3.4,v:-1},
+  {x:1.4,y:8.7,v:0,h:1},{x:10.5,y:8.7,v:0,h:1},{x:13.7,y:6.4,v:-1}
+];
+var switches = [
+  {x:1.4,y:4.9},{x:7.6,y:1.3},{x:8.3,y:5.6},{x:3.3,y:8.6}
+];
+/* dimension strings */
+var dimsH = [
+  {a:0,b:7,y:-0.75},{a:7,b:14,y:-0.75},{a:0,b:14,y:-1.45}
+];
+var dimsV = [
+  {a:0,b:5.2,x:-0.75},{a:5.2,b:9,x:-0.75},{a:0,b:9,x:-1.45}
+];
+/* ---------- layer state ---------- */
+var lay = {furn:true, elec:false, dim:true};
+var measureMode=false, revT=-1, revCount=0, revProg=1;
+var m1=null, m2=null;
+var cutX = 0.46*WW;
+var drawT0 = performance.now();
+var DRAW_MS = REDUCED ? 1 : 4200;
+
+/* ---------- stroke helpers ---------- */
+function wallPath(seg, t0, t1){
+  /* draw portion [t0,t1] of segment param 0..1 */
+  var a=seg[0],b=seg[1],c=seg[2],d=seg[3];
+  var s0=Math.max(0,t0), s1=Math.min(1,t1);
+  if(s1<=s0) return;
+  ctx.moveTo(X(a+(c-a)*s0), Y(b+(d-b)*s0));
+  ctx.lineTo(X(a+(c-a)*s1), Y(b+(d-b)*s1));
+}
+function tick(x,y){
+  /* architectural 45° slash tick */
+  ctx.beginPath();
+  ctx.moveTo(x-4,y+4); ctx.lineTo(x+4,y-4);
+  ctx.stroke();
+}
+function dimString(x1,y1,x2,y2,label,flip){
+  ctx.strokeStyle=FAINT; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  tick(x1,y1); tick(x2,y2);
+  ctx.save();
+  ctx.translate((x1+x2)/2,(y1+y2)/2);
+  if(Math.abs(x2-x1)<1) ctx.rotate(-Math.PI/2);
+  ctx.fillStyle=FAINT;
+  ctx.font="10px ui-monospace,Menlo,monospace";
+  ctx.textAlign="center"; ctx.textBaseline="bottom";
+  ctx.fillText(label, flip?3:-3, flip?-2:2);
+  ctx.restore();
+}
+/* ---------- draw order & self-drawing timeline ---------- */
+var ORDER = [];
+function segLen(seg){
+  return Math.hypot(seg[2]-seg[0], seg[3]-seg[1]);
+}
+function buildOrder(){
+  ORDER = [];
+  walls.forEach(function(s){ ORDER.push({k:"wall",s:s}); });
+  winGaps.forEach(function(g){ ORDER.push({k:"win",g:g}); });
+  doors.forEach(function(d){ ORDER.push({k:"door",d:d}); });
+  ORDER.push({k:"furn"});
+  ORDER.push({k:"wash"});
+  ORDER.push({k:"labels"});
+}
+buildOrder();
+function easedT(){
+  var t = (performance.now()-drawT0)/DRAW_MS;
+  if(t>=1) return 1;
+  return t<0?0:1-Math.pow(1-t,2);
+}
+/* total wall length for progressive stroke */
+var TOTAL=0;
+walls.forEach(function(s){ TOTAL+=segLen(s); });
+
+function drawWalls(p){
+  /* progressive: total wall length covered = p * TOTAL */
+  var budget = p*TOTAL, acc=0;
+  ctx.strokeStyle=INK; ctx.lineWidth=3;
+  ctx.lineCap="square";
+  ctx.beginPath();
+  for(var i=0;i<walls.length;i++){
+    var s=walls[i], L=segLen(s);
+    var t0=acc/TOTAL, t1=(acc+L)/TOTAL;
+    var local = Math.max(0, Math.min(1,(p-t0)/(t1-t0)));
+    wallPath(s, 0, local);
+    acc+=L;
+    if(local<1) break;
+  }
+  ctx.stroke();
+}
+function drawWindows(p){
+  if(p<0.86) return;
+  ctx.strokeStyle=FAINT; ctx.lineWidth=1.2;
+  winGaps.forEach(function(g){
+    ctx.beginPath();
+    ctx.moveTo(X(g.x1),Y(g.y1)); ctx.lineTo(X(g.x2),Y(g.y2));
+    ctx.stroke();
+    /* double glazing lines */
+    if(g.y1===g.y2){
+      ctx.beginPath();
+      ctx.moveTo(X(g.x1),Y(g.y1)-3); ctx.lineTo(X(g.x2),Y(g.y2)-3);
+      ctx.moveTo(X(g.x1),Y(g.y1)+3); ctx.lineTo(X(g.x2),Y(g.y2)+3);
+      ctx.stroke();
+    }else{
+      ctx.beginPath();
+      ctx.moveTo(X(g.x1)-3,Y(g.y1)); ctx.lineTo(X(g.x2)-3,Y(g.y2));
+      ctx.moveTo(X(g.x1)+3,Y(g.y1)); ctx.lineTo(X(g.x2)+3,Y(g.y2));
+      ctx.stroke();
+    }
+  });
+}
+function drawDoors(p){
+  if(p<0.92) return;
+  ctx.strokeStyle=INK; ctx.lineWidth=1.6;
+  doors.forEach(function(d){
+    var r=0.82;
+    ctx.beginPath();
+    if(!d.horiz){        /* in vertical wall: leaf horizontal */
+      ctx.moveTo(X(d.cx),Y(d.cy-r));
+      ctx.lineTo(X(d.cx+r),Y(d.cy-r));
+      ctx.arc(X(d.cx),Y(d.cy-r),r,0,Math.PI/2);
+    }else{
+      ctx.moveTo(X(d.cx-r),Y(d.cy));
+      ctx.lineTo(X(d.cx-r),Y(d.cy+r));
+      ctx.arc(X(d.cx-r),Y(d.cy),r,Math.PI/2,Math.PI);
+    }
+    ctx.stroke();
+  });
+}
+function drawFurn(p){
+  if(!lay.furn || p<0.97) return;
+  ctx.strokeStyle=FAINT; ctx.lineWidth=1.2;
+  furn.forEach(function(f){
+    if(f.c){
+      ctx.beginPath(); ctx.arc(X(f.x),Y(f.y),f.r*S,0,6.2832); ctx.stroke();
+      if(f.r>0.4){ /* table cross */
+        ctx.beginPath();
+        ctx.moveTo(X(f.x)-f.r*S,Y(f.y)); ctx.lineTo(X(f.x)+f.r*S,Y(f.y));
+        ctx.moveTo(X(f.x),Y(f.y)-f.r*S); ctx.lineTo(X(f.x),Y(f.y)+f.r*S);
+        ctx.stroke();
+      }
+    }else{
+      ctx.strokeRect(X(f[0]),Y(f[1]),f[2]*S,f[3]*S);
+      if(f[4]==="sofa"){
+        ctx.strokeRect(X(f[0]),Y(f[1]),f[2]*S,0.25*S);
+      }
+      if(f[4]==="bed"){
+        ctx.beginPath();
+        ctx.moveTo(X(f[0]),Y(f[1]+0.4)); ctx.lineTo(X(f[0]+f[2]),Y(f[1]+0.4));
+        ctx.stroke();
+      }
+    }
+  });
+}
+function drawWash(p, hovered){
+  if(p<0.9) return;
+  rooms.forEach(function(r){
+    ctx.fillStyle = hovered===r ? "rgba(179,65,43,.20)" : WASH[r.n];
+    ctx.fillRect(X(r.x),Y(r.y),r.w*S,r.h*S);
+    if(hovered===r){
+      ctx.strokeStyle=RED; ctx.lineWidth=1.4;
+      ctx.strokeRect(X(r.x),Y(r.y),r.w*S,r.h*S);
+    }
+  });
+}
+function drawLabels(p){
+  if(p<1) return;
+  ctx.fillStyle=INK; ctx.textAlign="center";
+  ctx.font="700 12px ui-monospace,Menlo,monospace";
+  ctx.save();
+  ctx.font="700 11px ui-monospace,Menlo,monospace";
+  rooms.forEach(function(r){
+    ctx.fillText(r.n, X(r.x+r.w/2), Y(r.y+r.h/2)+4);
+    ctx.fillStyle=FAINT;
+    ctx.font="9px ui-monospace,Menlo,monospace";
+    ctx.fillText((r.w*r.h).toFixed(1)+" m²", X(r.x+r.w/2), Y(r.y+r.h/2)+18);
+    ctx.fillStyle=INK;
+    ctx.font="700 11px ui-monospace,Menlo,monospace";
+  });
+  ctx.restore();
+}
+function drawDims(p){
+  if(!lay.dim || p<1) return;
+  dimsH.forEach(function(d){
+    dimString(X(d.a),Y(d.y),X(d.b),Y(d.y),(d.b-d.a).toFixed(2).replace(/0$/,""),false);
+  });
+  dimsV.forEach(function(d){
+    dimString(X(d.x),Y(d.a),X(d.x),Y(d.b),(d.b-d.a).toFixed(2).replace(/0$/,""),true);
+  });
+}
+function drawElec(p){
+  if(!lay.elec || p<1) return;
+  ctx.strokeStyle=RED; ctx.lineWidth=1.2;
+  lights.forEach(function(l){
+    ctx.beginPath(); ctx.arc(X(l.x),Y(l.y),0.28*S,0,6.2832); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(X(l.x)-4,Y(l.y)); ctx.lineTo(X(l.x)+4,Y(l.y));
+    ctx.moveTo(X(l.x),Y(l.y)-4); ctx.lineTo(X(l.x),Y(l.y)+4);
+    ctx.stroke();
+  });
+  sockets.forEach(function(s){
+    var x=X(s.x), y=Y(s.y);
+    ctx.beginPath(); ctx.arc(x,y,3.6,0,6.2832); ctx.stroke();
+    if(s.h){ ctx.beginPath(); ctx.moveTo(x-4,y+4); ctx.lineTo(x+4,y-4); ctx.stroke(); }
+  });
+  switches.forEach(function(s){
+    var x=X(s.x), y=Y(s.y);
+    ctx.beginPath();
+    ctx.moveTo(x-3,y+3); ctx.lineTo(x,y-4); ctx.lineTo(x+3,y+3);
+    ctx.stroke();
+  });
+}
+/* ---------- section cut ---------- */
+var cutslider=document.getElementById("cutslider");
+function drawCut(){
+  if(cutX<=0.02) return;
+  ctx.save();
+  ctx.strokeStyle=RED; ctx.lineWidth=1.2;
+  ctx.setLineDash([7,4]);
+  ctx.beginPath();
+  ctx.moveTo(X(cutX),Y(-0.45)); ctx.lineTo(X(cutX),Y(WH+0.45));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  /* A–A′ flags */
+  ctx.fillStyle=RED;
+  ctx.font="700 11px ui-monospace,Menlo,monospace";
+  ctx.textAlign="left";
+  ctx.beginPath(); ctx.moveTo(X(cutX),Y(-0.45));
+  ctx.lineTo(X(cutX)-6,Y(-0.75)); ctx.lineTo(X(cutX)-6,Y(-0.15)); ctx.closePath(); ctx.fill();
+  ctx.fillText("A", X(cutX)-18, Y(-0.38));
+  ctx.textAlign="right";
+  ctx.beginPath(); ctx.moveTo(X(cutX),Y(WH+0.45));
+  ctx.lineTo(X(cutX)+6,Y(WH+0.75)); ctx.lineTo(X(cutX)+6,Y(WH+0.15)); ctx.closePath(); ctx.fill();
+  ctx.fillText("A′", X(cutX)+18, Y(WH+0.72));
+  ctx.restore();
+}
+function drawSection(){
+  /* small section profile panel, right of plan */
+  if(cutX<=0.02) return;
+  var bw=Math.min(210,W*0.2), bh=110;
+  var bx=W-bw-16, by=Y(WH)-bh-40;
+  if(bx<X(WW)+20){ bx=X(WW)+20; }
+  ctx.save();
+  ctx.fillStyle="rgba(243,236,217,.92)";
+  ctx.strokeStyle=INK; ctx.lineWidth=1.2;
+  ctx.fillRect(bx,by,bw,bh); ctx.strokeRect(bx,by,bw,bh);
+  /* section: floor, walls, roof */
+  var fx=bx+12, fw=bw-24, fy=by+bh-22;
+  ctx.beginPath();
+  ctx.moveTo(fx,fy); ctx.lineTo(fx+fw,fy);                  /* ground */
+  ctx.moveTo(fx,fy); ctx.lineTo(fx,fy-46);                  /* left wall */
+  ctx.lineTo(fx+fw,fy-46); ctx.lineTo(fx+fw,fy);            /* roof+right */
+  ctx.moveTo(fx+fw*0.5,fy-46); ctx.lineTo(fx+fw*0.5,fy);    /* cut wall @cut */
+  ctx.stroke();
+  ctx.fillStyle=RED; ctx.font="9px ui-monospace,Menlo,monospace";
+  ctx.textAlign="left";
+  ctx.fillText("SEÇÃO A–A′  x="+cutX.toFixed(1)+"m", bx+10, by+14);
+  ctx.fillStyle=FAINT;
+  ctx.fillText("h=3.20m", fx+4, fy-50);
+  ctx.restore();
+}
+/* ---------- revision cloud ---------- */
+function drawRev(now){
+  if(revCount===0) return;
+  if(revT>0){
+    revProg = Math.min(1,(now-revT)/900);
+    if(revProg>=1) revT=-1;
+  }
+  var p = revProg;
+  ctx.save();
+  ctx.strokeStyle=RED; ctx.lineWidth=1.6;
+  var rx=X(-0.5), ry=Y(-0.5), rw=X(WW+0.5)-rx, rh=Y(WH+0.5)-ry;
+  var per=2*(rw+rh);
+  var drawn = per*p;
+  var arcs=26, seg=per/arcs;
+  var r=Math.max(6,seg*0.55);
+  ctx.beginPath();
+  var pts=[[rx,ry],[rx+rw,ry],[rx+rw,ry+rh],[rx,ry+rh]];
+  var edges=[[0,1],[1,2],[2,3],[3,0]];
+  var traveled=0;
+  edges.forEach(function(e){
+    var a=pts[e[0]], b=pts[e[1]];
+    var L=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    var n=Math.max(1,Math.floor(L/seg));
+    for(var i=0;i<n;i++){
+      if(traveled>drawn) break;
+      var t0=i/n, t1=(i+1)/n;
+      var p0=[a[0]+(b[0]-a[0])*t0, a[1]+(b[1]-a[1])*t0];
+      var p1=[a[0]+(b[0]-a[0])*t1, a[1]+(b[1]-a[1])*t1];
+      var mx=(p0[0]+p1[0])/2, my=(p0[1]+p1[1])/2;
+      var nx=-(p1[1]-p0[1]), ny=(p1[0]-p0[0]);
+      var nl=Math.hypot(nx,ny)||1;
+      var cx=mx+nx/nl*r*0.7, cy=my+ny/nl*r*0.7;
+      var a0=Math.atan2(p0[1]-cy,p0[0]-cx);
+      var a1=Math.atan2(p1[1]-cy,p1[0]-cx);
+      if(a1<a0) a1+=6.2832;
+      ctx.arc(cx,cy,r,a0,a1);
+      traveled+=seg;
+    }
+  });
+  ctx.stroke();
+  ctx.restore();
+}
+/* ---------- measure mode ---------- */
+function drawMeasure(){
+  if(!measureMode) return;
+  ctx.save();
+  ctx.strokeStyle=RED; ctx.lineWidth=1.4; ctx.setLineDash([5,4]);
+  if(m1){
+    ctx.beginPath();
+    ctx.moveTo(m1.px,m1.py);
+    if(m2) ctx.lineTo(m2.px,m2.py);
+    else if(mouse) ctx.lineTo(mouse.px,mouse.py);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  [m1,m2].forEach(function(m){
+    if(!m) return;
+    ctx.beginPath(); ctx.arc(m.px,m.py,4,0,6.2832); ctx.stroke();
+  });
+  if(m1&&m2){
+    var d=Math.hypot(m2.px-m1.px,m2.py-m1.py)/S;
+    ctx.fillStyle=RED;
+    ctx.font="700 11px ui-monospace,Menlo,monospace";
+    ctx.textAlign="center";
+    ctx.fillText(d.toFixed(2)+" m",(m1.px+m2.px)/2,(m1.py+m2.py)/2-8);
+  }
+  ctx.restore();
+}
+/* ---------- interactions ---------- */
+var mouse=null, hovered=null;
+function worldOf(e){
+  var r=cv.getBoundingClientRect();
+  var px=e.clientX-r.left, py=e.clientY-r.top;
+  return {px:px,py:py,wx:(px-OX)/S,wy:(py-OY)/S};
+}
+cv.addEventListener("pointermove", function(e){
+  mouse=worldOf(e);
+  var w=mouse;
+  document.getElementById("coord").textContent =
+    Math.round(w.wx*100)/100+" , "+Math.round(w.wy*100)/100+" m";
+  hovered=null;
+  if(w.wx>=0&&w.wx<=WW&&w.wy>=0&&w.wy<=WH){
+    for(var i=0;i<rooms.length;i++){
+      var r=rooms[i];
+      if(w.wx>=r.x&&w.wx<=r.x+r.w&&w.wy>=r.y&&w.wy<=r.y+r.h){hovered=r;break;}
+    }
+  }
+  if(hovered){
+    document.getElementById("roomname").textContent=hovered.n;
+    document.getElementById("roomarea").textContent=(hovered.w*hovered.h).toFixed(1)+" m²";
+  }else{
+    document.getElementById("roomname").textContent="—";
+    document.getElementById("roomarea").textContent="—";
+  }
+});
+cv.addEventListener("pointerleave", function(){ mouse=null; hovered=null; });
+cv.addEventListener("pointerdown", function(e){
+  if(!measureMode) return;
+  var w=worldOf(e);
+  if(!m1||m2){ m1={px:w.px,py:w.py,wx:w.wx,wy:w.wy}; m2=null; }
+  else{ m2={px:w.px,py:w.py,wx:w.wx,wy:w.wy}; }
+});
+/* toolbar */
+function toggle(btn,key,label){
+  btn.addEventListener("click",function(){
+    lay[key]=!lay[key];
+    btn.setAttribute("aria-pressed",lay[key]?"true":"false");
+    document.getElementById("modehint").textContent =
+      "LAYERS: "+(lay.furn?"FURN ":"")+(lay.elec?"ELEC ":"")+(lay.dim?"DIMS":"");
+  });
+}
+toggle(document.getElementById("bFurn"),"furn");
+toggle(document.getElementById("bElec"),"elec");
+toggle(document.getElementById("bDim"),"dim");
+var measureBtn=document.getElementById("bMeasure");
+measureBtn.addEventListener("click",function(){
+  measureMode=!measureMode;
+  measureBtn.classList.toggle("act",measureMode);
+  if(!measureMode){ m1=m2=null; }
+  cv.style.cursor=measureMode?"cell":"crosshair";
+});
+var reviseBtn=document.getElementById("bRevise");
+reviseBtn.addEventListener("click",function(){
+  revCount++;
+  revT=performance.now();
+  document.getElementById("revno").textContent=String(revCount).padStart(2,"0");
+});
+cutslider.addEventListener("input",function(){
+  cutX = parseInt(cutslider.value,10)/100*WW;
+});
+cutX = 0.46*WW;
+/* ---------- main loop ---------- */
+function frame(now){
+  ctx.clearRect(0,0,W,H);
+  var p = easedT();
+  drawWash(p,hovered);
+  drawWalls(p);
+  drawWindows(p);
+  drawDoors(p);
+  drawFurn(p);
+  drawElec(p);
+  drawLabels(p);
+  drawDims(p);
+  drawCut();
+  drawSection();
+  drawRev(now);
+  drawMeasure();
+  requestAnimationFrame(frame);
+}
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

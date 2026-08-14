@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CARBON — a typewriter memoir</title>
+<style>
+  :root {
+    --paper:#efe8d8; --paper-hi:#f6f0e2; --paper-lo:#e4dbc6;
+    --type-ink:#2e2a26; --red-pencil:#b2452e; --wood:#5b4632;
+    --lamp:#ffdf9e;
+  }
+  body[data-ribbon="red"]    { --type-ink:#8e2f22; }
+  body[data-ribbon="purple"] { --type-ink:#5e4a72; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { height:100%; }
+  body {
+    min-height:100%;
+    background:#241c14;
+    background-image:
+      radial-gradient(90% 60% at 50% -5%, rgba(255,223,158,.20) 0%, rgba(255,223,158,0) 62%),
+      linear-gradient(#241c14, #17110c);
+    font-family: "Courier New", Courier, ui-monospace, monospace;
+    color:var(--type-ink);
+    display:flex; flex-direction:column; align-items:center;
+    padding:26px 14px 40px;
+  }
+  /* desk-lamp pool on the desk itself */
+  .desk {
+    position:relative; width:min(860px, 100%);
+    background:
+      radial-gradient(75% 55% at 50% 0%, rgba(255,223,158,.24) 0%, rgba(255,223,158,0) 70%),
+      linear-gradient(160deg, #4a3a2a, #33271c 70%);
+    border-radius:10px;
+    box-shadow: 0 24px 60px -20px rgba(0,0,0,.8), 0 2px 0 rgba(255,235,190,.08) inset;
+    padding:30px 22px 20px;
+  }
+  .desk::after {  /* wood grain */
+    content:""; position:absolute; inset:0; border-radius:10px; pointer-events:none;
+    opacity:.4; mix-blend-mode:overlay;
+    background-image: repeating-linear-gradient(93deg, rgba(0,0,0,.24) 0 2px, transparent 2px 9px);
+  }
+  .machine {
+    position:relative; z-index:1; margin:0 auto 18px; width:min(640px,100%);
+    background:linear-gradient(180deg,#3d3a37,#26241f);
+    border-radius:12px 12px 6px 6px;
+    padding:12px 14px 10px;
+    box-shadow: 0 3px 0 rgba(255,235,190,.12) inset, 0 10px 22px rgba(0,0,0,.5);
+    display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:center;
+  }
+  .machine .name {
+    font-size:10px; letter-spacing:.5em; color:#c9bfa5; margin-right:auto;
+    text-shadow:0 1px 0 #000;
+  }
+  .mbtn {
+    font:inherit; font-size:10px; letter-spacing:.16em; cursor:pointer;
+    color:#d8cfb6; background:linear-gradient(180deg,#4a463f,#322f29);
+    border:1px solid #57524a; border-radius:5px; padding:6px 10px;
+    box-shadow:0 2px 0 #1b1916; user-select:none;
+  }
+  .mbtn:hover { filter:brightness(1.15); }
+  .mbtn:active { transform:translateY(1px); box-shadow:0 1px 0 #1b1916; }
+  .mbtn.sel { color:#ffe9b0; border-color:#a58443; box-shadow:0 0 8px rgba(255,222,150,.35), 0 2px 0 #1b1916; }
+  .ribbongroup { display:flex; gap:5px; align-items:center; }
+  .rb {
+    width:22px; height:14px; border-radius:3px; cursor:pointer; border:1px solid rgba(0,0,0,.5);
+    box-shadow:0 1px 2px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.15) inset;
+  }
+  .rb[data-r="black"]  { background:#2e2a26; }
+  .rb[data-r="red"]    { background:#8e2f22; }
+  .rb[data-r="purple"] { background:#5e4a72; }
+  .rb.sel { outline:2px solid #ffe9b0; outline-offset:1px; }
+
+  .sheet-wrap {
+    position:relative; z-index:1; margin:0 auto; width:min(680px,100%);
+    box-shadow: 0 22px 40px -14px rgba(0,0,0,.65);
+    animation: none;
+  }
+  .sheet-wrap.jolt { animation: paperjolt .12s ease; }
+  @keyframes paperjolt {
+    0% { transform:translate(0,0); }
+    40% { transform:translate(1px,-1.5px); }
+    100% { transform:translate(0,0); }
+  }
+  .sheet {
+    background:
+      radial-gradient(140% 90% at 30% -10%, rgba(255,223,158,.28) 0%, rgba(255,223,158,0) 55%),
+      var(--paper);
+    min-height:60vh; padding:44px 46px 60px;
+    border-radius:3px; position:relative;
+    box-shadow: 0 1px 0 rgba(255,255,255,.35) inset;
+    line-height:1.85; font-size:15px; letter-spacing:.02em;
+    word-wrap:break-word; overflow-wrap:break-word;
+    cursor:text;
+  }
+  /* foxing stains */
+  .sheet::before {
+    content:""; position:absolute; inset:0; pointer-events:none; border-radius:3px;
+    background-image:
+      radial-gradient(28px 20px at 82% 12%, rgba(148,104,58,.13) 0 60%, transparent 70%),
+      radial-gradient(20px 26px at 9% 78%, rgba(148,104,58,.11) 0 55%, transparent 70%),
+      radial-gradient(12px 12px at 62% 88%, rgba(148,104,58,.16) 0 55%, transparent 70%),
+      radial-gradient(16px 12px at 30% 34%, rgba(148,104,58,.07) 0 55%, transparent 70%);
+  }
+  /* ruled margin line in red pencil */
+  .sheet::after {
+    content:""; position:absolute; top:0; bottom:0; left:34px; width:1.5px;
+    background:repeating-linear-gradient(180deg, rgba(178,69,46,.5) 0 7px, transparent 7px 11px);
+    pointer-events:none;
+  }
+  #page { white-space:pre-wrap; min-height:1em; }
+  #page .glyph { transition: opacity .05s; }
+  .i0 { color:var(--type-ink); opacity:.92; }
+  .i1 { color:var(--type-ink); opacity:.78; }
+  .i2 { color:var(--type-ink); opacity:.62; }
+  .i3 { color:var(--type-ink); opacity:.45; }
+  .caret {
+    display:inline-block; width:.62em; height:1.05em; vertical-align:-0.15em;
+    background:var(--type-ink); opacity:.7; animation:blink 1.06s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity:0; } }
+  .witeout {
+    display:inline-block; border-radius:4px 6px 5px 3px;
+    background:linear-gradient(150deg, #f4efe2, #fbf8ee);
+    box-shadow:0 1px 2px rgba(90,70,40,.25);
+    padding:0 .12em;
+  }
+  .ann {
+    position:absolute; color:var(--red-pencil); font-size:11px; letter-spacing:.06em;
+    transform:rotate(-2.4deg); pointer-events:none; opacity:.85;
+    text-shadow:0 0 2px rgba(178,69,46,.3);
+  }
+  .ann.a1 { top:14px; right:20px; }
+  .ann.a2 { bottom:24px; right:36px; }
+  .keys {
+    margin:18px auto 0; width:min(680px,100%); z-index:1; position:relative;
+    display:grid; grid-template-columns:repeat(12, 1fr); gap:4px;
+  }
+  .k {
+    font:inherit; font-size:11.5px; padding:9px 0 7px; text-align:center; cursor:pointer;
+    color:#e5dcc2; background:linear-gradient(180deg,#524d43,#3a362f);
+    border:1px solid #5c574c; border-radius:4px; user-select:none;
+    box-shadow:0 2px 0 #1e1c18;
+  }
+  .k:active, .k.hit { transform:translateY(2px); box-shadow:0 0 0 #1e1c18; filter:brightness(1.2); }
+  .k.w2 { grid-column:span 2; }
+  .k.sp { grid-column:span 6; letter-spacing:.4em; }
+  .hintbar {
+    margin-top:14px; font-size:10px; letter-spacing:.22em; color:#8f846c; text-align:center;
+    width:min(680px,100%);
+  }
+  .hintbar b { color:#c9b98e; font-weight:400; }
+  @media (prefers-reduced-motion: reduce){
+    .caret { animation:none; }
+    .sheet-wrap.jolt { animation:none; }
+  }
+  @media (max-width:560px){
+    .sheet { padding:30px 22px 46px; font-size:14px; }
+    .sheet::after { left:22px; }
+    .keys { grid-template-columns:repeat(8,1fr); }
+    .k.sp { grid-column:span 8; }
+    .machine { justify-content:center; }
+    .machine .name { margin:0 0 4px; width:100%; text-align:center; }
+  }
+</style>
+</head>
+<body data-ribbon="black">
+  <div class="desk">
+    <div class="machine">
+      <span class="name">CARBON&nbsp;No.4</span>
+      <div class="ribbongroup" role="group" aria-label="Ribbon selector">
+        <span class="rb sel" data-r="black" title="Black ribbon" role="button" tabindex="0"></span>
+        <span class="rb" data-r="red" title="Red ribbon" role="button" tabindex="0"></span>
+        <span class="rb" data-r="purple" title="Faded purple ribbon" role="button" tabindex="0"></span>
+      </div>
+      <button class="mbtn" id="dingBtn">DING ↵</button>
+      <button class="mbtn" id="witeBtn">WITE-OUT</button>
+      <button class="mbtn" id="exportBtn">EXPORT</button>
+      <button class="mbtn" id="soundBtn" aria-pressed="false">SOUND: OFF</button>
+    </div>
+
+    <div class="sheet-wrap" id="sheetWrap">
+      <div class="sheet" id="sheet">
+        <span class="ann a1" id="ann1">draft — be honest ↴</span>
+        <span class="ann a2" id="ann2" style="display:none">revise!</span>
+        <div id="page"></div>
+      </div>
+    </div>
+
+    <div class="keys" id="keyrows" aria-label="On-screen typewriter keys"></div>
+    <div class="hintbar">TYPE ON YOUR KEYBOARD OR TAP KEYS · <b>DING ↵</b> RETURNS THE CARRIAGE · <b>WITE-OUT</b> EATS THE LAST WORD · <b>EXPORT</b> DOWNLOADS THE PAGE</div>
+  </div>
+
+<script>
+'use strict';
+/* ---------- CARBON: page model ---------- */
+const pageEl = document.getElementById('page');
+const sheetWrap = document.getElementById('sheetWrap');
+const sheet = document.getElementById('sheet');
+const caret = document.createElement('span');
+caret.className = 'caret';
+
+// each glyph: { ch, inkClass } — rendered as spans for variable ink density
+let glyphs = [];
+const INKS = ['i0','i0','i0','i1','i1','i2','i3'];
+
+function render(){
+  pageEl.textContent = '';
+  for (const g of glyphs){
+    if (g.wite){
+      const b = document.createElement('span');
+      b.className = 'witeout';
+      b.textContent = g.ch;
+      pageEl.appendChild(b);
+    } else {
+      const s = document.createElement('span');
+      s.className = 'glyph ' + g.ink;
+      s.textContent = g.ch;
+      pageEl.appendChild(s);
+    }
+  }
+  pageEl.appendChild(caret);
+  sheet.scrollTop = sheet.scrollHeight;
+}
+function plainText(){
+  return glyphs.map(g => g.ch).join('');
+}
+function jolt(){
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  sheetWrap.classList.remove('jolt');
+  void sheetWrap.offsetWidth;
+  sheetWrap.classList.add('jolt');
+}
+
+/* ---------- WebAudio: gesture-gated mechanical sounds ---------- */
+let AC=null, master=null, soundOn=false;
+const soundBtn = document.getElementById('soundBtn');
+function ensureAudio(){
+  if (AC) return true;
+  try {
+    AC = new (window.AudioContext||window.webkitAudioContext)();
+    master = AC.createGain(); master.gain.value = 0.12;
+    master.connect(AC.destination);
+  } catch(e){ AC = null; }
+  return !!AC;
+}
+soundBtn.addEventListener('click', function(){
+  soundOn = !soundOn;
+  soundBtn.textContent = 'SOUND: ' + (soundOn ? 'ON' : 'OFF');
+  soundBtn.setAttribute('aria-pressed', String(soundOn));
+  if (soundOn && ensureAudio() && AC.state==='suspended') AC.resume().catch(function(){});
+});
+function noiseBurst(dur, freq, vol, type){
+  if (!soundOn || !ensureAudio() || !AC) return;
+  const t = AC.currentTime;
+  if (type === 'ding'){
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type='triangle'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(vol,t+0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+0.05);
+    return;
+  }
+  // key hammer: filtered noise click + low thump
+  const len = Math.floor(AC.sampleRate * dur);
+  const buf = AC.createBuffer(1, len, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i=0;i<len;i++){ d[i] = (Math.random()*2-1) * Math.pow(1-i/len, 2.5); }
+  const src = AC.createBufferSource(); src.buffer = buf;
+  const bp = AC.createBiquadFilter(); bp.type='bandpass';
+  bp.frequency.value = freq; bp.Q.value = 1.1;
+  const g = AC.createGain(); g.gain.value = vol;
+  src.connect(bp); bp.connect(g); g.connect(master);
+  src.start(t);
+  const o = AC.createOscillator(), g2 = AC.createGain();
+  o.type='sine'; o.frequency.setValueAtTime(120,t);
+  o.frequency.exponentialRampToValueAtTime(60,t+0.06);
+  g2.gain.setValueAtTime(vol*0.5,t);
+  g2.gain.exponentialRampToValueAtTime(0.0001,t+0.07);
+  o.connect(g2); g2.connect(master); o.start(t); o.stop(t+0.08);
+}
+function keySound(){ noiseBurst(0.05, 2400 + Math.random()*900, 0.5); }
+function dingSound(){
+  noiseBurst(1.1, 1568, 0.35, 'ding');
+  noiseBurst(0.18, 500, 0.2);   // carriage slide
+}
+
+/* ---------- typing ---------- */
+function typeGlyph(ch){
+  const ink = INKS[Math.floor(Math.random()*INKS.length)];
+  glyphs.push({ ch, ink });
+  if (plainText().length > 40) document.getElementById('ann2').style.display='';
+  jolt(); keySound(); render();
+}
+function backspace(){
+  if (!glyphs.length) return;
+  glyphs.pop();
+  jolt(); keySound(); render();
+}
+function carriageReturn(){
+  // find start of current line; if line has < 8 chars left before margin, wrap
+  const nl = plainText().lastIndexOf('\n');
+  const lineLen = plainText().length - (nl+1);
+  const margin = 64;   // approx chars per line at this size
+  if (lineLen < margin){ typeGlyph('\n'); }
+  else {
+    glyphs.push({ ch:'\n', ink:'i0' });
+    render();
+  }
+  dingSound(); jolt();
+}
+function witeOut(){
+  // erase last word: mark its glyphs as painted-over
+  let i = glyphs.length - 1;
+  while (i >= 0 && glyphs[i].ch === ' ') i--;
+  const end = i;
+  while (i >= 0 && glyphs[i].ch !== ' ') i--;
+  if (end < 0) return;
+  let erased = 0;
+  for (let k=i+1; k<=end; k++){
+    if (!glyphs[k].wite){ glyphs[k].wite = true; erased++; }
+  }
+  noiseBurst(0.25, 900, 0.3);
+  render();
+  if (!erased) flashAnn('nothing left to paint over');
+}
+function flashAnn(msg){
+  const a = document.getElementById('ann2');
+  const old = a.textContent;
+  a.textContent = msg; a.style.display='';
+  setTimeout(function(){ a.textContent = old; }, 1600);
+}
+
+/* ---------- ribbon selector ---------- */
+const RIBBON_CLASS = { black:'', red:'', purple:'' };
+document.querySelectorAll('.rb').forEach(function(rb){
+  function pick(){
+    document.querySelectorAll('.rb').forEach(r => r.classList.remove('sel'));
+    rb.classList.add('sel');
+    document.body.dataset.ribbon = rb.dataset.r;
+    noiseBurst(0.12, 700, 0.25);
+  }
+  rb.addEventListener('click', pick);
+  rb.addEventListener('keydown', function(e){
+    if (e.key==='Enter'||e.key===' '){ e.preventDefault(); pick(); }
+  });
+});
+
+/* ---------- on-screen keyboard ---------- */
+const KEYROWS = [
+  ['1','2','3','4','5','6','7','8','9','0','-','⌫'],
+  ['q','w','e','r','t','y','u','i','o','p','[',']'],
+  ['a','s','d','f','g','h','j','k','l',';',"'"],
+  ['z','x','c','v','b','n','m',',','.','/'],
+];
+const keyrows = document.getElementById('keyrows');
+function makeKey(label, cls, fn){
+  const b = document.createElement('div');
+  b.className = 'k' + (cls ? ' '+cls : '');
+  b.textContent = label;
+  b.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    b.classList.add('hit');
+    setTimeout(()=>b.classList.remove('hit'), 120);
+    ensureAudio();  // gesture
+    fn();
+  });
+  return b;
+}
+KEYROWS.forEach(function(row){
+  row.forEach(function(ch){
+    keyrows.appendChild(makeKey(ch, '', function(){
+      if (ch === '⌫') backspace();
+      else typeGlyph(ch);
+    }));
+  });
+});
+keyrows.appendChild(makeKey('SPACE', 'sp', function(){ typeGlyph(' '); }));
+keyrows.appendChild(makeKey('DING ↵', 'w2', function(){ carriageReturn(); }));
+
+/* ---------- physical keyboard ---------- */
+sheet.addEventListener('click', function(){ /* focus affirmation */ });
+document.addEventListener('keydown', function(e){
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  let handled = true;
+  if (e.key === 'Enter'){ carriageReturn(); }
+  else if (e.key === 'Backspace'){ backspace(); }
+  else if (e.key === ' '){ typeGlyph(' '); }
+  else if (e.key.length === 1){ typeGlyph(e.key); }
+  else { handled = false; }
+  if (handled) e.preventDefault();
+});
+
+/* ---------- machine buttons ---------- */
+document.getElementById('dingBtn').addEventListener('click', carriageReturn);
+document.getElementById('witeBtn').addEventListener('click', witeOut);
+document.getElementById('exportBtn').addEventListener('click', function(){
+  const text = plainText() || '(the page is still blank — that is also a memoir)';
+  const header = 'CARBON No.4 — typed ' + new Date().toLocaleString('en-US') + '\n\n';
+  const blob = new Blob([header + text + '\n'], { type:'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'carbon-memoir.txt';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 800);
+  flashAnn('page folded & sent');
+});
+
+/* ---------- boot: a typed invitation ---------- */
+const HELLO = 'the ribbon is fresh.\nbegin anywhere —';
+let helloI = 0;
+function typeHello(){
+  if (helloI < HELLO.length){
+    const ch = HELLO[helloI++];
+    glyphs.push({ ch, ink: INKS[Math.floor(Math.random()*INKS.length)] });
+    render();
+    setTimeout(typeHello, 34 + Math.random()*60);
+  }
+}
+render();
+if (matchMedia('(prefers-reduced-motion: reduce)').matches){
+  // no theatrics: put the greeting up instantly, let the user delete or write over it
+  for (const ch of HELLO) glyphs.push({ ch, ink:'i1' });
+  render();
+} else {
+  typeHello();
+}
+
+</script>
+</body>
+</html>

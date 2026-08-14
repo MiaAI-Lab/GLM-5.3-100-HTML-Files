@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:#20180f; color:#2b2115;
+  }
+  #sea { position:fixed; inset:0; width:100%; height:100%; }
+  /* desk vignette around the map */
+  #viewport {
+    position:fixed; inset:0; overflow:hidden; cursor:grab;
+    background:radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 40%, rgba(12,8,4,.55) 100%);
+  }
+  #viewport.drag { cursor:grabbing; }
+  #world {
+    position:absolute; left:50%; top:50%; width:1600px; height:1100px;
+    transform:translate(-50%,-50%) scale(var(--z,1)) translate(var(--px,0), var(--py,0));
+    transform-origin:center;
+    transition:transform .18s ease-out;
+    box-shadow:0 40px 90px rgba(0,0,0,.75), 0 0 0 12px #3a2c1a, 0 0 0 14px #211709;
+    border-radius:4px;
+  }
+  #map { width:100%; height:100%; display:block; border-radius:4px; }
+  #markers { position:absolute; inset:0; pointer-events:none; }
+  .marker {
+    position:absolute; transform:translate(-50%,-100%); pointer-events:auto; cursor:pointer;
+    font-size:20px; color:#5c3a1e; text-shadow:0 1px 0 rgba(255,248,230,.7);
+    transition:transform .2s;
+  }
+  .marker:hover { transform:translate(-50%,-115%) scale(1.25); }
+  .marker.sea { font-size:16px; opacity:.85; }
+
+  header {
+    position:fixed; top:0; left:0; right:0; z-index:20; display:flex; align-items:center; gap:18px;
+    padding:14px 22px; pointer-events:none;
+    background:linear-gradient(180deg, rgba(18,12,6,.85), transparent);
+  }
+  header > * { pointer-events:auto; }
+  h1 { font-size:22px; letter-spacing:.3em; color:#e8d9b8; font-weight:400; text-transform:uppercase; }
+  .sub { font-size:11px; color:#b7a582; letter-spacing:.16em; font-style:italic; }
+  .sub b { color:#e8d9b8; font-style:normal; }
+  .tools { margin-left:auto; display:flex; gap:8px; }
+  .tools button {
+    font-family:inherit; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    background:rgba(46,33,18,.85); color:#e8d9b8; border:1px solid #6b5636;
+    padding:8px 14px; cursor:pointer; border-radius:3px; transition:all .15s;
+  }
+  .tools button:hover { background:#6b5636; color:#fff8ea; }
+  .tools button.on { background:#8c2f1f; border-color:#8c2f1f; color:#ffe9d2; }
+
+  aside#card {
+    position:fixed; right:26px; bottom:26px; width:min(340px, 90vw); z-index:30;
+    background:linear-gradient(160deg, #f0e4c8, #e2d2ae);
+    border:1px solid #8a744e; border-radius:6px; padding:22px 22px 18px;
+    box-shadow:0 24px 60px rgba(0,0,0,.7), inset 0 0 40px rgba(120,90,40,.18);
+    animation:cardin .4s cubic-bezier(.2,1.3,.4,1);
+  }
+  @keyframes cardin { from { transform:translateY(30px) rotate(2deg); opacity:0; } }
+  aside#card .x {
+    position:absolute; top:8px; right:8px; border:none; background:transparent; cursor:pointer;
+    color:#8a744e; font-size:14px; padding:4px;
+  }
+  aside#card .seal {
+    width:44px; height:44px; border-radius:50%; margin-bottom:10px;
+    background:radial-gradient(circle at 35% 30%, #c0392b, #7b241c);
+    color:#f4e6c8; display:flex; align-items:center; justify-content:center; font-size:20px;
+    box-shadow:0 3px 8px rgba(0,0,0,.4), inset 0 0 0 3px rgba(244,230,200,.25);
+    transform:rotate(-8deg);
+  }
+  aside#card h2 { font-size:22px; color:#3a2b16; font-weight:700; }
+  aside#card .tagline { font-size:11px; letter-spacing:.2em; color:#8c2f1f; text-transform:uppercase; margin:4px 0 10px; font-family:system-ui, sans-serif; }
+  aside#card p { font-size:13.5px; line-height:1.7; color:#4a3a22; font-style:italic; }
+  aside#card dl { margin-top:12px; display:grid; grid-template-columns:auto 1fr; gap:4px 12px; font-size:11.5px; }
+  aside#card dt { color:#8a744e; letter-spacing:.08em; text-transform:uppercase; font-family:system-ui, sans-serif; }
+  aside#card dd { color:#3a2b16; }
+
+  #hint {
+    position:fixed; left:26px; bottom:22px; z-index:20; font-size:10.5px; letter-spacing:.22em;
+    text-transform:uppercase; color:rgba(232,217,184,.55); font-family:system-ui, sans-serif;
+  }
+  #measureBar {
+    position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:25;
+    background:rgba(46,33,18,.92); color:#e8d9b8; border:1px solid #6b5636; border-radius:999px;
+    padding:8px 18px; font-size:12px; letter-spacing:.1em; font-style:italic;
+  }
+  #measureBar b { color:#ffd98a; }
+  #measureBar button { border:none; background:transparent; color:#ffd98a; cursor:pointer; font:inherit; text-decoration:underline; }
+
+  /* compass rose, bottom right of the world */
+  #compass {
+    position:absolute; right:36px; bottom:30px; width:110px; height:110px; z-index:5;
+    animation:spin 60s linear infinite; opacity:.85; pointer-events:none;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  @media (max-width:640px) {
+    h1 { font-size:16px; letter-spacing:.2em; }
+    .sub { display:none; }
+    #compass { width:70px; height:70px; right:14px; bottom:14px; }
+    #hint { display:none; }
+  }
+  @media (prefers-reduced-motion: reduce) { #compass { animation:none; } }
+</style>
+</head>
+<body>
+<canvas id="sea"></canvas>
+<main id="viewport">
+  <div id="world">
+    <canvas id="map"></canvas>
+    <div id="markers"></div>
+  </div>
+</main>
+<header>
+  <h1>Terra Incognita</h1>
+  <p class="sub">the cartographer's table · seed <b id="seedLabel">—</b></p>
+  <div class="tools">
+    <button id="regen">↻ new archipelago</button>
+    <button id="measure">📐 measure</button>
+    <button id="zoomIn">＋</button>
+    <button id="zoomOut">−</button>
+  </div>
+</header>
+<aside id="card" hidden>
+  <button class="x" id="cardClose">✕</button>
+  <div class="seal">⚗</div>
+  <h2 id="cardTitle">—</h2>
+  <div class="tagline" id="cardTag">—</div>
+  <p id="cardLore">—</p>
+  <dl id="cardFacts"></dl>
+</aside>
+<div id="hint">drag to pan · scroll to zoom · click a region</div>
+<div id="measureBar" hidden>from — to — · <b id="leagueV">—</b> leagues · <button id="measureClear">clear</button></div>
+<script>
+(() => {
+  "use strict";
+  /* ============ seeded RNG + value noise ============ */
+  let seed = Math.floor(Math.random() * 90000) + 10000;
+  function rng() { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; }
+  const R = (a, b) => a + rng() * (b - a);
+  const RI = (a, b) => Math.floor(R(a, b + 1));
+  const pick = (arr) => arr[Math.floor(rng() * arr.length)];
+
+  /* ============ name generator ============ */
+  const SYL_A = ["Vor", "Sal", "Amber", "Mor", "Kest", "Dra", "Gale", "Thorn", "Isel", "Cor", "Bran", "Vael", "Ash", "Mist", "Ost", "Sel", "Har", "Ryn"];
+  const SYL_B = ["low", "mar", "ric", "dor", "ven", "holm", "wick", "stad", "fell", "mere", "gard", "by", "thorpe", "ness", " Reach", " Sound", " Deep", " Isle"];
+  const SEA_TAGS = ["The Amber Reach", "The Widow's Sound", "Sea of Glass", "The Gullwash", "Merrow Strait", "The Salt Vein", "Coral Gate", "The Long Shallows"];
+  const REGIONS = [
+    { tag: "Kingdom", lore: "Ruled by a line of salt-kings who claim descent from the tide itself. The harbors smell of tar, saffron, and old debts." },
+    { tag: "Free Isles", lore: "Nine villages, nine grudges, one shared granary. Visitors are fed first and questioned politely, much later." },
+    { tag: "Duchy", lore: "The duchy's wealth is entirely bees. Wax, honey, and patience — exported in equal measure since the Second Charter." },
+    { tag: "Barony", lore: "A barony famous for a battle nobody won. The field is now wheat, and the wheat is now bread, and the bread is excellent." },
+    { tag: "Wild Marches", lore: "Beyond the last lighthouse the maps give up and start drawing dragons. Cartographers are advised to draw them smiling." },
+    { tag: "Principality", lore: "The prince is nine years old and terrifyingly good at chess. The regent counts spoons. All is well." },
+    { tag: "Republic", lore: "Governed by the Council of Thirty, who argue by ritual insult every equinox. Nothing is ever decided, and the harvests are always good." },
+    { tag: "Theocracy", lore: "They worship a lighthouse. It is, to be fair, a very good lighthouse." },
+  ];
+  const BEASTS = ["moon-eels", "glass hawks", "salt wolves", "paper whales", "lantern moths", "iron gulls", "reef griffins", "talking cod"];
+  const EXPORTS = ["ambergris", "honey", "blue glass", "storm-glass", "cider", "sea-salt", "manuscripts", "goose down", "resin", "pearls"];
+
+  function placeName() { return pick(SYL_A) + pick(SYL_B); }
+
+  /* ============ island generation ============ */
+  const W = 1600, H = 1100;
+  const map = document.getElementById("map");
+  const g = map.getContext("2d");
+  map.width = W; map.height = H;
+  let islands = [], regions = [];
+
+  function genWorld() {
+    islands = []; regions = [];
+    const n = RI(4, 6);
+    for (let i = 0; i < n; i++) {
+      const cx = R(180, W - 180), cy = R(160, H - 160);
+      let ok = true;
+      for (const o of islands) if (Math.hypot(o.cx - cx, o.cy - cy) < 260) ok = false;
+      if (!ok) continue;
+      /* blob coastline: radial polygon with noise */
+      const pts = [];
+      const base = R(70, 150), sides = RI(14, 22);
+      for (let k = 0; k < sides; k++) {
+        const a = (Math.PI * 2 * k) / sides;
+        const r = base * (0.62 + 0.55 * Math.abs(Math.sin(a * RI(1,3) + R(0,2))) + R(0, 0.28));
+        pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.82]);
+      }
+      islands.push({ cx, cy, pts, base });
+    }
+    /* regions from islands + one sea region */
+    islands.forEach((isl, i) => {
+      const reg = pick(REGIONS);
+      regions.push({
+        x: isl.cx, y: isl.cy - isl.base * 0.5, island: isl,
+        name: placeName(),
+        tag: reg.tag, lore: reg.lore,
+        beast: pick(BEASTS), exp: pick(EXPORTS),
+        pop: RI(4, 90) * 1000 + RI(0, 999),
+      });
+    });
+    regions.push({ x: R(200, W - 400), y: R(140, H - 160), sea: true, name: pick(SEA_TAGS), tag: "Open Sea", lore: "Cold, wide, and honest. The currents here run contrary to rumor.", beast: pick(BEASTS), exp: "salt" });
+    document.getElementById("seedLabel").textContent = String(seed % 100000).padStart(5, "0");
+  }
+
+  /* ============ rendering ============ */
+  function drawMap() {
+    /* parchment */
+    const bg = g.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, "#ece0c4");
+    bg.addColorStop(0.5, "#e3d4b2");
+    bg.addColorStop(1, "#d9c8a2");
+    g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    /* fibers */
+    for (let i = 0; i < 900; i++) {
+      g.fillStyle = "rgba(120,96,60," + (rng() * 0.06) + ")";
+      g.fillRect(rng() * W, rng() * H, R(1, 2.4), R(0.6, 1.2));
+    }
+    /* lat/long rhumb lines */
+    g.strokeStyle = "rgba(140,110,64,.14)"; g.lineWidth = 1;
+    for (let x = 0; x < W; x += 130) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+    for (let y = 0; y < H; y += 130) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+    /* compass-network lines from center */
+    g.strokeStyle = "rgba(140,110,64,.1)";
+    for (let k = 0; k < 16; k++) {
+      const a = (Math.PI * 2 * k) / 16;
+      g.beginPath(); g.moveTo(W / 2, H / 2);
+      g.lineTo(W / 2 + Math.cos(a) * 1600, H / 2 + Math.sin(a) * 1600); g.stroke();
+    }
+    /* sea hatch around islands: draw darker sea first */
+    g.fillStyle = "rgba(196,213,216,.6)"; /* faint sea tint */
+    /* sea tint zones behind islands */
+    islands.forEach(isl => {
+      const rg = g.createRadialGradient(isl.cx, isl.cy, isl.base * 0.4, isl.cx, isl.cy, isl.base * 1.9);
+      rg.addColorStop(0, "rgba(176,196,205,.55)");
+      rg.addColorStop(1, "rgba(176,196,205,0)");
+      g.fillStyle = rg;
+      g.beginPath(); g.arc(isl.cx, isl.cy, isl.base * 1.9, 0, 6.283); g.fill();
+    });
+    /* islands */
+    islands.forEach(isl => {
+      const path = new Path2D();
+      isl.pts.forEach((p, i) => i ? path.lineTo(p[0], p[1]) : path.moveTo(p[0], p[1]));
+      path.closePath();
+      /* land fill */
+      g.fillStyle = "#e6d9b4";
+      g.fill(path);
+      /* inner terrain: hachure mountains */
+      g.save(); g.clip(path);
+      g.strokeStyle = "rgba(92,66,34,.5)"; g.lineWidth = 1.1;
+      const mN = RI(3, 6);
+      for (let m = 0; m < mN; m++) {
+        const mx = isl.cx + R(-isl.base * .4, isl.base * .4);
+        const my = isl.cy + R(-isl.base * .3, isl.base * .3);
+        /* little peak ^^ */
+        g.beginPath();
+        g.moveTo(mx - 11, my + 5); g.lineTo(mx - 4, my - 7); g.lineTo(mx + 1, my + 2);
+        g.lineTo(mx + 6, my - 5); g.lineTo(mx + 12, my + 5);
+        g.stroke();
+      }
+      /* forest glyphs: little circles */
+      g.strokeStyle = "rgba(70,100,60,.55)";
+      const fN = RI(4, 9);
+      for (let f = 0; f < fN; f++) {
+        const fx = isl.cx + R(-isl.base * .5, isl.base * .5);
+        const fy = isl.cy + R(-isl.base * .4, isl.base * .4);
+        g.beginPath(); g.arc(fx, fy, R(3, 6), 0, 6.283); g.stroke();
+        g.beginPath(); g.moveTo(fx, fy + 6); g.lineTo(fx, fy + 9); g.stroke();
+      }
+      g.restore();
+      /* coast ink (double line) */
+      g.strokeStyle = "#3d2d16"; g.lineWidth = 2.6;
+      g.stroke(path);
+      g.strokeStyle = "rgba(61,45,22,.4)"; g.lineWidth = 6;
+      g.stroke(path);
+      /* drop shadow SE */
+      g.save(); g.translate(4, 5); g.strokeStyle = "rgba(40,28,12,.25)"; g.lineWidth = 2.6; g.stroke(path); g.restore();
+    });
+    /* sea monster embellishments */
+    const monN = 2;
+    for (let m = 0; m < monN; m++) {
+      let mx = R(120, W - 120), my = R(120, H - 120);
+      let clash = islands.some(isl => Math.hypot(isl.cx - mx, isl.cy - my) < isl.base * 2);
+      if (clash) { m--; continue; }
+      /* sea serpent: arcs + head */
+      g.strokeStyle = "#4a3820"; g.lineWidth = 2.2;
+      g.beginPath();
+      g.arc(mx, my, 16, Math.PI * 0.15, Math.PI * 0.85, false);
+      g.stroke();
+      g.beginPath();
+      g.arc(mx + 34, my + 2, 12, Math.PI * 1.15, Math.PI * 1.85, false);
+      g.stroke();
+      /* head */
+      g.beginPath();
+      g.moveTo(mx + 44, my - 2); g.lineTo(mx + 54, my - 8); g.lineTo(mx + 52, my + 4); g.closePath();
+      g.fillStyle = "#4a3820"; g.fill();
+      /* flukes */
+      g.beginPath();
+      g.moveTo(mx - 14, my + 6); g.lineTo(mx - 26, my + 2); g.lineTo(mx - 24, my + 12); g.closePath(); g.fill();
+    }
+    /* title cartouche */
+    g.fillStyle = "rgba(236,224,196,.85)";
+    const tw = 300, th = 74, tx = 24, ty = H - th - 24;
+    g.fillRect(tx, ty, tw, th);
+    g.strokeStyle = "#5c3a1e"; g.lineWidth = 2; g.strokeRect(tx + 4, ty + 4, tw - 8, th - 8);
+    g.fillStyle = "#5c3a1e";
+    g.font = "italic 20px Georgia, serif";
+    g.fillText("Terra Incognita", tx + 24, ty + 30);
+    g.font = "11px Georgia, serif";
+    g.fillText("drawn from uncertain sources · seed " + String(seed % 100000).padStart(5, "0"), tx + 24, ty + 50);
+    /* border frame double rule */
+    g.strokeStyle = "#5c3a1e"; g.lineWidth = 3;
+    g.strokeRect(14, 14, W - 28, H - 28);
+    g.lineWidth = 1;
+    g.strokeRect(22, 22, W - 44, H - 44);
+  }
+
+  /* ============ markers ============ */
+  const markersBox = document.getElementById("markers");
+  function renderMarkers() {
+    markersBox.innerHTML = "";
+    regions.forEach((r, i) => {
+      const d = document.createElement("div");
+      d.className = "marker" + (r.sea ? " sea" : "");
+      d.textContent = r.sea ? "⚓" : "⚑";
+      d.style.left = r.x + "px";
+      d.style.top = r.y + "px";
+      d.setAttribute("role", "button");
+      d.setAttribute("aria-label", r.name);
+      d.addEventListener("click", (e) => { e.stopPropagation(); openCard(r); });
+      markersBox.appendChild(d);
+    });
+  }
+
+  /* ============ gazetteer card ============ */
+  const card = document.getElementById("card");
+  function openCard(r) {
+    document.getElementById("cardTitle").textContent = r.name;
+    document.getElementById("cardTag").textContent = r.tag;
+    document.getElementById("cardLore").textContent = r.lore;
+    const facts = [
+      ["Known for", r.exp],
+      ["Beasts", r.beast],
+      ["Population", r.sea ? "fish, mostly" : r.pop.toLocaleString("en-US")],
+      ["Charted", "partially"],
+    ];
+    document.getElementById("cardFacts").innerHTML = facts
+      .map(f => "<dt>" + f[0] + "</dt><dd>" + f[1] + "</dd>").join("");
+    card.hidden = false;
+  }
+  document.getElementById("cardClose").addEventListener("click", () => { card.hidden = true; });
+
+  /* ============ pan & zoom ============ */
+  const world = document.getElementById("world");
+  const viewport = document.getElementById("viewport");
+  let zoom = 1, px = 0, py = 0, panning = false, sx = 0, sy2 = 0;
+  function applyT() {
+    world.style.setProperty("--z", zoom);
+    world.style.setProperty("--px", px + "px");
+    world.style.setProperty("--py", py + "px");
+  }
+  viewport.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("#card")) return;
+    panning = true; sx = e.clientX - px; sy2 = e.clientY - py;
+    viewport.classList.add("drag");
+  });
+  window.addEventListener("pointermove", (e) => {
+    if (!panning) return;
+    px = e.clientX - sx; py = e.clientY - sy2;
+    applyT();
+  });
+  window.addEventListener("pointerup", () => { panning = false; viewport.classList.remove("drag"); });
+  viewport.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    zoom = Math.max(0.4, Math.min(3, zoom * (e.deltaY < 0 ? 1.12 : 0.89)));
+    applyT();
+  }, { passive: false });
+  document.getElementById("zoomIn").addEventListener("click", () => { zoom = Math.min(3, zoom * 1.25); applyT(); });
+  document.getElementById("zoomOut").addEventListener("click", () => { zoom = Math.max(0.4, zoom / 1.25); applyT(); });
+
+  /* pinch zoom */
+  let pinchD = 0;
+  viewport.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 2) {
+      pinchD = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    }
+  }, { passive: true });
+  viewport.addEventListener("touchmove", (e) => {
+    if (e.touches.length === 2 && pinchD > 0) {
+      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      zoom = Math.max(0.4, Math.min(3, zoom * (d / pinchD)));
+      pinchD = d; applyT();
+    }
+  }, { passive: true });
+
+  /* ============ regenerate ============ */
+  document.getElementById("regen").addEventListener("click", () => {
+    seed = Math.floor(Math.random() * 90000) + 10000;
+    genWorld(); drawMap(); renderMarkers();
+    card.hidden = true;
+  });
+
+  /* ============ measure tool ============ */
+  const measureBtn = document.getElementById("measure");
+  const measureBar = document.getElementById("measureBar");
+  let measuring = false, mA = null, mLine = null;
+  measureBtn.addEventListener("click", () => {
+    measuring = !measuring;
+    measureBtn.classList.toggle("on", measuring);
+    if (!measuring) { mA = null; if (mLine) mLine.remove(); measureBar.hidden = true; }
+    else {
+      /* instructions */
+      measureBar.hidden = false;
+      document.getElementById("leagueV").textContent = "click two points";
+    }
+  });
+  world.addEventListener("click", (e) => {
+    if (!measuring) return;
+    const rect = world.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * W;
+    const y = ((e.clientY - rect.top) / rect.height) * H;
+    if (!mA) {
+      mA = { x, y };
+      measureBar.hidden = false;
+      document.getElementById("leagueV").textContent = "now the second point";
+    } else {
+      const leagues = (Math.hypot(x - mA.x, y - mA.y) / 26).toFixed(1);
+      document.getElementById("leagueV").textContent = leagues + " leagues";
+      /* draw flowing dashed line via SVG overlay */
+      if (mLine) mLine.remove();
+      const NS = "http://www.w3.org/2000/svg";
+      mLine = document.createElementNS(NS, "svg");
+      mLine.setAttribute("style", "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4");
+      const ln = document.createElementNS(NS, "line");
+      ln.setAttribute("x1", mA.x); ln.setAttribute("y1", mA.y);
+      ln.setAttribute("x2", x); ln.setAttribute("y2", y);
+      ln.setAttribute("stroke", "#8c2f1f"); ln.setAttribute("stroke-width", "2.5");
+      ln.setAttribute("stroke-dasharray", "10 6");
+      mLine.appendChild(ln);
+      markersBox.appendChild(mLine);
+      const dot = (dx, dy) => {
+        const c = document.createElementNS(NS, "circle");
+        c.setAttribute("cx", dx); c.setAttribute("cy", dy); c.setAttribute("r", 4);
+        c.setAttribute("fill", "#8c2f1f");
+        mLine.appendChild(c);
+      };
+      dot(mA.x, mA.y); dot(x, y);
+      /* animate dashes */
+      let off = 0;
+      const anim = setInterval(() => {
+        if (!mLine.isConnected) { clearInterval(anim); return; }
+        off = (off + 0.6) % 16;
+        ln.setAttribute("stroke-dashoffset", -off);
+      }, 40);
+      mA = null;
+    }
+  });
+
+  /* ============ sea ambience canvas (behind table) ============ */
+  const sea = document.getElementById("sea");
+  const sg = sea.getContext("2d");
+  function seaBg() {
+    sea.width = innerWidth; sea.height = innerHeight;
+    const grd = sg.createLinearGradient(0, 0, 0, sea.height);
+    grd.addColorStop(0, "#241c11");
+    grd.addColorStop(1, "#120d07");
+    sg.fillStyle = grd; sg.fillRect(0, 0, sea.width, sea.height);
+    /* faint wood grain lines */
+    sg.strokeStyle = "rgba(0,0,0,.25)";
+    for (let y = 0; y < sea.height; y += 7) {
+      sg.beginPath(); sg.moveTo(0, y + Math.sin(y) * 1.5);
+      sg.lineTo(sea.width, y + Math.cos(y * 0.7) * 1.5); sg.stroke();
+    }
+  }
+  seaBg();
+  window.addEventListener("resize", seaBg);
+
+  /* ============ compass ============ */
+  const NS = "http://www.w3.org/2000/svg";
+  const comp = document.createElementNS(NS, "svg");
+  comp.id = "compass";
+  comp.setAttribute("viewBox", "0 0 100 100");
+  comp.innerHTML =
+    '<circle cx="50" cy="50" r="44" fill="none" stroke="#5c3a1e" stroke-width="1.6"/>' +
+    '<circle cx="50" cy="50" r="36" fill="none" stroke="#5c3a1e" stroke-width=".8" opacity=".6"/>' +
+    '<path d="M50 6 L56 50 L50 94 L44 50 Z" fill="#8c2f1f" opacity=".85"/>' +
+    '<path d="M6 50 L50 44 L94 50 L50 56 Z" fill="#5c3a1e" opacity=".55"/>' +
+    '<circle cx="50" cy="50" r="5" fill="#5c3a1e"/>' +
+    '<text x="50" y="18" font-size="10" text-anchor="middle" fill="#5c3a1e" font-family="Georgia">N</text>';
+  world.appendChild(comp);
+
+  /* ============ boot ============ */
+  genWorld(); drawMap(); renderMarkers(); applyT();
+})();
+</script>
+</body>
+</html>

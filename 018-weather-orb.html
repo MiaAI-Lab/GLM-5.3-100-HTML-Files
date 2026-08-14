@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TEMPER — a weather instrument</title>
+<style>
+:root{
+  --ink:#DCE3F2; --dim:#7C87A6; --panel:rgba(22,26,40,.72);
+  --hair:rgba(180,195,235,.16); --glow:#9FD8FF;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%}
+body{
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(1200px 800px at 72% 18%, #1A2238 0%, transparent 60%),
+    radial-gradient(900px 700px at 20% 85%, #141B2E 0%, transparent 55%),
+    #070A14;
+  overflow-x:hidden;
+  min-height:100vh;
+}
+/* starfield */
+.stars{position:fixed; inset:0; z-index:0; pointer-events:none}
+.stars i{position:absolute; border-radius:50%; background:#fff;
+  animation:tw 4s ease-in-out infinite}
+@keyframes tw{50%{opacity:.25}}
+.wrap{position:relative; z-index:1; min-height:100vh;
+  display:flex; flex-direction:column; align-items:center;
+  padding:clamp(14px,3vh,34px) 16px 26px}
+.brand{display:flex; align-items:baseline; gap:12px; margin-bottom:4px}
+.brand h1{font-size:clamp(19px,3vw,30px); font-weight:800; letter-spacing:.32em}
+.brand span{font-family:"Courier New",monospace; font-size:10px; color:var(--dim); letter-spacing:.2em}
+.sub{font-family:"Courier New",monospace; font-size:10px; color:var(--dim);
+  letter-spacing:.24em; margin-bottom:clamp(10px,2.6vh,26px)}
+/* ---------- orb assembly ---------- */
+.bench{display:grid; grid-template-columns:auto; justify-items:center; gap:clamp(14px,3vh,26px)}
+.orbzone{position:relative; width:min(64vw,340px); aspect-ratio:1;
+  display:grid; place-items:center}
+.orbzone::before{ /* floor pool */
+  content:""; position:absolute; left:50%; bottom:2%; width:70%; height:12%;
+  transform:translateX(-50%);
+  background:radial-gradient(ellipse,rgba(120,180,255,.22),transparent 70%);
+}
+.orb{
+  position:absolute; inset:0; border-radius:50%;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,.5) 0 6%, rgba(255,255,255,0) 14%),
+    radial-gradient(circle at 68% 74%, rgba(140,190,255,.16), transparent 46%),
+    radial-gradient(circle at 50% 44%, #2E4A78 0%, #1B2C4C 52%, #101A30 78%, #0A1122 100%);
+  box-shadow:
+    inset 0 -22px 44px rgba(0,0,0,.55),
+    inset 0 12px 30px rgba(160,210,255,.2),
+    0 30px 60px -18px rgba(0,10,30,.8),
+    0 0 90px 8px rgba(90,150,230,.14);
+  overflow:hidden;
+  transition:filter .8s;
+}
+body[data-cond="storm"] .orb{filter:saturate(.72) brightness(.9)}
+/* inner sky canvas */
+.sky{position:absolute; inset:0; border-radius:50%; display:block}
+/* glass caustic ring */
+.caustic{
+  position:absolute; inset:0; border-radius:50%; pointer-events:none;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 58%, rgba(190,225,255,.1) 66%, transparent 74%),
+    conic-gradient(from 320deg, transparent 0 12%, rgba(200,230,255,.14) 16%, transparent 22% 48%,
+      rgba(200,230,255,.1) 52%, transparent 60% 100%);
+  mix-blend-mode:screen;
+}
+.spec{
+  position:absolute; left:18%; top:12%; width:26%; height:16%;
+  border-radius:50%; background:linear-gradient(115deg,rgba(255,255,255,.85),rgba(255,255,255,0) 70%);
+  transform:rotate(-18deg); filter:blur(2px); pointer-events:none;
+}
+.flashlayer{
+  position:absolute; inset:0; border-radius:50%; background:#EAF4FF;
+  opacity:0; pointer-events:none; mix-blend-mode:screen;
+}
+.ring{
+  position:absolute; inset:-16px; border-radius:50%; pointer-events:none;
+  border:1px solid var(--hair);
+}
+.ring::after{
+  content:""; position:absolute; inset:34%; border-radius:50%;
+  border:1px dashed rgba(180,195,235,.2);
+}
+/* readout inside orb */
+.orbtemp{
+  position:absolute; left:50%; top:56%; transform:translateX(-50%);
+  font-size:clamp(30px,7vw,44px); font-weight:200; letter-spacing:.02em;
+  color:#F2F7FF; text-shadow:0 2px 18px rgba(0,20,60,.8);
+  z-index:3; pointer-events:none;
+}
+.orbtemp b{font-weight:600}
+.unit{font-size:.45em; color:var(--dim); vertical-align:super}
+/* ---------- instrument panel ---------- */
+.panel{
+  width:min(94vw,760px);
+  background:var(--panel); border:1px solid var(--hair); border-radius:20px;
+  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  box-shadow:0 24px 60px -20px rgba(0,5,20,.7);
+  padding:clamp(14px,2.4vw,24px);
+  display:grid; grid-template-columns:1fr; gap:clamp(12px,2vw,20px);
+}
+.row{display:flex; align-items:center; gap:clamp(10px,2vw,22px); flex-wrap:wrap}
+/* chips */
+.chips{display:flex; gap:8px; flex-wrap:wrap}
+.chip{
+  font:inherit; font-size:11px; font-weight:700; letter-spacing:.14em;
+  color:var(--dim); background:transparent; border:1px solid var(--hair);
+  border-radius:99px; padding:8px 14px; cursor:pointer; transition:.25s;
+  text-transform:uppercase;
+}
+.chip:hover{color:var(--ink); border-color:rgba(180,195,235,.4)}
+.chip[aria-pressed="true"]{
+  color:#0A1122; background:linear-gradient(135deg,#BFE3FF,#8CC3F5);
+  border-color:transparent;
+}
+.chip .ic{margin-right:5px}
+/* dial */
+.dialwrap{position:relative; flex:none}
+.dial{
+  position:relative; width:clamp(150px,22vw,196px); aspect-ratio:200/104;
+  touch-action:none; cursor:grab;
+}
+.dial:active{cursor:grabbing}
+.dial svg{position:absolute; inset:0; width:100%; height:100%; overflow:visible}
+.track{fill:none; stroke:rgba(150,175,225,.18); stroke-width:7; stroke-linecap:round}
+.fillarc{fill:none; stroke:url(#dialgrad); stroke-width:7; stroke-linecap:round;
+  transition:stroke-dashoffset .18s}
+.tick{stroke:rgba(190,210,245,.4); stroke-width:1.4}
+.tick.major{stroke-width:2.2; stroke:rgba(210,225,250,.66)}
+.ticklabel{fill:var(--dim); font:600 8.5px "Courier New",monospace; letter-spacing:.06em}
+.handle{fill:#EAF3FF; stroke:#0A1122; stroke-width:1.4;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
+.detentflash{fill:none; stroke:#BFE3FF; stroke-width:9; stroke-linecap:round; opacity:0}
+.dial .val{
+  position:absolute; left:50%; bottom:-8px; transform:translateX(-50%);
+  font-family:"Courier New",monospace; font-size:clamp(15px,2vw,19px); font-weight:700;
+  color:#EAF3FF; letter-spacing:.06em; white-space:nowrap;
+}
+.dial .val small{color:var(--dim); font-size:9px; letter-spacing:.22em; display:block; text-align:center}
+/* meta column */
+.meta{flex:1; min-width:150px}
+.meta .bigread{font-family:"Courier New",monospace; font-size:12px; line-height:1.9;
+  color:var(--dim); letter-spacing:.05em}
+.meta .bigread b{color:var(--ink); font-weight:700}
+.condline{font-size:12.5px; margin-top:6px; color:#BFD3F2; font-style:italic}
+/* five-day strip */
+.strip{display:flex; gap:clamp(6px,1.4vw,12px); justify-content:space-between}
+.day{
+  flex:1; min-width:0; background:rgba(12,16,30,.55); border:1px solid var(--hair);
+  border-radius:14px; padding:9px 6px 8px; text-align:center; cursor:pointer;
+  transition:transform .2s, border-color .2s; position:relative; overflow:hidden;
+}
+.day:hover{transform:translateY(-3px); border-color:rgba(180,195,235,.4)}
+.day.now{border-color:#8CC3F5}
+.day .dn{font-family:"Courier New",monospace; font-size:8.5px; letter-spacing:.2em; color:var(--dim)}
+.day .mini{
+  position:relative; width:34px; height:34px; margin:6px auto 4px; border-radius:50%;
+  background:radial-gradient(circle at 34% 30%, #4A6EA8, #16233F 75%);
+  box-shadow:inset 0 -4px 8px rgba(0,0,0,.5), 0 3px 8px rgba(0,10,30,.5);
+  overflow:hidden;
+}
+.day .mini i{position:absolute; border-radius:50%; background:#fff; opacity:0}
+.day .mini .mrain{width:1.5px; height:7px; border-radius:2px; top:40%; opacity:0;
+  background:linear-gradient(#BFE3FF,transparent)}
+.day .dt{font-size:11px; font-weight:700; margin-top:2px}
+.day .dt small{color:var(--dim); font-weight:400}
+.day[data-cond="clear"] .mini{background:radial-gradient(circle at 34% 30%,#FFE9A8,#D88A3D 78%)}
+.day[data-cond="clouds"] .mini{background:radial-gradient(circle at 34% 30%,#E8EEF8,#7186A8 78%)}
+.day[data-cond="rain"] .mini{background:radial-gradient(circle at 34% 30%,#9FC6E8,#2E4A78 78%)}
+.day[data-cond="snow"] .mini{background:radial-gradient(circle at 34% 30%,#F4F8FF,#9FB4D8 78%)}
+.day[data-cond="storm"] .mini{background:radial-gradient(circle at 34% 30%,#8C9BC0,#232C48 78%)}
+/* thunder toggle + sound */
+.tools{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.tool{
+  font:inherit; font-size:10.5px; font-weight:700; letter-spacing:.14em;
+  color:var(--dim); background:transparent; border:1px solid var(--hair);
+  border-radius:8px; padding:8px 13px; cursor:pointer; transition:.2s;
+  text-transform:uppercase;
+}
+.tool:hover{color:var(--ink)}
+.tool[aria-pressed="true"]{color:#0A1122; background:#BFE3FF; border-color:transparent}
+/* toast */
+.toast{
+  position:fixed; left:50%; bottom:22px; transform:translateX(-50%) translateY(8px);
+  background:rgba(230,240,255,.94); color:#0A1122; font-size:12px; font-weight:700;
+  padding:9px 18px; border-radius:99px; z-index:20; opacity:0; transition:.3s;
+  letter-spacing:.05em; pointer-events:none;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+@media (prefers-reduced-motion:reduce){
+  .stars i{animation:none}
+  .fillarc{transition:none}
+}
+@media (max-width:520px){
+  .panel{border-radius:16px}
+  .orbzone{width:min(78vw,300px)}
+  .strip{flex-wrap:wrap}
+  .day{flex:1 1 30%}
+}
+</style>
+</head>
+<body>
+<div class="stars" id="stars" aria-hidden="true"></div>
+<div class="wrap">
+  <div class="brand"><h1>TEMPER</h1><span>MK-II</span></div>
+  <div class="sub">ATMOSPHERIC DISPLAY INSTRUMENT · SN 047</div>
+
+  <div class="bench">
+    <div class="orbzone">
+      <div class="orb" id="orb">
+        <canvas class="sky" id="sky"></canvas>
+        <div class="flashlayer" id="flash"></div>
+        <div class="caustic" aria-hidden="true"></div>
+        <div class="spec" aria-hidden="true"></div>
+        <div class="orbtemp" id="orbtemp"><b>21</b>°<span class="unit">C</span></div>
+      </div>
+      <div class="ring" aria-hidden="true"></div>
+    </div>
+
+    <section class="panel" aria-label="Instrument panel">
+      <div class="row">
+        <div class="dialwrap">
+          <div class="dial" id="dial" role="slider" tabindex="0"
+               aria-label="Temperature dial" aria-valuemin="-12" aria-valuemax="42"
+               aria-valuenow="21" aria-valuetext="21 degrees">
+            <svg viewBox="0 0 200 104" aria-hidden="true">
+              <defs>
+                <linearGradient id="dialgrad" x1="0" y1="1" x2="1" y2="0">
+                  <stop offset="0" stop-color="#7FD4FF"/>
+                  <stop offset=".55" stop-color="#BFE3FF"/>
+                  <stop offset="1" stop-color="#FFC46B"/>
+                </linearGradient>
+              </defs>
+              <path class="track" d="M 16 92 A 84 84 0 0 1 184 92"></path>
+              <path class="fillarc" id="fillarc"
+                    d="M 16 92 A 84 84 0 0 1 184 92"></path>
+              <circle class="detentflash" id="detflash" r="13" fill="none"></circle>
+              <g id="ticks"></g>
+              <circle class="handle" id="handle" r="8" cx="16" cy="92"></circle>
+            </svg>
+            <div class="val"><span id="dialval">21°C</span><small>DRAG · DETENTS AT 1°</small></div>
+          </div>
+        </div>
+        <div class="meta">
+          <div class="bigread">
+            CONDITION <b id="r-cond">CLEAR</b><br>
+            DEW POINT <b id="r-dew">8°C</b> · WIND <b id="r-wind">6 KM/H</b><br>
+            PRESSURE <b id="r-pres">1014 hPa</b>
+          </div>
+          <div class="condline" id="r-line">Thin light, warm glass, a small sun turning.</div>
+        </div>
+      </div>
+
+      <div class="row" style="justify-content:space-between">
+        <div class="chips" id="chips" role="group" aria-label="Condition chips">
+          <button class="chip" data-cond="clear" aria-pressed="true"><span class="ic">☀</span>CLEAR</button>
+          <button class="chip" data-cond="clouds" aria-pressed="false"><span class="ic">☁</span>CLOUDS</button>
+          <button class="chip" data-cond="rain" aria-pressed="false"><span class="ic">☂</span>RAIN</button>
+          <button class="chip" data-cond="snow" aria-pressed="false"><span class="ic">❄</span>SNOW</button>
+          <button class="chip" data-cond="storm" aria-pressed="false"><span class="ic">⚡</span>STORM</button>
+        </div>
+        <div class="tools">
+          <button class="tool" id="sound" aria-pressed="false">THUNDER AUDIO: OFF</button>
+        </div>
+      </div>
+
+      <div class="strip" id="strip" aria-label="Five day forecast"></div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+/* TEMPER — chunk 1: canvas sky engine inside the glass orb */
+"use strict";
+const byId = i => document.getElementById(i);
+const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- starfield ---------- */
+(function stars() {
+  const host = byId("stars");
+  for (let i = 0; i < 90; i++) {
+    const s = document.createElement("i");
+    const sz = Math.random() < 0.8 ? 1 : 2;
+    s.style.cssText =
+      "left:" + (Math.random() * 100).toFixed(2) + "%;top:" + (Math.random() * 100).toFixed(2) +
+      "%;width:" + sz + "px;height:" + sz + "px;opacity:" + (0.25 + Math.random() * 0.6).toFixed(2) +
+      ";animation-delay:" + (-Math.random() * 4).toFixed(2) + "s";
+    host.appendChild(s);
+  }
+})();
+
+/* ---------- sky canvas ---------- */
+const sky = byId("sky");
+const ctx = sky.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+function sizeSky() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  const r = sky.getBoundingClientRect();
+  W = sky.width = Math.max(2, Math.round(r.width * DPR));
+  H = sky.height = Math.max(2, Math.round(r.height * DPR));
+}
+/* weather state */
+const wx = {
+  cond: "clear", temp: 21, t: 0, flash: 0,
+  clouds: [], drops: [], flakes: [], ripples: [],
+  rays: 0
+};
+function seedWeather() {
+  wx.clouds = [];
+  for (let i = 0; i < 6; i++) {
+    wx.clouds.push({
+      x: Math.random(), y: 0.18 + Math.random() * 0.4,
+      s: 0.5 + Math.random() * 0.9, v: (0.004 + Math.random() * 0.012) * (Math.random() < 0.5 ? 1 : 1),
+      a: 0.5 + Math.random() * 0.4
+    });
+  }
+  wx.drops = [];
+  for (let i = 0; i < 90; i++) {
+    wx.drops.push({ x: Math.random(), y: Math.random(), v: 0.55 + Math.random() * 0.8, l: 0.05 + Math.random() * 0.08 });
+  }
+  wx.flakes = [];
+  for (let i = 0; i < 70; i++) {
+    wx.flakes.push({ x: Math.random(), y: Math.random(), v: 0.04 + Math.random() * 0.08, r: 0.6 + Math.random() * 1.8, ph: Math.random() * 6.28 });
+  }
+  wx.ripples = [];
+}
+seedWeather();
+
+/* sky backdrop color per condition */
+function skyColors() {
+  const t = wx.temp;
+  const cold = Math.max(0, Math.min(1, (18 - t) / 26)); /* 1 cold .. 0 hot */
+  switch (wx.cond) {
+    case "clear": {
+      const top = mix("#275A9C", "#4E7FC4", 1 - cold);
+      const bot = mix("#BFDCAF", "#F5D9A0", cold);
+      return [top, bot];
+    }
+    case "clouds": return [mix("#5E7796", "#7488A8", 1 - cold), mix("#9AA8BE", "#B9C2D2", cold)];
+    case "rain": return ["#3A4E6E", "#7C93B4"];
+    case "snow": return ["#6E82A8", "#D5E0F0"];
+    case "storm": return ["#1D2438", "#465370"];
+  }
+  return ["#275A9C", "#C8DFAF"];
+}
+function mix(a, b, u) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const r = Math.round((pa >> 16) + ((pb >> 16) - (pa >> 16)) * u);
+  const g = Math.round(((pa >> 8) & 255) + (((pb >> 8) & 255) - ((pa >> 8) & 255)) * u);
+  const bl = Math.round((pa & 255) + ((pb & 255) - (pa & 255)) * u);
+  return "rgb(" + r + "," + g + "," + bl + ")";
+}
+
+/* ---------- renderers ---------- */
+function drawSkyBase() {
+  const [top, bot] = skyColors();
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, top);
+  g.addColorStop(1, bot);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  /* haze band at horizon */
+  const hz = ctx.createLinearGradient(0, H * 0.55, 0, H);
+  hz.addColorStop(0, "rgba(255,255,255,0)");
+  hz.addColorStop(1, "rgba(255,255,255,.14)");
+  ctx.fillStyle = hz;
+  ctx.fillRect(0, H * 0.55, W, H * 0.45);
+}
+function drawSun() {
+  const cx = W * 0.64, cy = H * 0.34;
+  const r = Math.min(W, H) * 0.11;
+  /* rotating rays */
+  const rot = wx.t * 0.0004;
+  const n = 12;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(rot);
+  ctx.globalCompositeOperation = "lighter";
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const len = r * (2.1 + Math.sin(wx.t * 0.002 + i * 1.7) * 0.5);
+    const gr = ctx.createLinearGradient(0, 0, Math.cos(a) * len, Math.sin(a) * len);
+    gr.addColorStop(0, "rgba(255,240,190,.5)");
+    gr.addColorStop(1, "rgba(255,240,190,0)");
+    ctx.strokeStyle = gr;
+    ctx.lineWidth = Math.max(2, r * 0.16);
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r * 1.25, Math.sin(a) * r * 1.25);
+    ctx.lineTo(Math.cos(a) * len, Math.sin(a) * len);
+    ctx.stroke();
+  }
+  ctx.restore();
+  /* core */
+  const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.9);
+  core.addColorStop(0, "rgba(255,252,235,1)");
+  core.addColorStop(0.35, "rgba(255,238,170,.95)");
+  core.addColorStop(1, "rgba(255,220,130,0)");
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 1.9, 0, 7);
+  ctx.fill();
+}
+function drawClouds() {
+  wx.clouds.forEach(c => {
+    const cw = W * 0.34 * c.s, ch = cw * 0.4;
+    const cx = c.x * (W + cw) - cw, cy = c.y * H;
+    const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, cw);
+    const white = wx.cond === "storm" ? "168,178,204" : wx.cond === "rain" ? "196,208,228" : "244,248,255";
+    gr.addColorStop(0, "rgba(" + white + "," + c.a + ")");
+    gr.addColorStop(1, "rgba(" + white + ",0)");
+    ctx.fillStyle = gr;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, cw, ch, 0, 0, 7);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(cx - cw * 0.4, cy + ch * 0.2, cw * 0.55, ch * 0.72, 0, 0, 7);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(cx + cw * 0.42, cy + ch * 0.24, cw * 0.5, ch * 0.66, 0, 0, 7);
+    ctx.fill();
+  });
+}
+function drawRain() {
+  ctx.strokeStyle = "rgba(200,225,255,.6)";
+  ctx.lineWidth = Math.max(1, DPR);
+  wx.drops.forEach(d => {
+    const x = d.x * W, y = d.y * H;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + 2 * DPR, y + d.l * H);
+    ctx.stroke();
+  });
+  /* bottom ripples */
+  ctx.strokeStyle = "rgba(220,240,255,.5)";
+  wx.ripples.forEach(rp => {
+    ctx.globalAlpha = Math.max(0, 1 - rp.age);
+    ctx.beginPath();
+    ctx.ellipse(rp.x * W, H * 0.94, rp.age * W * 0.09 * DPR + 2, rp.age * 8 * DPR + 1, 0, 0, 7);
+    ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+}
+function drawSnow() {
+  wx.flakes.forEach(f => {
+    const x = (f.x + Math.sin(wx.t * 0.0006 + f.ph) * 0.03) * W;
+    const y = f.y * H;
+    ctx.fillStyle = "rgba(255,255,255," + (0.4 + f.r / 3) + ")";
+    ctx.beginPath();
+    ctx.arc(x, y, f.r * DPR, 0, 7);
+    ctx.fill();
+  });
+}
+function stepWeather(dt) {
+  const adv = RM ? 0.12 : 1;
+  wx.t += dt * adv;
+  /* clouds always drift a little; more in storm */
+  const cmul = wx.cond === "storm" ? 2.2 : wx.cond === "clouds" ? 1.4 : 0.7;
+  wx.clouds.forEach(c => {
+    c.x += c.v * dt * 0.06 * cmul;
+    if (c.x > 1.15) c.x = -0.18;
+  });
+  if (wx.cond === "rain" || wx.cond === "storm") {
+    wx.drops.forEach(d => {
+      d.y += d.v * dt * 0.9;
+      d.x += dt * 0.02;
+      if (d.y > 1) {
+        d.y = -0.05; d.x = Math.random();
+        if (Math.random() < 0.12) wx.ripples.push({ x: d.x, age: 0 });
+      }
+    });
+  }
+  if (wx.cond === "snow") {
+    wx.flakes.forEach(f => {
+      f.y += f.v * dt * 0.14;
+      if (f.y > 1) { f.y = -0.03; f.x = Math.random(); }
+    });
+  }
+  wx.ripples.forEach(rp => rp.age += dt * 0.9);
+  wx.ripples = wx.ripples.filter(rp => rp.age < 1);
+  /* lightning: random flashes in storm */
+  if (wx.cond === "storm" && !RM) {
+    if (Math.random() < dt * 0.28) {
+      wx.flash = 1;
+      maybeThunder();
+    }
+  }
+  wx.flash = Math.max(0, wx.flash - dt * 2.4);
+}
+function renderSky() {
+  drawSkyBase();
+  if (wx.cond === "clear") drawSun();
+  if (wx.cond !== "clear") drawClouds();
+  if (wx.cond === "rain" || wx.cond === "storm") drawRain();
+  if (wx.cond === "snow") drawSnow();
+  if (wx.flash > 0.02) {
+    ctx.fillStyle = "rgba(240,248,255," + (wx.flash * 0.75).toFixed(3) + ")";
+    ctx.fillRect(0, 0, W, H);
+  }
+  /* vignette so the canvas melts into the glass */
+  const v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.32, W / 2, H / 2, Math.max(W, H) * 0.52);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(6,10,22,.55)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, W, H);
+}
+/* TEMPER — chunk 2: dial, chips, forecast strip, thunder audio, main loop */
+/* ---------- gesture-gated thunder audio ---------- */
+let AC = null, soundOn = false;
+function getAC() {
+  if (AC) return AC;
+  try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; }
+  return AC;
+}
+function maybeThunder() {
+  if (!soundOn) return;
+  const a = getAC();
+  if (!a) return;
+  try {
+    if (a.state === "suspended") a.resume().catch(function () {});
+    const dur = 1.7;
+    const buf = a.createBuffer(1, Math.floor(a.sampleRate * dur), a.sampleRate);
+    const d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < d.length; i++) {
+      const w = Math.random() * 2 - 1;
+      last = (last + 0.03 * w) / 1.03;             /* brown-ish noise */
+      const env = Math.pow(1 - i / d.length, 1.6);
+      d[i] = last * 5.2 * env;
+    }
+    const src = a.createBufferSource();
+    src.buffer = buf;
+    const lp = a.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 160; lp.Q.value = 0.4;
+    const g = a.createGain();
+    g.gain.value = 0.5;
+    src.connect(lp); lp.connect(g); g.connect(a.destination);
+    src.start();
+  } catch (e) { /* silent */ }
+}
+/* ---------- main loop ---------- */
+let prevT = performance.now();
+function tick(now) {
+  const dt = Math.min(0.06, (now - prevT) / 1000);
+  prevT = now;
+  stepWeather(dt);
+  renderSky();
+  /* flash the glass layer too for a bloom feel */
+  byId("flash").style.opacity = (wx.flash * 0.5).toFixed(3);
+  requestAnimationFrame(tick);
+}
+/* ---------- temperature dial with detents ---------- */
+const dial = byId("dial");
+const fillarc = byId("fillarc");
+const handle = byId("handle");
+const dialval = byId("dialval");
+const ARC_R = 84, CXA = 100, CYA = 92;
+const A0 = Math.PI, A1 = 0;               /* 180° sweep, left to right */
+const TMIN = -12, TMAX = 42;
+function arcLen() { return Math.PI * ARC_R; }
+function tempToAngle(t) {
+  const u = (t - TMIN) / (TMAX - TMIN);
+  return A0 + (A1 - A0) * u;              /* PI .. 0 */
+}
+function angleToXY(a) {
+  return [CXA + Math.cos(a) * ARC_R, CYA - Math.sin(a) * ARC_R];
+}
+function placeDial(t, snap) {
+  wx.temp = t;
+  const a = tempToAngle(t);
+  const [x, y] = angleToXY(a);
+  handle.setAttribute("cx", x.toFixed(2));
+  handle.setAttribute("cy", y.toFixed(2));
+  const frac = (t - TMIN) / (TMAX - TMIN);
+  fillarc.style.strokeDasharray = arcLen().toFixed(1);
+  fillarc.style.strokeDashoffset = (arcLen() * (1 - frac)).toFixed(1);
+  dialval.textContent = Math.round(t) + "°C";
+  dial.setAttribute("aria-valuenow", Math.round(t));
+  dial.setAttribute("aria-valuetext", Math.round(t) + " degrees Celsius");
+  byId("orbtemp").innerHTML = "<b>" + Math.round(t) + "</b>°<span class=\"unit\">C</span>";
+  updateReadout();
+}
+let detentFlashT = 0;
+function detentPop(t) {
+  const df = byId("detflash");
+  const a = tempToAngle(t);
+  const [x, y] = angleToXY(a);
+  df.setAttribute("cx", x); df.setAttribute("cy", y);
+  df.style.opacity = "0.7";
+  clearTimeout(detentFlashT);
+  detentFlashT = setTimeout(function () { df.style.opacity = "0"; }, 160);
+}
+function dialFromEvent(e) {
+  const r = dial.getBoundingClientRect();
+  const px = (e.clientX - r.left) / r.width * 200;
+  const py = (e.clientY - r.top) / r.height * 104;
+  const ang = Math.atan2(CYA - py, px - CXA);
+  const a = Math.max(0.02, Math.min(Math.PI - 0.02, ang));
+  let t = TMIN + (a / Math.PI) * (TMAX - TMIN);
+  t = Math.round(t);                        /* 1° detents */
+  placeDial(t);
+  if (t !== lastDetent) { detentPop(t); lastDetent = t; }
+}
+let lastDetent = null;
+let dialing = false;
+dial.addEventListener("pointerdown", function (e) {
+  dialing = true;
+  dial.setPointerCapture(e.pointerId);
+  dialFromEvent(e);
+});
+dial.addEventListener("pointermove", function (e) { if (dialing) dialFromEvent(e); });
+dial.addEventListener("pointerup", function () { dialing = false; });
+dial.addEventListener("pointercancel", function () { dialing = false; });
+dial.addEventListener("keydown", function (e) {
+  const step = e.shiftKey ? 5 : 1;
+  if (e.key === "ArrowRight" || e.key === "ArrowUp") { placeDial(Math.min(TMAX, wx.temp + step)); detentPop(wx.temp); e.preventDefault(); }
+  if (e.key === "ArrowLeft" || e.key === "ArrowDown") { placeDial(Math.max(TMIN, wx.temp - step)); detentPop(wx.temp); e.preventDefault(); }
+  if (e.key === "Home") { placeDial(TMIN); e.preventDefault(); }
+  if (e.key === "End") { placeDial(TMAX); e.preventDefault(); }
+});
+/* ---------- ticks ---------- */
+(function ticks() {
+  const g = byId("ticks");
+  let html = "";
+  for (let t = TMIN; t <= TMAX; t += 3) {
+    const a = tempToAngle(t);
+    const [x1, y1] = angleToXY(a);
+    const major = t % 12 === 0;
+    const r2 = ARC_R - (major ? 12 : 7);
+    const x2 = CXA + Math.cos(a) * r2, y2 = CYA - Math.sin(a) * r2;
+    html += '<line class="tick' + (major ? " major" : "") + '" x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) +
+      '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '"></line>';
+    if (major) {
+      const rl = ARC_R - 22;
+      const xl = CXA + Math.cos(a) * rl, yl = CYA - Math.sin(a) * rl;
+      html += '<text class="ticklabel" x="' + xl.toFixed(1) + '" y="' + yl.toFixed(1) +
+        '" text-anchor="middle" dominant-baseline="middle">' + t + "</text>";
+    }
+  }
+  g.innerHTML = html;
+})();
+/* ---------- readouts ---------- */
+const LINES = {
+  clear: ["Thin light, warm glass, a small sun turning.", "Clear air over the studio; shadows are sharp."],
+  clouds: ["Soft gray traffic of clouds, going nowhere fast.", "Muted light — good for photographing the orb."],
+  rain: ["Steady rain ticking on the dome, ripples below.", "Petrichor setting: drips grow and fade."],
+  snow: ["Slow circles of snow, each flake on its own path.", "Hushed studio; the glass feels warmer."],
+  storm: ["Charge in the air — flash and rumble on standby.", "Do not unplug the instrument during a storm."]
+};
+function updateReadout() {
+  const names = { clear: "CLEAR", clouds: "CLOUDS", rain: "RAIN", snow: "SNOW", storm: "STORM" };
+  byId("r-cond").textContent = names[wx.cond];
+  const dew = Math.round(wx.temp - 12 + (wx.cond === "rain" || wx.cond === "storm" ? 5 : 0));
+  byId("r-dew").textContent = dew + "°C";
+  const wind = Math.round(4 + (wx.cond === "storm" ? 38 : wx.cond === "rain" ? 14 : wx.cond === "clouds" ? 8 : 5) + Math.abs(wx.temp) % 6);
+  byId("r-wind").textContent = wind + " KM/H";
+  const pres = 1014 + Math.round((wx.cond === "storm" ? -18 : wx.cond === "rain" ? -7 : 3) + (wx.temp + 12) % 5);
+  byId("r-pres").textContent = pres + " hPa";
+  const set = LINES[wx.cond];
+  byId("r-line").textContent = set[Math.floor(wx.t / 9000) % set.length];
+}
+/* ---------- condition chips ---------- */
+const chips = byId("chips");
+chips.addEventListener("click", function (e) {
+  const b = e.target.closest(".chip");
+  if (!b) return;
+  setCondition(b.dataset.cond, true);
+});
+function setCondition(c, announce) {
+  wx.cond = c;
+  document.body.dataset.cond = c;
+  chips.querySelectorAll(".chip").forEach(function (ch) {
+    ch.setAttribute("aria-pressed", ch.dataset.cond === c ? "true" : "false");
+  });
+  updateReadout();
+  if (announce) toast(NAMES[c] + " — cross-fading atmosphere");
+}
+const NAMES = { clear: "CLEAR", clouds: "CLOUDS", rain: "RAIN", snow: "SNOW", storm: "STORM" };
+/* ---------- forecast strip ---------- */
+const DAYS = [
+  { d: "TODAY", cond: "clear", hi: 21, lo: 12 },
+  { d: "TUE", cond: "clouds", hi: 19, lo: 11 },
+  { d: "WED", cond: "rain", hi: 16, lo: 10 },
+  { d: "THU", cond: "snow", hi: -2, lo: -8 },
+  { d: "FRI", cond: "storm", hi: 18, lo: 12 }
+];
+const strip = byId("strip");
+DAYS.forEach(function (day, i) {
+  const el = document.createElement("button");
+  el.className = "day" + (i === 0 ? " now" : "");
+  el.dataset.cond = day.cond;
+  el.setAttribute("aria-label", day.d + ": " + NAMES[day.cond] + ", high " + day.hi + ", low " + day.lo);
+  el.innerHTML =
+    '<span class="dn">' + day.d + "</span>" +
+    '<span class="mini"><i class="mrain"></i></span>' +
+    '<span class="dt">' + day.hi + "°<small> / " + day.lo + "°</small></span>";
+  el.addEventListener("click", function () {
+    setCondition(day.cond, false);
+    placeDial(day.hi);
+    toast(day.d + " — " + NAMES[day.cond] + " · " + day.hi + "°/" + day.lo + "°");
+    strip.querySelectorAll(".day").forEach(function (d2) { d2.classList.remove("now"); });
+    el.classList.add("now");
+  });
+  strip.appendChild(el);
+});
+/* ---------- sound toggle ---------- */
+byId("sound").addEventListener("click", function () {
+  soundOn = !soundOn;
+  const b = byId("sound");
+  b.setAttribute("aria-pressed", soundOn ? "true" : "false");
+  b.textContent = "THUNDER AUDIO: " + (soundOn ? "ON" : "OFF");
+  if (soundOn) {
+    const a = getAC();
+    if (a && a.state === "suspended") a.resume().catch(function () {});
+    toast("Thunder audio armed — switch to STORM");
+    if (wx.cond === "storm") maybeThunder();
+  } else {
+    toast("Thunder audio muted");
+  }
+});
+/* ---------- toast ---------- */
+let toastH = null;
+function toast(msg) {
+  const t = byId("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastH);
+  toastH = setTimeout(function () { t.classList.remove("show"); }, 2100);
+}
+/* ---------- boot ---------- */
+function boot() {
+  sizeSky();
+  placeDial(21);
+  setCondition("clear", false);
+  requestAnimationFrame(tick);
+}
+boot();
+addEventListener("resize", function () {
+  sizeSky();
+});
+toast("TEMPER MK-II online");
+</script>
+</body>
+</html>

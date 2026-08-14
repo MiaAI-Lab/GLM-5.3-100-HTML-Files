@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PRISMA — Membership</title>
+<style>
+:root{
+  --bg:#0a0c10; --ink:#edf0f6; --dim:#8b93a3;
+  --gold:#f5c451; --cyan:#6fdcff; --violet:#a875ff;
+  --accent:var(--gold);
+  --shine:.85; --rx:0deg; --ry:0deg; --fx:50%; --fy:50%; --hue:0deg;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+  background:
+    radial-gradient(1200px 700px at 50% -12%, #1d2330 0%, transparent 62%),
+    radial-gradient(900px 520px at 88% 112%, #191226 0%, transparent 58%),
+    radial-gradient(600px 400px at 6% 90%, #0d1a1e 0%, transparent 60%),
+    var(--bg);
+  color:var(--ink); overflow:hidden;
+  display:flex; flex-direction:column; user-select:none; -webkit-user-select:none;
+}
+header.top{
+  padding:clamp(14px,2.4vh,26px) clamp(18px,4vw,44px) 0;
+  display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;
+}
+header.top h1{
+  font-size:clamp(15px,2vw,21px); letter-spacing:.55em; font-weight:600;
+}
+header.top h1 b{color:var(--accent); font-weight:800}
+header.top p{font-size:clamp(10px,1.2vw,12.5px); letter-spacing:.28em; color:var(--dim)}
+
+main.stage{
+  flex:1; position:relative; perspective:1400px; touch-action:none; cursor:crosshair;
+}
+/* ---------- active card ---------- */
+.cardWrap{
+  position:absolute; left:50%; top:44%; transform:translate(-50%,-50%);
+  width:clamp(210px,30vh,290px); aspect-ratio:5/7;
+}
+.card{
+  position:absolute; inset:0; transform-style:preserve-3d;
+  transform:rotateX(var(--rx)) rotateY(calc(var(--ry) + var(--flip,0deg)));
+  transition:transform .12s linear;
+}
+.card.dealing{animation:deal .7s cubic-bezier(.2,.9,.25,1.12)}
+@keyframes deal{
+  0%{transform:translate(70vw,-60vh) rotateZ(38deg) scale(.6); opacity:0}
+  60%{opacity:1}
+  100%{transform:translate(0,0) rotateZ(0) scale(1)}
+}
+.face{
+  position:absolute; inset:0; border-radius:18px; overflow:hidden;
+  backface-visibility:hidden; -webkit-backface-visibility:hidden;
+  border:1px solid #ffffff22;
+  box-shadow:0 30px 60px -18px #000c, 0 4px 14px #0009, inset 0 0 0 1px #ffffff0d;
+  background:linear-gradient(160deg,#191d24 0%,#0e1116 55%,#14181f 100%);
+}
+.face.back{transform:rotateY(180deg)}
+/* rainbow foil refractor layer */
+.foil{
+  position:absolute; inset:-30%;
+  background:conic-gradient(from calc(var(--hue) + 40deg) at var(--fx) var(--fy),
+    #ff3d6e,#ff9d3d,#f8ec5a,#4dff88,#38d0ff,#7a5cff,#ff3d6e);
+  mix-blend-mode:color-dodge; filter:blur(2px) saturate(1.5);
+  opacity:calc(var(--shine)*.55);
+}
+.foil.bands{
+  background:repeating-conic-gradient(from var(--hue) at 30% 30%,
+    #ffffff26 0deg 9deg, #ffffff05 9deg 16deg, #ffffff38 16deg 24deg);
+  mix-blend-mode:overlay; filter:none; opacity:calc(var(--shine)*.8);
+}
+.sheen{
+  position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background:radial-gradient(420px 320px at var(--fx) var(--fy),
+    #ffffffcc 0%, #ffffff33 28%, transparent 62%);
+  mix-blend-mode:soft-light; opacity:calc(var(--shine)*.9);
+}
+/* typography on card */
+.face .tierline{
+  position:absolute; top:9%; left:0; right:0; text-align:center;
+  font-size:clamp(9px,1.4vh,11px); letter-spacing:.42em; color:#ffffff99;
+}
+.face .tier{
+  position:absolute; top:42%; left:0; right:0; text-align:center;
+  font-size:clamp(30px,7vh,46px); font-weight:800; letter-spacing:.34em;
+  padding-left:.34em; color:#fff;
+  text-shadow:0 2px 18px var(--accent), 0 0 2px #fff8;
+}
+.face .sub{
+  position:absolute; top:56%; left:0; right:0; text-align:center;
+  font-size:clamp(8px,1.3vh,10.5px); letter-spacing:.3em; color:var(--accent);
+}
+.face .serial{
+  position:absolute; bottom:7%; left:0; right:0; text-align:center;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:10px; color:#ffffff70;
+}
+.seal{
+  position:absolute; top:16%; left:50%; transform:translateX(-50%);
+  width:21%; opacity:.92; filter:drop-shadow(0 0 10px var(--accent));
+}
+.seal svg{display:block; width:100%; height:auto}
+.sparkfield{position:absolute; inset:0; pointer-events:none}
+.spark{
+  position:absolute; width:3px; height:3px; border-radius:50%;
+  background:#fff; box-shadow:0 0 6px 1px var(--accent);
+  opacity:0; animation:tw 2.6s infinite;
+}
+@keyframes tw{0%,100%{opacity:0; transform:scale(.4)}
+  50%{opacity:.95; transform:scale(1.15)}}
+/* back face */
+.face.back{display:flex; flex-direction:column; justify-content:center;
+  padding:9% 11%; gap:4%}
+.face.back h3{font-size:clamp(11px,1.8vh,14px); letter-spacing:.34em;
+  color:var(--accent); margin-bottom:5%}
+.face.back li{
+  list-style:none; font-size:clamp(9.5px,1.6vh,12.5px); letter-spacing:.14em;
+  color:#dfe4ee; padding:2.2% 0 2.2% 9%; position:relative;
+  opacity:0; transform:translateX(-14px);
+  transition:opacity .5s ease, transform .5s cubic-bezier(.2,.8,.3,1);
+  border-bottom:1px solid #ffffff10;
+}
+.face.back li::before{content:"◆"; position:absolute; left:0; color:var(--accent); font-size:8px; top:36%}
+.card.flipped .face.back li{opacity:1; transform:none}
+.card.flipped .face.back li:nth-child(1){transition-delay:.15s}
+.card.flipped .face.back li:nth-child(2){transition-delay:.28s}
+.card.flipped .face.back li:nth-child(3){transition-delay:.41s}
+.card.flipped .face.back li:nth-child(4){transition-delay:.54s}
+.card.flipped .face.back li:nth-child(5){transition-delay:.67s}
+/* ---------- fan ---------- */
+.fan{
+  position:absolute; left:50%; bottom:max(2.5vh,18px); transform:translateX(-50%);
+  height:clamp(96px,17vh,150px); width:min(92vw,720px);
+  transform:translateX(-50%) rotate(var(--fanRot,0deg));
+  transition:transform .3s ease;
+}
+.mini{
+  position:absolute; left:50%; bottom:0; width:calc(clamp(210px,30vh,290px)*.56);
+  aspect-ratio:5/7; margin-left:calc(clamp(210px,30vh,290px)*-.28);
+  border-radius:10px; cursor:pointer;
+  border:1px solid #ffffff1c;
+  background:linear-gradient(160deg,#1a1e26,#0d1015 60%,#151920);
+  box-shadow:0 12px 24px -8px #000c;
+  transform-origin:50% 130%;
+  transition:transform .45s cubic-bezier(.3,.9,.3,1.15), box-shadow .3s, border-color .3s;
+  overflow:hidden;
+}
+.mini::after{
+  content:""; position:absolute; inset:0;
+  background:linear-gradient(115deg,transparent 30%,#ffffff14 45%,transparent 60%);
+}
+.mini .mfoil{
+  position:absolute; inset:0; opacity:.5; mix-blend-mode:color-dodge;
+  background:conic-gradient(from var(--hue) at 50% 120%,#ff3d6e33,#ffd23d33,#5aff8833,#38d0ff33,#7a5cff33,#ff3d6e33);
+}
+.mini .mname{
+  position:absolute; bottom:8%; left:0; right:0; text-align:center;
+  font-size:9px; letter-spacing:.3em; color:#ffffffb0; font-weight:700;
+}
+.mini.active{border-color:var(--accent); box-shadow:0 0 22px -4px var(--accent), 0 12px 24px -8px #000c}
+.mini:hover{transform:var(--mt) translateY(-14px) scale(1.05) !important; z-index:60 !important}
+/* ---------- controls ---------- */
+footer.bar{
+  position:relative; z-index:80;
+  display:flex; align-items:center; justify-content:center; gap:clamp(12px,3vw,34px);
+  padding:0 clamp(14px,3vw,40px) clamp(14px,2.6vh,26px); flex-wrap:wrap;
+}
+button.flipbtn{
+  font:inherit; font-size:12px; letter-spacing:.4em; padding:12px 26px 12px 30px;
+  color:var(--ink); background:linear-gradient(180deg,#20252e,#151920);
+  border:1px solid #ffffff2e; border-radius:999px; cursor:pointer;
+  box-shadow:0 6px 16px -6px #000d, inset 0 1px 0 #ffffff1c;
+  transition:transform .15s, box-shadow .2s, border-color .2s;
+}
+button.flipbtn:hover{transform:translateY(-2px); border-color:var(--accent)}
+button.flipbtn:active{transform:translateY(1px) scale(.98)}
+.shinebox{display:flex; align-items:center; gap:12px; font-size:10px;
+  letter-spacing:.3em; color:var(--dim)}
+input[type=range]{
+  -webkit-appearance:none; appearance:none; width:clamp(120px,18vw,190px); height:22px;
+  background:transparent; cursor:pointer;
+}
+input[type=range]::-webkit-slider-runnable-track{
+  height:4px; border-radius:2px;
+  background:linear-gradient(90deg,#3a2f52,var(--accent));
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:16px; height:16px; border-radius:50%;
+  margin-top:-6px; background:#fff; border:3px solid var(--accent);
+  box-shadow:0 0 12px var(--accent);
+}
+input[type=range]::-moz-range-track{height:4px; border-radius:2px;
+  background:linear-gradient(90deg,#3a2f52,var(--accent))}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;
+  background:#fff;border:3px solid var(--accent)}
+.hint{position:absolute; right:clamp(14px,3vw,40px); bottom:clamp(90px,15vh,120px);
+  font-size:10px; letter-spacing:.24em; color:#ffffff45; text-align:right; line-height:2;
+  pointer-events:none}
+@media (max-width:640px){ .hint{display:none} }
+@media (prefers-reduced-motion:reduce){
+  .spark{animation:none; opacity:.5}
+  .card{transition:none}
+  .card.dealing{animation:none}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>PRISMA <b>—</b> MEMBERSHIP</h1>
+  <p>COLLECTIBLE ACCESS · FOUNDER SERIES</p>
+</header>
+<main class="stage" id="stage">
+  <div class="cardWrap">
+    <article class="card" id="card">
+      <div class="face front" id="faceF">
+        <div class="foil"></div>
+        <div class="foil bands"></div>
+        <div class="sparkfield" id="sparkfield"></div>
+        <div class="sheen"></div>
+        <div class="tierline" id="tierline">TIER 01 · FOUNDER CIRCLE</div>
+        <div class="seal">
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="2.5" opacity=".8"/>
+            <circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" stroke-width="1" opacity=".45"/>
+            <path d="M50 22 L62 42 L58 68 L42 68 L38 42 Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+            <path d="M38 42 L62 42 M50 22 L50 68" stroke="currentColor" stroke-width="1" opacity=".5"/>
+          </svg>
+        </div>
+        <h2 class="tier" id="tierName">AURUM</h2>
+        <p class="sub" id="tierSub">FOUNDER CIRCLE</p>
+        <p class="serial" id="serial">№ 0042 / 0500</p>
+      </div>
+      <div class="face back" id="faceB">
+        <h3 id="backTitle">AURUM PRIVILEGES</h3>
+        <ul id="benefits"></ul>
+      </div>
+    </article>
+  </div>
+  <div class="fan" id="fan"></div>
+  <p class="hint">DOUBLE-CLICK — DEAL A CARD<br>DRAG THE FAN — SWIRL</p>
+</main>
+<footer class="bar">
+  <button class="flipbtn" id="flipBtn">FLIP</button>
+  <div class="shinebox">
+    <span>SHINE</span>
+    <input type="range" id="shine" min="10" max="100" value="85" aria-label="Foil shine intensity">
+  </div>
+</footer>
+<script>
+"use strict";
+const TIERS = [
+  {name:"AURUM", sub:"FOUNDER CIRCLE", line:"TIER 01 · FOUNDER CIRCLE", accent:"#f5c451",
+   perks:["Gilded concierge line","Vault priority drops","Founders' foil serial","Annual Aurum gala","Legacy reforge rights"]},
+  {name:"NIMBUS", sub:"STRATOSPHERE CLUB", line:"TIER 02 · STRATOSPHERE CLUB", accent:"#6fdcff",
+   perks:["Early access window","Cloud mint passes","Nimbus lounge streams","Quarterly foil packs","Skyline meetups"]},
+  {name:"VOID", sub:"THE UNNUMBERED", line:"TIER 03 · THE UNNUMBERED", accent:"#a875ff",
+   perks:["Everything, quietly","Black-card auctions","One wish per cycle","Void envelope mailings","Unnamed floor access"]},
+  {name:"PRISM", sub:"SPECTRUM SOCIETY", line:"TIER 04 · SPECTRUM SOCIETY", accent:"#ff6f91",
+   perks:["Full-spectrum foil","Refraction workshops","Light-room sessions","Spectrum swap meets","Chromatic collabs"]},
+  {name:"ORE", sub:"BEDROCK GUILD", line:"TIER 05 · BEDROCK GUILD", accent:"#9fe86b",
+   perks:["Foundry tours","Ore-grade badge","Bench test previews","Guild forging nights","Bedrock newsletter"]},
+];
+let idx = 0, flipped = false;
+
+const root = document.documentElement;
+const card = document.getElementById("card");
+const faceF = document.getElementById("faceF");
+const tierName = document.getElementById("tierName");
+const tierSub = document.getElementById("tierSub");
+const tierline = document.getElementById("tierline");
+const serial = document.getElementById("serial");
+const backTitle = document.getElementById("backTitle");
+const benefits = document.getElementById("benefits");
+const fan = document.getElementById("fan");
+const stage = document.getElementById("stage");
+const flipBtn = document.getElementById("flipBtn");
+const shineEl = document.getElementById("shine");
+
+function setTier(i, deal){
+  idx = (i + TIERS.length) % TIERS.length;
+  const t = TIERS[idx];
+  root.style.setProperty("--accent", t.accent);
+  tierName.textContent = t.name;
+  tierSub.textContent = t.sub;
+  tierline.textContent = t.line;
+  serial.textContent = "№ " + String(40 + idx * 7).padStart(4,"0") + " / 0500";
+  backTitle.textContent = t.name + " PRIVILEGES";
+  benefits.innerHTML = t.perks.map(p => "<li>" + p + "</li>").join("");
+  if (flipped) doFlip(false);
+  if (deal){
+    card.classList.remove("dealing");
+    void card.offsetWidth;
+    card.classList.add("dealing");
+  }
+  updateMinis();
+}
+function doFlip(on){
+  flipped = on;
+  card.style.setProperty("--flip", on ? "180deg" : "0deg");
+  card.classList.toggle("flipped", on);
+}
+flipBtn.addEventListener("click", () => doFlip(!flipped));
+
+/* ---------- sparkle field ---------- */
+const sparkfield = document.getElementById("sparkfield");
+const sparks = [];
+for (let i = 0; i < 14; i++){
+  const s = document.createElement("i");
+  s.className = "spark";
+  s.style.left = (8 + Math.random() * 84) + "%";
+  s.style.top = (8 + Math.random() * 84) + "%";
+  s.style.animationDelay = (-Math.random() * 2.6) + "s";
+  s.style.animationDuration = (1.8 + Math.random() * 1.6) + "s";
+  sparkfield.appendChild(s);
+  sparks.push(s);
+}
+function sparkBoost(k){
+  sparks.forEach(s => {
+    s.style.width = s.style.height = (2 + k * 3.4) + "px";
+  });
+}
+
+/* ---------- pointer tilt ---------- */
+let tx = 0, ty = 0, cx = 0, cy = 0, targetShine = +shineEl.value / 100;
+function onPoint(x, y){
+  const r = stage.getBoundingClientRect();
+  const nx = (x - r.left) / r.width, ny = (y - r.top) / r.height;
+  tx = (nx - .5) * 2; ty = (ny - .5) * 2;
+  root.style.setProperty("--fx", (nx * 100).toFixed(1) + "%");
+  root.style.setProperty("--fy", (ny * 100).toFixed(1) + "%");
+}
+stage.addEventListener("pointermove", e => onPoint(e.clientX, e.clientY));
+stage.addEventListener("pointerdown", e => onPoint(e.clientX, e.clientY));
+
+function loop(){
+  cx += (tx - cx) * .09; cy += (ty - cy) * .09;
+  root.style.setProperty("--ry", (cx * 16).toFixed(2) + "deg");
+  root.style.setProperty("--rx", (-cy * 12).toFixed(2) + "deg");
+  root.style.setProperty("--hue", ((cx * 90 + performance.now() * .008) % 360).toFixed(1) + "deg");
+  sparkBoost(Math.min(1, Math.hypot(cx, cy)));
+  requestAnimationFrame(loop);
+}
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+if (!reduced) requestAnimationFrame(loop);
+else { root.style.setProperty("--ry","0deg"); root.style.setProperty("--rx","0deg"); }
+
+/* ---------- fan ---------- */
+function buildFan(){
+  fan.innerHTML = "";
+  TIERS.forEach((t, i) => {
+    const d = document.createElement("div");
+    d.className = "mini";
+    const rot = (i - (TIERS.length - 1) / 2) * 17;
+    d.style.setProperty("--mt", `rotate(${rot}deg) translateY(${-Math.abs(rot) * .35}px)`);
+    d.style.transform = d.style.getPropertyValue("--mt");
+    d.style.zIndex = String(10 + i);
+    d.innerHTML = `<div class="mfoil" style="background:conic-gradient(from ${i * 60}deg at 50% 130%,#ff3d6e33,#ffd23d33,#5aff8833,#38d0ff33,#7a5cff33,#ff3d6e33)"></div><span class="mname">${t.name}</span>`;
+    d.addEventListener("click", () => setTier(i, true));
+    fan.appendChild(d);
+  });
+  updateMinis();
+}
+function updateMinis(){
+  [...fan.children].forEach((d, i) => d.classList.toggle("active", i === idx));
+}
+let fanDrag = null, fanRot0 = 0, fanRot = 0;
+fan.addEventListener("pointerdown", e => {
+  fanDrag = {x: e.clientX, r: fanRot0};
+  fan.setPointerCapture(e.pointerId);
+});
+fan.addEventListener("pointermove", e => {
+  if (!fanDrag) return;
+  fanRot = fanDrag.r + (e.clientX - fanDrag.x) * .22;
+  fan.style.setProperty("--fanRot", fanRot.toFixed(1) + "deg");
+});
+fan.addEventListener("pointerup", () => { fanDrag = null; fanRot0 = fanRot; });
+
+/* double-click anywhere on stage deals a random card */
+stage.addEventListener("dblclick", () => {
+  let n; do { n = Math.floor(Math.random() * TIERS.length); } while (n === idx);
+  setTier(n, true);
+});
+
+shineEl.addEventListener("input", () => {
+  targetShine = +shineEl.value / 100;
+  root.style.setProperty("--shine", targetShine.toFixed(2));
+});
+/* subtle holo idle drift even without pointer */
+setInterval(() => {
+  if (Math.abs(tx) < .04 && Math.abs(ty) < .04 && !reduced){
+    const t = performance.now() * .0004;
+    root.style.setProperty("--hue", (((Math.sin(t) + 1) / 2 * 120).toFixed(1)) + "deg");
+  }
+}, 60);
+setTier(0, false);
+buildFan();
+/* ---------- gesture-gated foil shimmer sound ---------- */
+let AC = null;
+function shimmer(){
+  try{
+    if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === "suspended") AC.resume();
+    const t0 = AC.currentTime;
+    const g = AC.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.05, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.9);
+    g.connect(AC.destination);
+    [1318.5, 1760, 2637].forEach((f, i) => {
+      const o = AC.createOscillator();
+      o.type = "sine";
+      o.frequency.setValueAtTime(f * (1 + (Math.random() - .5) * .01), t0);
+      const og = AC.createGain();
+      og.gain.value = 0.28 / (i + 1);
+      o.connect(og).connect(g);
+      o.start(t0 + i * 0.03);
+      o.stop(t0 + 0.95);
+    });
+  }catch(e){ /* audio unavailable — silent */ }
+}
+card.addEventListener("dblclick", e => { e.stopPropagation(); shimmer(); });
+flipBtn.addEventListener("click", shimmer);
+fan.addEventListener("click", shimmer, true);
+</script>
+</body>
+</html>

@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WOVEN — the loom studio</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background:#1f1610; color:#e8dcc8; touch-action:none; user-select:none; -webkit-user-select:none;
+    display:flex; flex-direction:column;
+  }
+  header {
+    padding:14px 22px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+    background:rgba(15,10,6,.7); border-bottom:1px solid rgba(232,220,200,.12); z-index:10;
+  }
+  h1 { font-size:16px; font-weight:300; letter-spacing:.42em; text-transform:uppercase; }
+  h1 b { color:#d49a4a; font-weight:600; }
+  .yarns { display:flex; gap:6px; align-items:center; }
+  .yarns .lab { font-size:9px; letter-spacing:.2em; color:#a08c6e; text-transform:uppercase; margin-right:4px; }
+  .yarns button {
+    width:26px; height:26px; border-radius:50%; border:2px solid transparent; cursor:pointer; transition:all .15s;
+    box-shadow:inset 0 0 4px rgba(0,0,0,.4), inset 0 2px 3px rgba(255,255,255,.25);
+  }
+  .yarns button.on { border-color:#f2e6d0; transform:scale(1.15); }
+  .tools { margin-left:auto; display:flex; gap:8px; }
+  .tools button {
+    background:rgba(242,230,208,.08); color:#e8dcc8; border:1px solid rgba(242,230,208,.25);
+    border-radius:8px; font:inherit; font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+    padding:8px 14px; cursor:pointer; transition:all .15s;
+  }
+  .tools button:hover { background:rgba(242,230,208,.18); }
+
+  /* ---------- loom ---------- */
+  #loom { flex:1; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
+  .frame {
+    position:relative; width:min(880px, 94vw); aspect-ratio:16/10;
+    background:
+      linear-gradient(180deg, #2c1f14, #241a10);
+    border:14px solid transparent;
+    border-radius:10px;
+    box-shadow:
+      0 30px 70px rgba(0,0,0,.7),
+      inset 0 0 0 2px rgba(232,220,200,.12);
+    overflow:hidden;
+  }
+  .frame::before, .frame::after {
+    content:""; position:absolute; top:-4px; bottom:-4px; width:16px;
+    background:repeating-linear-gradient(180deg, #4a3320 0 22px, #3a2917 22px 44px);
+    z-index:6;
+  }
+  .frame::before { left:-4px; } .frame::after { right:-4px; }
+  canvas#c { width:100%; height:100%; display:block; }
+  /* heddle bar */
+  .heddle {
+    position:absolute; top:6px; left:20px; right:20px; height:14px; z-index:5;
+    background:linear-gradient(180deg, #5a4530, #3a2c1c); border-radius:4px;
+    box-shadow:0 2px 6px rgba(0,0,0,.5); transition:transform .18s;
+  }
+  .beater {
+    position:absolute; left:16px; right:16px; height:6px; z-index:7;
+    background:linear-gradient(180deg, #8a6a3e, #5a4530); border-radius:3px;
+    box-shadow:0 3px 10px rgba(0,0,0,.6); opacity:0;
+    transition:all .22s cubic-bezier(.2,.9,.3,1);
+  }
+  .beater.hit { opacity:1; }
+  .readout {
+    position:absolute; left:22px; bottom:14px; z-index:8;
+    font-size:10px; letter-spacing:.2em; color:#a08c6e; text-transform:uppercase;
+  }
+  .readout b { color:#e8dcc8; }
+  .hintbar {
+    position:absolute; right:22px; bottom:14px; z-index:8; font-size:10px; color:#6a5c46; letter-spacing:.1em;
+  }
+
+  /* draft grid (pattern designer) */
+  .draftwrap {
+    position:fixed; left:0; right:0; bottom:0; z-index:20;
+    background:rgba(15,10,6,.88); border-top:1px solid rgba(232,220,200,.15);
+    padding:12px 22px; display:flex; gap:20px; align-items:center; flex-wrap:wrap;
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  }
+  .draftwrap .lab { font-size:9px; letter-spacing:.22em; color:#a08c6e; text-transform:uppercase; }
+  .draft { display:grid; grid-template-columns:repeat(16, 18px); gap:3px; }
+  .draft i {
+    width:18px; height:18px; border-radius:3px; background:#2c2014; cursor:pointer;
+    border:1px solid rgba(232,220,200,.14); transition:background .12s;
+  }
+  .draft i.on { background:var(--y, #b0452e); border-color:transparent; }
+  .presets { display:flex; gap:8px; flex-wrap:wrap; }
+  .presets button {
+    background:rgba(242,230,208,.07); color:#cbb890; border:1px solid rgba(232,220,200,.2);
+    border-radius:999px; font:inherit; font-size:10px; letter-spacing:.12em; padding:7px 13px; cursor:pointer;
+  }
+  .presets button:hover { background:rgba(242,230,208,.16); }
+  .tension { display:flex; align-items:center; gap:8px; }
+  .tension input { width:90px; }
+  input[type=range] {
+    -webkit-appearance:none; appearance:none; height:3px; background:#4a3a28; border-radius:99px; outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:13px; height:13px; border-radius:50%; background:#e8dcc8; cursor:grab; }
+  .rowlab { font-size:9px; color:#a08c6e; letter-spacing:.14em; }
+
+  .toast {
+    position:fixed; top:16px; left:50%; transform:translate(-50%,-80px); z-index:60;
+    background:#3a2c1c; color:#f2e6d0; border:1px solid #6a543a; border-radius:999px;
+    padding:9px 18px; font-size:11px; letter-spacing:.12em;
+    transition:transform .35s cubic-bezier(.2,1.4,.4,1);
+  }
+  .toast.show { transform:translate(-50%,0); }
+  @media (max-width:640px) {
+    .draftwrap { padding:10px 12px; gap:10px; }
+    .draft { grid-template-columns:repeat(16, 13px); }
+    .draft i { width:13px; height:13px; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Wo<b>ven</b></h1>
+    <div class="yarns" id="yarns">
+      <span class="lab">weft</span>
+      <button class="on" data-c="#b0452e" style="background:#b0452e" title="madder red"></button>
+      <button data-c="#2a4a6e" style="background:#2a4a6e" title="indigo"></button>
+      <button data-c="#d4a537" style="background:#d4a537" title="marigold"></button>
+      <button data-c="#e8e0cc" style="background:#e8e0cc" title="undyed flax"></button>
+      <button data-c="#4a6e46" style="background:#4a6e46" title="moss"></button>
+      <button data-c="#8a4a6e" style="background:#8a4a6e" title="plum"></button>
+    </div>
+    <div class="tools">
+      <button id="bPass">throw shuttle (space)</button>
+      <button id="bUnpick">unpick</button>
+      <button id="bFinish">finish cloth</button>
+    </div>
+  </header>
+
+  <div id="loom">
+    <div class="frame">
+      <div class="heddle" id="heddle"></div>
+      <div class="beater" id="beater"></div>
+      <canvas id="c"></canvas>
+      <div class="readout">row <b id="rowN">0</b> · pattern <b id="patName">plain weave</b></div>
+      <div class="hintbar">rhythm matters — throw on the beat</div>
+    </div>
+  </div>
+
+  <div class="draftwrap">
+    <span class="lab">draft</span>
+    <div class="draft" id="draft"></div>
+    <div class="presets">
+      <button data-p="plain">plain</button>
+      <button data-p="twill">2/2 twill</button>
+      <button data-p="herringbone">herringbone</button>
+      <button data-p="rose">rose path</button>
+    </div>
+    <div class="tension">
+      <span class="rowlab">tension</span>
+      <input type="range" id="tension" min="0" max="100" value="50">
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const cv = $("c"), g = cv.getContext("2d");
+  const COLS = 48;
+  let W = 0, H = 0, DPR = 1;
+  let rows = [], weft = "#b0452e", tension = 0.5;
+  let patternName = "plain weave";
+
+  /* ---------- draft patterns (16-wide, true=up) ---------- */
+  const PATTERNS = {
+    "plain weave":     [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0],
+    "2/2 twill":       [1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0],
+    "herringbone":     [1,1,0,0,1,1,0,0,0,0,1,1,0,0,1,1],
+    "rose path":       [1,1,1,0,0,1,0,0,1,1,1,0,0,1,0,0],
+  };
+  let draft = PATTERNS["plain weave"].slice();
+
+  /* ---------- geometry ---------- */
+  function metrics() {
+    const gw = W - 44, gx = 22;
+    const cw = gw / COLS;
+    return { gx, gw, cw, rowH: Math.max(7, cw * 0.72) };
+  }
+
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    const r = cv.getBoundingClientRect();
+    W = r.width; H = r.height;
+    cv.width = W * DPR; cv.height = H * DPR;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    draw();
+  }
+
+  /* ---------- draw ---------- */
+  function draw() {
+    g.clearRect(0, 0, W, H);
+    const m = metrics();
+    /* warp threads */
+    for (let i = 0; i < COLS; i++) {
+      const x = m.gx + i * m.cw;
+      g.strokeStyle = "rgba(232,224,204,.6)";
+      g.lineWidth = Math.max(1.5, m.cw * 0.34);
+      g.beginPath();
+      g.moveTo(x + m.cw / 2, 0);
+      g.lineTo(x + m.cw / 2, H);
+      g.stroke();
+    }
+    /* woven rows, bottom-up: newest at the beater line, cloth grows down */
+    const baseY = H * 0.34;
+    rows.forEach((row, ri) => {
+      const y = baseY + ri * m.rowH;
+      row.forEach((cell, ci) => {
+        if (!cell.c) return;
+        const x = m.gx + ci * m.cw;
+        const puck = (1 - tension) * Math.sin(ci * 1.7 + ri) * 2.4;
+        /* weft thread: over/under interlace */
+        g.strokeStyle = cell.c;
+        g.lineWidth = Math.max(2, m.cw * 0.5);
+        g.lineCap = "round";
+        g.beginPath();
+        const up = (draft[(ci + row.off) % draft.length] === 1) === cell.up;
+        const yy = y + (up ? -m.rowH * 0.28 : m.rowH * 0.22);
+        g.moveTo(x + m.cw * 0.1, yy + puck);
+        g.lineTo(x + m.cw * 0.9, yy + puck);
+        g.stroke();
+        /* tiny fuzz */
+        if (Math.random() < 0.02) {
+          g.fillStyle = "rgba(0,0,0,.2)";
+          g.fillRect(x + Math.random() * m.cw, yy, 1, 1);
+        }
+      });
+    });
+    /* shed gap under heddle */
+    g.fillStyle = "rgba(0,0,0,.25)";
+    g.fillRect(0, baseY - m.rowH * 1.4, W, m.rowH * 0.5);
+  }
+
+  /* ---------- throw shuttle ---------- */
+  const shuttleEl = null;
+  let beat = 0, throwing = false;
+  function throwShuttle() {
+    if (throwing || rows.length > 40) return;
+    throwing = true;
+    /* heddle shifts */
+    const heddle = $("heddle");
+    const dir = rows.length % 2 === 0 ? 1 : -1;
+    heddle.style.transform = "translateY(" + (dir * 7) + "px)";
+    /* weave one row */
+    const row = { off: rows.length % 2, cells: [] };
+    for (let i = 0; i < COLS; i++) row.cells.push({ c: weft, up: (draft[(i + row.off) % draft.length] === 1) });
+    rows.push(row);
+    /* beater pack */
+    setTimeout(() => {
+      const beater = $("beater");
+      const m = metrics();
+      const y = H * 0.34 + (rows.length - 1) * m.rowH;
+      beater.style.top = (y - 10) + "px";
+      beater.classList.add("hit");
+      thock();
+      setTimeout(() => beater.classList.remove("hit"), 200);
+    }, 160);
+    $("rowN").textContent = rows.length;
+    draw();
+    setTimeout(() => { throwing = false; }, 220);
+  }
+
+  /* ---------- audio ---------- */
+  let AC = null;
+  function thock() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      const t0 = AC.currentTime;
+      const o = AC.createOscillator(), gn = AC.createGain(), f = AC.createBiquadFilter();
+      o.type = "triangle"; o.frequency.setValueAtTime(180, t0);
+      o.frequency.exponentialRampToValueAtTime(70, t0 + 0.08);
+      f.type = "lowpass"; f.frequency.value = 900;
+      gn.gain.setValueAtTime(0.09, t0);
+      gn.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.11);
+      o.connect(f); f.connect(gn); gn.connect(AC.destination);
+      o.start(t0); o.stop(t0 + 0.12);
+    } catch (e) {}
+  }
+
+  /* ---------- controls ---------- */
+  $("bPass").addEventListener("click", throwShuttle);
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "Space") { e.preventDefault(); throwShuttle(); }
+  });
+  $("bUnpick").addEventListener("click", () => {
+    rows.pop();
+    $("rowN").textContent = rows.length;
+    draw();
+    toastMsg("row unpicked");
+  });
+  $("bFinish").addEventListener("click", () => {
+    if (!rows.length) { toastMsg("nothing woven yet"); return; }
+    try {
+      const a = document.createElement("a");
+      a.download = "woven-cloth-" + Date.now() + ".png";
+      a.href = cv.toDataURL("image/png");
+      a.click();
+      toastMsg("cloth finished · " + rows.length + " rows");
+    } catch (e) { toastMsg("export blocked"); }
+  });
+  document.querySelectorAll("#yarns button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll("#yarns button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    weft = b.dataset.c;
+    toastMsg("weft: " + b.title);
+  }));
+  $("tension").addEventListener("input", (e) => {
+    tension = parseInt(e.target.value, 10) / 100;
+    draw();
+  });
+  document.querySelectorAll(".presets button").forEach(b => b.addEventListener("click", () => {
+    patternName = { plain:"plain weave", twill:"2/2 twill", herringbone:"herringbone", rose:"rose path" }[b.dataset.p];
+    draft = PATTERNS[patternName].slice();
+    $("patName").textContent = patternName;
+    syncDraftUI();
+    draw();
+    toastMsg("pattern: " + patternName);
+  }));
+
+  /* ---------- draft grid editing ---------- */
+  const draftEl = $("draft");
+  function syncDraftUI() {
+    draftEl.innerHTML = "";
+    draft.forEach((v, i) => {
+      const d = document.createElement("i");
+      if (v) { d.classList.add("on"); d.style.setProperty("--y", weft); }
+      d.addEventListener("click", () => {
+        draft[i] = draft[i] ? 0 : 1;
+        patternName = "custom draft";
+        $("patName").textContent = "custom draft";
+        syncDraftUI(); draw();
+      });
+      draftEl.appendChild(d);
+    });
+  }
+  syncDraftUI();
+
+  /* ---------- toast ---------- */
+  let toastTimer = null;
+  function toastMsg(m) {
+    const t = $("toast");
+    t.textContent = m; t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 1600);
+  }
+
+  window.addEventListener("resize", resize);
+  resize();
+  /* welcome rows */
+  setTimeout(() => { throwShuttle(); }, 500);
+  setTimeout(() => { throwShuttle(); }, 1000);
+})();
+</script>
+</body>
+</html>

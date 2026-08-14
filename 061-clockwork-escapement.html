@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESCAPEMENT — clockwork mechanism</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: Georgia, "Palatino Linotype", serif;
+    background:radial-gradient(ellipse at 50% 40%, #241610, #120a06 75%);
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px;
+    color:#d8c9a8; padding:14px; user-select:none; -webkit-user-select:none;
+  }
+  header { text-align:center; }
+  header h1 { font-size:clamp(18px, 3.2vw, 26px); font-weight:400; letter-spacing:.5em; text-transform:uppercase; color:#d4b46a; }
+  header p { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.34em; color:#8a7454; text-transform:uppercase; margin-top:7px; }
+
+  .movement { position:relative; width:min(680px, 94vw); aspect-ratio:4/3; }
+  svg.mech { width:100%; height:100%; display:block; }
+  /* velvet mat */
+  .movement::before {
+    content:""; position:absolute; inset:-4%; border-radius:24px; z-index:-1;
+    background:radial-gradient(ellipse at 50% 45%, #2e1a22, #1c1016 70%);
+    box-shadow:0 30px 80px rgba(0,0,0,.7);
+  }
+  /* museum spotlight */
+  .movement::after {
+    content:""; position:absolute; inset:0; pointer-events:none; border-radius:12px;
+    background:radial-gradient(ellipse 70% 55% at 50% 30%, rgba(255,230,170,.1), transparent 70%);
+  }
+
+  .controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:center; }
+  .controls button {
+    background:rgba(212,180,106,.08); color:#d4b46a; border:1px solid rgba(212,180,106,.35);
+    font-family:system-ui, sans-serif; font-size:9.5px; letter-spacing:.2em; text-transform:uppercase;
+    padding:10px 20px; border-radius:99px; cursor:pointer; transition:all .15s;
+  }
+  .controls button:hover { background:rgba(212,180,106,.22); }
+  .controls button.on { background:#8a6e3a; border-color:#8a6e3a; color:#f6efdd; }
+  .readout {
+    font-family:"Courier New", monospace; font-size:11px; color:#8a7454; letter-spacing:.1em;
+  }
+  .readout b { color:#d4b46a; font-weight:400; }
+  .hint { font-family:system-ui, sans-serif; font-size:9px; letter-spacing:.22em; color:#5a4a34; text-transform:uppercase; }
+  @media (max-width:640px) { .hint { display:none; } }
+  @media (prefers-reduced-motion: reduce) { .gear, .anchor, .balance { animation:none !important; } }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Escapement</h1>
+    <p>a clockwork movement · brass, steel &amp; ruby jewels</p>
+  </header>
+
+  <div class="movement">
+    <svg class="mech" viewBox="0 0 680 510" aria-hidden="true">
+      <defs>
+        <radialGradient id="brassG" cx="38%" cy="32%" r="80%">
+          <stop offset="0%" stop-color="#e8c87a"/>
+          <stop offset="55%" stop-color="#c9a44e"/>
+          <stop offset="100%" stop-color="#8a6e2e"/>
+        </radialGradient>
+        <radialGradient id="steelG" cx="38%" cy="32%" r="80%">
+          <stop offset="0%" stop-color="#d8dce2"/>
+          <stop offset="60%" stop-color="#9aa2ae"/>
+          <stop offset="100%" stop-color="#5a626e"/>
+        </radialGradient>
+        <radialGradient id="rubyG" cx="40%" cy="35%" r="80%">
+          <stop offset="0%" stop-color="#ff8a9a"/>
+          <stop offset="60%" stop-color="#c22a44"/>
+          <stop offset="100%" stop-color="#7a1228"/>
+        </radialGradient>
+      </defs>
+
+      <!-- mainspring barrel (back) -->
+      <g>
+        <circle cx="170" cy="330" r="86" fill="url(#brassG)" stroke="#6a5426" stroke-width="3"/>
+        <circle cx="170" cy="330" r="66" fill="none" stroke="#a8863e" stroke-width="2" stroke-dasharray="4 6"/>
+        <circle cx="170" cy="330" r="46" fill="none" stroke="#a8863e" stroke-width="5"/>
+        <!-- wound spring hint -->
+        <path id="springCoil" d="" fill="none" stroke="#8a6e2e" stroke-width="3"/>
+        <circle cx="170" cy="330" r="10" fill="url(#steelG)"/>
+        <text x="170" y="438" text-anchor="middle" font-family="Georgia" font-size="11" fill="#8a7454" font-style="italic">mainspring barrel</text>
+      </g>
+
+      <!-- gear train: center wheel, third wheel, fourth wheel -->
+      <g id="gearCenterWrap" transform="translate(330,255)">
+        <g class="gear" id="gearCenter">
+          <circle r="80" fill="url(#brassG)" stroke="#6a5426" stroke-width="3" opacity=".97"/>
+          <g id="teethC"></g>
+          <circle r="58" fill="none" stroke="#a8863e" stroke-width="2" stroke-dasharray="2 7"/>
+          <circle r="6" fill="url(#steelG)"/>
+          <circle cx="0" cy="-58" r="4" fill="url(#rubyG)"/>
+        </g>
+        <text y="104" text-anchor="middle" font-family="Georgia" font-size="11" fill="#8a7454" font-style="italic">centre wheel · 96 teeth</text>
+      </g>
+
+      <g id="gear3Wrap" transform="translate(475,205)">
+        <g class="gear" id="gear3">
+          <circle r="58" fill="url(#brassG)" stroke="#6a5426" stroke-width="2.6"/>
+          <g id="teeth3"></g>
+          <circle r="38" fill="none" stroke="#a8863e" stroke-width="1.6" stroke-dasharray="2 6"/>
+          <circle r="5" fill="url(#steelG)"/>
+          <circle cx="0" cy="-38" r="3.4" fill="url(#rubyG)"/>
+        </g>
+        <text y="86" text-anchor="middle" font-family="Georgia" font-size="11" fill="#8a7454" font-style="italic">third wheel · 72</text>
+      </g>
+
+      <g id="gear4Wrap" transform="translate(560,330)">
+        <g class="gear" id="gear4">
+          <circle r="42" fill="url(#steelG)" stroke="#4a525e" stroke-width="2.4"/>
+          <g id="teeth4"></g>
+          <circle r="26" fill="none" stroke="#7a828e" stroke-width="1.4" stroke-dasharray="2 5"/>
+          <circle r="4.4" fill="url(#brassG)"/>
+        </g>
+        <text y="72" text-anchor="middle" font-family="Georgia" font-size="11" fill="#8a7454" font-style="italic">fourth wheel · 60</text>
+      </g>
+
+      <!-- escape wheel -->
+      <g transform="translate(475,400)">
+        <g class="gear" id="escapeW">
+          <circle r="44" fill="url(#brassG)" stroke="#6a5426" stroke-width="2.4"/>
+          <g id="teethE"></g>
+          <circle r="30" fill="none" stroke="#a8863e" stroke-width="1.4" stroke-dasharray="2 5"/>
+          <circle r="5" fill="url(#steelG)"/>
+        </g>
+        <text y="72" text-anchor="middle" font-family="Georgia" font-size="11" fill="#8a7454" font-style="italic">escape wheel · 15 clubs</text>
+      </g>
+
+      <!-- pallet fork / anchor -->
+      <g transform="translate(410,450)">
+        <g class="anchor" id="anchorG">
+          <path d="M0 0 L 60 -22 L 74 -4 L 60 2 L 46 -8 L 40 6 L 20 0 L 8 10 L -2 4 Z"
+                fill="url(#steelG)" stroke="#4a525e" stroke-width="2"/>
+          <circle r="5" fill="url(#rubyG)"/>
+        </g>
+        <text y="34" text-anchor="middle" font-family="Georgia" font-size="11" fill="#8a7454" font-style="italic">pallet anchor</text>
+      </g>
+
+      <!-- balance wheel + hairspring -->
+      <g transform="translate(330,415)">
+        <g class="balance" id="balanceG">
+          <circle r="38" fill="none" stroke="url(#brassG)" stroke-width="7"/>
+          <circle r="38" fill="none" stroke="#6a5426" stroke-width="1" opacity=".6"/>
+          <path d="M-34 0 L34 0 M0 -34 L0 34" stroke="#c9a44e" stroke-width="5"/>
+          <path d="M0 0 q 10 -12 20 0 q 10 12 20 0" fill="none" stroke="#9aa2ae" stroke-width="1.4"/>
+        </g>
+        <text y="66" text-anchor="middle" font-family="Georgia" font-size="11" fill="#8a7454" font-style="italic">balance &amp; hairspring</text>
+      </g>
+
+      <!-- crown wheel (winder) -->
+      <g transform="translate(120,140)">
+        <g class="gear" id="crownG">
+          <circle r="34" fill="url(#steelG)" stroke="#4a525e" stroke-width="2.4"/>
+          <g id="teethCr"></g>
+          <circle r="5" fill="url(#brassG)"/>
+        </g>
+        <text y="58" text-anchor="middle" font-family="Georgia" font-size="11" fill="#8a7454" font-style="italic">crown wheel — drag to wind</text>
+      </g>
+
+      <!-- power reserve -->
+      <g transform="translate(590,110)">
+        <path d="M-44 14 A 46 46 0 0 1 44 14" fill="none" stroke="#4a3a22" stroke-width="7" stroke-linecap="round"/>
+        <path id="reserveArc" d="" fill="none" stroke="#d4b46a" stroke-width="7" stroke-linecap="round"/>
+        <text y="38" text-anchor="middle" font-family="Georgia" font-size="11" fill="#8a7454" font-style="italic">power reserve</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="controls">
+    <button id="tickBtn" class="on">♥ ticking</button>
+    <button id="labelsBtn" class="on">labels</button>
+    <span class="readout">reserve <b id="reserveV">40 h</b> · beat <b id="beatV">2.5</b> hz</span>
+  </div>
+  <span class="hint">drag the crown wheel clockwise to wind the mainspring</span>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById($id(id));
+  function $id(id) { return id; }
+  const NS = "http://www.w3.org/2000/svg";
+
+  /* ---------- build gear teeth ---------- */
+  function teeth(groupId, rOut, n, toothH, steel) {
+    const grp = document.getElementById(groupId);
+    for (let i = 0; i < n; i++) {
+      const a = (6.283 / n) * i;
+      const p = document.createElementNS(NS, "path");
+      /* trapezoid tooth pointing outward */
+      const w1 = 0.36 / n * 6.283, w2 = 0.18 / n * 6.283;
+      const r1 = rOut - 2, r2 = rOut + toothH;
+      const d =
+        "M" + (Math.cos(a - w1) * r1).toFixed(1) + " " + (Math.sin(a - w1) * r1).toFixed(1) +
+        " L" + (Math.cos(a - w2) * r2).toFixed(1) + " " + (Math.sin(a - w2) * r2).toFixed(1) +
+        " L" + (Math.cos(a + w2) * r2).toFixed(1) + " " + (Math.sin(a + w2) * r2).toFixed(1) +
+        " L" + (Math.cos(a + w1) * r1).toFixed(1) + " " + (Math.sin(a + w1) * r1).toFixed(1) + " Z";
+      p.setAttribute("d", d);
+      p.setAttribute("fill", steel ? "url(#steelG)" : "url(#brassG)");
+      p.setAttribute("stroke", steel ? "#4a525e" : "#6a5426");
+      p.setAttribute("stroke-width", "1");
+      grp.appendChild(p);
+    }
+  }
+  teeth("teethC", 80, 32, 8);
+  teeth("teeth3", 58, 24, 7);
+  teeth("teeth4", 42, 20, 6, true);
+  teeth("teethE", 44, 15, 10);
+  teeth("teethCr", 34, 14, 6, true);
+
+  /* ---------- state ---------- */
+  let reserve = 0.5;      /* 0..1 */
+  let ticking = true;
+  let phase = 0;          /* beat phase */
+  let speedK = 1;
+
+  /* ---------- animation ---------- */
+  const gC = document.getElementById("gearCenter");
+  const g3 = document.getElementById("gear3");
+  const g4 = document.getElementById("gear4");
+  const gE = document.getElementById("escapeW");
+  const anchor = document.getElementById("anchorG");
+  const balance = document.getElementById("balanceG");
+  const crown = document.getElementById("crownG");
+  let angles = { c: 0, t: 0, f: 0, e: 0, cr: 0 };
+
+  /* audio */
+  let AC = null;
+  function tickSnd(high) {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC || !ticking) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      const t0 = AC.currentTime;
+      const o = AC.createOscillator(), g = AC.createGain(), f = AC.createBiquadFilter();
+      o.type = "square"; o.frequency.value = high ? 2400 : 1900;
+      f.type = "bandpass"; f.frequency.value = high ? 3200 : 2400; f.Q.value = 2;
+      g.gain.setValueAtTime(0.02, t0);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.045);
+      o.connect(f); f.connect(g); g.connect(AC.destination);
+      o.start(t0); o.stop(t0 + 0.05);
+    } catch (e) {}
+  }
+  let lastTickSide = 0;
+
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+    const dt = 1 / 60;
+    /* train speed follows reserve */
+    const spd = ticking ? reserve * speedK : 0;
+    /* balance oscillates at ~2.5 hz scaled */
+    const hz = 1 + reserve * 2.5;
+    phase += dt * hz;
+    const swing = Math.sin(phase * 6.283);
+    balance.setAttribute("transform", "rotate(" + (swing * 32) + ")");
+    /* anchor rocks in sync */
+    const rock = swing > 0 ? 6 : -6;
+    anchor.setAttribute("transform", "rotate(" + rock + ")");
+    /* tick on direction change */
+    const side = swing > 0 ? 1 : -1;
+    if (side !== lastTickSide) {
+      lastTickSide = side;
+      tickSnd(side > 0);
+      /* escape wheel advances in steps */
+      angles.e += 6.283 / 15 / 2;
+    }
+    /* wheels geared down */
+    angles.c += dt * spd * 8;
+    angles.t = -angles.c * (32 / 24) * 0.72;
+    angles.f = angles.t * (24 / 20) * 0.7;
+    gC.setAttribute("transform", "rotate(" + (angles.c * 57.3 % 360) + ")");
+    g3.setAttribute("transform", "rotate(" + (angles.t * 57.3 % 360) + ")");
+    g4.setAttribute("transform", "rotate(" + (angles.f * 57.3 % 360) + ")");
+    gE.setAttribute("transform", "rotate(" + (angles.e * 57.3) + ")");
+    crown.setAttribute("transform", "rotate(" + (angles.cr * 57.3) + ")");
+    /* reserve drains */
+    if (ticking) {
+      reserve = Math.max(0, reserve - dt * 0.004);
+      $("reserveV").textContent = (reserve * 100).toFixed(0) + " h";
+      $("beatV").textContent = hz.toFixed(1);
+      drawReserve();
+      drawSpring();
+    }
+  }
+  requestAnimationFrame(loop);
+
+  /* power reserve arc */
+  function drawReserve() {
+    const a0 = -2.55, a1 = -0.59; /* arc angles */
+    const a = a0 + (a1 - a0) * reserve;
+    const x0 = 590 - 44 * Math.cos(Math.abs(a0) - 1.57 - 0.0), dummy = 0;
+    /* simpler: param around center (590,110) */
+    const cx = 0, cy = 14, R = 46;
+    const p0x = cx + R * Math.cos(a0), p0y = cy + R * Math.sin(a0);
+    const p1x = cx + R * Math.cos(a), p1y = cy + R * Math.sin(a);
+    document.getElementById("reserveArc").setAttribute("d",
+      "M" + p0x.toFixed(1) + " " + p0y.toFixed(1) + " A " + R + " " + R + " 0 0 1 " + p1x.toFixed(1) + " " + p1y.toFixed(1));
+  }
+  drawReserve();
+
+  /* mainspring coil tightens with reserve */
+  function drawSpring() {
+    let d = "M170 330";
+    const turns = 2 + reserve * 4;
+    for (let t2 = 0.2; t2 < turns; t2 += 0.12) {
+      const a = t2 * 6.283 * 0.9;
+      const r = 12 + t2 * 8;
+      d += " L" + (170 + Math.cos(a) * r).toFixed(1) + " " + (330 + Math.sin(a) * r).toFixed(1);
+    }
+    document.getElementById("springCoil").setAttribute("d", d);
+  }
+  drawSpring();
+
+  /* ---------- winding the crown ---------- */
+  let wdrag = false, wlastA = 0, wound = 0;
+  const crownSvg = document.getElementById("crownG");
+  addEventListener("pointerdown", (e) => {
+    const r = crownSvg.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    if (Math.hypot(e.clientX - cx, e.clientY - cy) < 120) {
+      wdrag = true;
+      wlastA = Math.atan2(e.clientY - cy, e.clientX - cx);
+    }
+  });
+  addEventListener("pointermove", (e) => {
+    if (!wdrag) return;
+    const r = crownSvg.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const a = Math.atan2(e.clientY - cy, e.clientX - cx);
+    let d = a - wlastA;
+    if (d > Math.PI) d -= 6.283;
+    if (d < -Math.PI) d += 6.283;
+    if (d > 0) {
+      angles.cr += d;
+      reserve = Math.min(1, reserve + d * 0.05);
+      wound += d;
+      if (wound > 1.2) { wound = 0; ratchet(); }
+      $("reserveV").textContent = (reserve * 100).toFixed(0) + " h";
+      drawReserve(); drawSpring();
+    }
+    wlastA = a;
+  });
+  addEventListener("pointerup", () => { wdrag = false; });
+  function ratchet() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC) return;
+    try {
+      if (AC.state === "suspended") AC.resume().catch(() => {});
+      const t0 = AC.currentTime;
+      const o = AC.createOscillator(), g = AC.createGain();
+      o.type = "triangle"; o.frequency.setValueAtTime(300, t0);
+      o.frequency.exponentialRampToValueAtTime(180, t0 + 0.06);
+      g.gain.setValueAtTime(0.035, t0);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.08);
+      o.connect(g); g.connect(AC.destination);
+      o.start(t0); o.stop(t0 + 0.09);
+    } catch (e) {}
+  }
+
+  /* ---------- controls ---------- */
+  $("tickBtn").addEventListener("click", function () {
+    ticking = !ticking;
+    this.classList.toggle("on", ticking);
+    this.textContent = ticking ? "♥ ticking" : "stopped";
+    if (ticking) { try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  });
+  $("labelsBtn").addEventListener("click", function () {
+    const on = this.classList.toggle("on");
+    document.querySelectorAll(".movement text").forEach(t => t.style.display = on ? "" : "none");
+  });
+})();
+</script>
+</body>
+</html>

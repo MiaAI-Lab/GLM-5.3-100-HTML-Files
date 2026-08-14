@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOBILE — a balance study</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background:#f2f0ec; color:#1c1e24; touch-action:none; user-select:none; -webkit-user-select:none;
+  }
+  .wall {
+    position:fixed; inset:0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 30%, #faf9f6, #eceae4 70%);
+  }
+  .shadowfloor {
+    position:fixed; left:0; right:0; bottom:0; height:26vh; pointer-events:none;
+    background:linear-gradient(180deg, transparent, rgba(28,30,36,.07));
+  }
+  canvas#c { position:fixed; inset:0; width:100%; height:100%; }
+  .plaque {
+    position:fixed; left:26px; top:22px; z-index:10;
+  }
+  .plaque h1 { font-size:16px; font-weight:300; letter-spacing:.5em; text-transform:uppercase; color:#2a2d36; }
+  .plaque p { font-size:9px; letter-spacing:.26em; text-transform:uppercase; color:#9a948a; margin-top:5px; }
+  .controls {
+    position:fixed; left:50%; bottom:20px; transform:translateX(-50%); z-index:10;
+    display:flex; gap:10px; padding:10px 14px; border-radius:99px;
+    background:rgba(250,249,246,.8); border:1px solid rgba(28,30,36,.12);
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  }
+  .controls button {
+    background:transparent; border:1px solid rgba(28,30,36,.25); color:#1c1e24;
+    font:inherit; font-size:9.5px; letter-spacing:.18em; text-transform:uppercase;
+    padding:9px 16px; border-radius:99px; cursor:pointer; transition:all .15s;
+  }
+  .controls button:hover { background:#1c1e24; color:#f2f0ec; }
+  .controls button.on { background:#c2492e; border-color:#c2492e; color:#fff; }
+  .hintline { position:fixed; right:26px; top:22px; z-index:10; font-size:9px; letter-spacing:.22em;
+    text-transform:uppercase; color:#9a948a; }
+  @media (max-width:640px) { .hintline { display:none; } }
+  @media (prefers-reduced-motion: reduce) { .breeze { animation:none !important; } }
+</style>
+</head>
+<body>
+  <div class="wall"></div>
+  <div class="shadowfloor"></div>
+  <canvas id="c"></canvas>
+
+  <div class="plaque">
+    <h1>Mobile</h1>
+    <p>kinetic sculpture · balance study no. 4</p>
+  </div>
+  <div class="hintline">drag the shapes · the balance finds itself</div>
+
+  <div class="controls">
+    <button id="breezeBtn">breeze</button>
+    <button id="swapBtn">swap shapes</button>
+    <button id="rehangBtn">rehang</button>
+    <button id="shadowBtn" class="on">shadow theater</button>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const cv = $("c"), g = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let breeze = 0, shadowMode = false;
+
+  /* ---------- sculpture model ---------- */
+  const SHAPES = ["leaf", "disc", "crescent", "ring", "rod"];
+  const COLORS = ["#1c1e24", "#c2492e", "#e0a52e", "#8a94a4"];
+  let tree = null;
+
+  function buildTree() {
+    /* recursive arms: {len, angle, mass, shape, color, children[]} */
+    function branch(depth) {
+      const b = {
+        len: 60 + Math.random() * 50 - depth * 8,
+        angle: (Math.random() - 0.5) * 0.7,
+        vel: 0,
+        shape: SHAPES[Math.floor(Math.random() * SHAPES.length)],
+        color: COLORS[Math.floor(Math.random() * COLORS.length)],
+        size: 16 + Math.random() * 16,
+        children: [],
+      };
+      if (depth < 2 && Math.random() < 0.85) {
+        const n = Math.random() < 0.5 ? 1 : 2;
+        for (let i = 0; i < n; i++) b.children.push(branch(depth + 1));
+      }
+      return b;
+    }
+    tree = branch(0);
+  }
+
+  function resize() {
+    DPR = Math.min(2, devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  addEventListener("resize", resize);
+  resize();
+  buildTree();
+
+  /* ---------- physics ---------- */
+  function torqueOf(b) {
+    /* sum of child mass distances vs shape mass */
+    let t = 0;
+    b.children.forEach(ch => { t += 1 + countNodes(ch); });
+    return t;
+  }
+  function countNodes(b) {
+    return 1 + b.children.reduce((s, c) => s + countNodes(c), 0);
+  }
+  function step(b, wind, t) {
+    /* damped pendulum with wind + child torque imbalance */
+    const imbalance = (torqueOf(b) - 1) * 0.0009;
+    const gust = Math.sin(t / 900 + b.len) * wind * 0.0016;
+    b.vel += imbalance + gust - b.angle * 0.004;
+    b.vel *= 0.985;
+    b.angle += b.vel;
+    b.children.forEach(ch => step(ch, wind, t));
+  }
+
+  /* ---------- render ---------- */
+  function drawShape(x, y, size, shape, color, rot) {
+    g.save();
+    g.translate(x, y);
+    g.rotate(rot);
+    g.fillStyle = color;
+    g.strokeStyle = color;
+    g.lineWidth = Math.max(2.5, size * 0.16);
+    if (shape === "leaf") {
+      g.beginPath();
+      g.moveTo(0, -size);
+      g.quadraticCurveTo(size * 0.8, 0, 0, size);
+      g.quadraticCurveTo(-size * 0.8, 0, 0, -size);
+      g.fill();
+    } else if (shape === "disc") {
+      g.beginPath(); g.arc(0, 0, size * 0.7, 0, 6.283); g.fill();
+    } else if (shape === "crescent") {
+      g.beginPath(); g.arc(0, 0, size * 0.72, 0.6, 5.7); g.stroke();
+    } else if (shape === "ring") {
+      g.beginPath(); g.arc(0, 0, size * 0.7, 0, 6.283); g.stroke();
+    } else {
+      g.fillRect(-size, -size * 0.14, size * 2, size * 0.28);
+    }
+    g.restore();
+  }
+
+  function drawTree(b, x, y, baseAngle, t, depth) {
+    const a = baseAngle + b.angle;
+    const ex = x + Math.sin(a) * b.len;
+    const ey = y + Math.cos(a) * b.len;
+    /* arm */
+    g.strokeStyle = "#1c1e24";
+    g.lineWidth = 1.4;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(ex, ey); g.stroke();
+    /* cable down to shape */
+    const shapeY = ey + b.size * 1.6;
+    g.beginPath(); g.moveTo(ex, ey); g.lineTo(ex, shapeY); g.stroke();
+    /* shape + wall shadow */
+    if (shadowMode) {
+      g.save();
+      g.globalAlpha = 0.16;
+      drawShape(ex + 26, shapeY + 18, b.size, b.shape, "#1c1e24", a * 0.5 + 0.3);
+      g.restore();
+    }
+    drawShape(ex, shapeY, b.size, b.shape, b.color, Math.sin(t / 2000 + b.len) * 0.3);
+    /* children hang from arm end */
+    b.children.forEach(ch => drawTree(ch, ex, ey, a * 0.6, t, depth + 1));
+    /* remember for dragging */
+    b._x = ex; b._y = shapeY;
+  }
+
+  let t0 = performance.now();
+  function loop(now) {
+    requestAnimationFrame(loop);
+    if (document.hidden) return;
+    breeze *= 0.995;
+    step(tree, breeze, now);
+    g.clearRect(0, 0, W, H);
+    /* ceiling cable */
+    const topX = W / 2, topY = 40;
+    g.strokeStyle = "#1c1e24"; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(topX, 0); g.lineTo(topX, topY); g.stroke();
+    drawTree(tree, topX, topY, 0, now, 0);
+  }
+  requestAnimationFrame(loop);
+
+  /* ---------- dragging shapes perturbs balance ---------- */
+  let dragNode = null;
+  function findNode(b, x, y) {
+    if (Math.hypot(b._x - x, b._y - y) < b.size + 12) return b;
+    for (const ch of b.children) {
+      const f = findNode(ch, x, y);
+      if (f) return f;
+    }
+    return null;
+  }
+  cv.addEventListener("pointerdown", (e) => {
+    dragNode = findNode(tree, e.clientX, e.clientY);
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (!dragNode) return;
+    /* convert drag to angular impulse */
+    dragNode.vel += (e.movementX || 0) * 0.004;
+    dragNode.vel += (e.movementY || 0) * 0.001;
+  });
+  addEventListener("pointerup", () => { dragNode = null; });
+
+  /* ---------- controls ---------- */
+  $("breezeBtn").addEventListener("click", () => { breeze = 2.6; });
+  $("swapBtn").addEventListener("click", () => {
+    /* walk tree, re-roll shapes */
+    (function walk(b) {
+      b.shape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+      b.color = COLORS[Math.floor(Math.random() * COLORS.length)];
+      b.children.forEach(walk);
+    })(tree);
+  });
+  $("rehangBtn").addEventListener("click", buildTree);
+  $("shadowBtn").addEventListener("click", function () {
+    shadowMode = !shadowMode;
+    this.classList.toggle("on", shadowMode);
+  });
+
+  /* welcome gust */
+  setTimeout(() => { breeze = 1.8; }, 700);
+})();
+</script>
+</body>
+</html>

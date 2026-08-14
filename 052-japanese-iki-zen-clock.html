@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ICHIGO ICHIE — 一期一会</title>
+<style>
+:root{
+  --washi:#f6f1e6; --washi2:#efe8d8; --sumi:#2b2a28; --sumi-soft:#5a5750;
+  --seal:#b03a2e; --breath:0; --ring-r:56;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:"Hiragino Mincho ProN","Yu Mincho",Georgia,"Times New Roman",serif;
+  background:
+    radial-gradient(120% 90% at 50% 8%, var(--washi) 40%, var(--washi2) 100%);
+  color:var(--sumi); overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  user-select:none; -webkit-user-select:none;
+}
+/* paper grain */
+body::before{
+  content:""; position:fixed; inset:0; pointer-events:none; opacity:.5;
+  background-image:
+    repeating-linear-gradient(0deg, #00000005 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, #00000004 0 1px, transparent 1px 4px),
+    radial-gradient(600px 300px at 20% 85%, #c9bfa86e, transparent 70%),
+    radial-gradient(500px 260px at 85% 15%, #d8cdb26e, transparent 70%);
+}
+.zen{position:relative; width:min(94vw,78vh); aspect-ratio:1;
+  display:flex; align-items:center; justify-content:center}
+/* seasonal kanji watermark */
+.kanji{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:min(64vw,56vh); font-weight:700; color:var(--sumi); opacity:.055;
+  pointer-events:none; transition:opacity 2s;
+}
+.zen:hover .kanji{opacity:.03}
+svg.clock{position:relative; width:100%; height:100%; overflow:visible}
+/* poetic line */
+.poem{
+  position:absolute; left:50%; transform:translateX(-50%);
+  bottom:-6%; font-size:clamp(12px,2.3vh,19px); letter-spacing:.32em;
+  color:var(--sumi-soft); white-space:nowrap; text-align:center;
+  transition:opacity 1.4s ease; font-style:italic;
+}
+.poem.fade{opacity:0}
+/* hanko seal */
+.seal{
+  position:absolute; right:4%; bottom:14%; width:clamp(38px,7vh,58px); aspect-ratio:1;
+  background:var(--seal); border-radius:6px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 2px 10px #b03a2e44, inset 0 0 0 2px #ffffff2e, inset 0 0 12px #7c241c;
+  transform:rotate(-4deg); transition:transform .4s cubic-bezier(.3,1.4,.4,1);
+}
+.seal:hover{transform:rotate(-1deg) scale(1.06)}
+.seal span{
+  color:var(--washi); font-size:clamp(15px,2.8vh,23px); font-weight:700;
+  writing-mode:vertical-rl; letter-spacing:.1em; line-height:1;
+}
+/* control ring (revealed on hover) */
+.ring{
+  position:absolute; left:-2%; top:50%; transform:translateY(-50%);
+  width:clamp(170px,30vh,230px); aspect-ratio:1; border-radius:50%;
+  border:1.5px solid #2b2a2822; opacity:0; transition:opacity .8s ease;
+  display:flex; align-items:center; justify-content:center; pointer-events:none;
+}
+.zen:hover .ring{opacity:1; pointer-events:auto}
+.ring::before{content:""; position:absolute; inset:6%; border-radius:50%;
+  border:1px solid #2b2a2814}
+.ring button{
+  position:absolute; width:34%; aspect-ratio:1; border-radius:50%;
+  border:1px solid #2b2a2833; background:#f6f1e6cc; color:var(--sumi);
+  font-family:inherit; font-size:clamp(9px,1.5vh,12px); letter-spacing:.12em;
+  cursor:pointer; transition:background .3s, transform .3s, color .3s;
+  display:flex; align-items:center; justify-content:center; text-align:center;
+  backdrop-filter:blur(2px);
+}
+.ring button:hover{background:var(--sumi); color:var(--washi); transform:scale(1.1)}
+.ring button.on{background:var(--seal); border-color:var(--seal); color:var(--washi)}
+#btnEnso{top:6%; left:50%; transform:translateX(-50%)}
+#btnSound{top:50%; right:6%; transform:translateY(-50%)}
+#btnGrid{bottom:6%; left:50%; transform:translateX(-50%)}
+#btnBreath{top:50%; left:6%; transform:translateY(-50%)}
+.ring button:hover{transform:translate(-50%,-50%) scale(1.1)}
+#btnSound:hover,#btnBreath:hover{transform:translate(0,-50%) scale(1.1)}
+/* day grid overlay */
+.gridview{
+  position:fixed; inset:0; background:#f6f1e6f2; z-index:50;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:clamp(10px,3vh,26px); opacity:0; pointer-events:none; transition:opacity .7s ease;
+}
+.gridview.open{opacity:1; pointer-events:auto}
+.gridview h2{font-size:clamp(13px,2.4vh,19px); letter-spacing:.5em; font-weight:400;
+  color:var(--sumi-soft)}
+.week{display:flex; gap:clamp(8px,2vw,20px)}
+.day{
+  width:clamp(44px,10vh,74px); aspect-ratio:1; position:relative;
+  display:flex; align-items:flex-end; justify-content:center; padding-bottom:12%;
+  border:1px solid #2b2a2818; border-radius:3px;
+  background:linear-gradient(180deg,#ffffff66,transparent);
+}
+.day .ink{
+  position:absolute; left:14%; right:14%; bottom:14%;
+  background:var(--sumi); border-radius:2px; opacity:.75;
+  height:calc(var(--fill,10%) - 10%); max-height:72%;
+  transition:height .8s cubic-bezier(.2,.8,.2,1);
+}
+.day.today{border-color:var(--seal)}
+.day.today .ink{background:var(--seal)}
+.day .dnum{position:relative; font-size:clamp(10px,1.8vh,13px);
+  color:var(--sumi-soft); letter-spacing:.1em}
+.day.today .dnum{color:var(--seal); font-weight:700}
+.gridview .close{
+  font-family:inherit; background:none; border:none; color:var(--sumi-soft);
+  letter-spacing:.4em; font-size:clamp(11px,2vh,15px); cursor:pointer; padding:8px;
+}
+.gridview .close:hover{color:var(--seal)}
+.gridview .glabel{font-size:clamp(9px,1.5vh,12px); letter-spacing:.3em; color:#8a8577}
+@media (max-width:560px){
+  .ring{left:50%; top:auto; bottom:-30%; transform:translateX(-50%); width:150px}
+  .zen:hover .ring{opacity:1}
+  .poem{bottom:-16%}
+  .seal{bottom:4%; right:2%}
+}
+@media (prefers-reduced-motion:reduce){
+  .poem{transition:none}
+  .day .ink{transition:none}
+  .seal{transition:none}
+}
+</style>
+</head>
+<body>
+<div class="zen" id="zen">
+  <div class="kanji" id="kanji">秋</div>
+  <svg class="clock" id="clock" viewBox="0 0 400 400" aria-hidden="true">
+    <circle id="ensoTrack" cx="200" cy="200" r="176" fill="none"
+      stroke="#2b2a28" stroke-opacity=".07" stroke-width="1.5"/>
+    <path id="enso" fill="none" stroke="#2b2a28" stroke-opacity=".82"
+      stroke-width="5" stroke-linecap="round"/>
+    <circle id="breathC" cx="200" cy="200" r="0" fill="#b03a2e" opacity="0"/>
+    <text id="tHH" x="200" y="196" text-anchor="middle" fill="#2b2a28"
+      font-size="88" font-weight="300" letter-spacing="4">--</text>
+    <text id="tMM" x="200" y="268" text-anchor="middle" fill="#5a5750"
+      font-size="42" font-weight="300" letter-spacing="6">--</text>
+    <text id="tSS" x="318" y="232" text-anchor="middle" fill="#b03a2e"
+      font-size="15" font-weight="300">--</text>
+    <text id="tDay" x="200" y="316" text-anchor="middle" fill="#8a8577"
+      font-size="13" letter-spacing="6">—</text>
+  </svg>
+  <p class="poem" id="poem">この一時に、この一出会い。</p>
+  <div class="ring" id="ring">
+    <button id="btnEnso">円相<br>ENSO</button>
+    <button id="btnSound">鐘<br>SOUND</button>
+    <button id="btnGrid">七日<br>WEEK</button>
+    <button id="btnBreath">息<br>BREATH</button>
+  </div>
+  <div class="seal" id="seal" role="button" tabindex="0" aria-label="Flip to week view">
+    <span>一期一会</span>
+  </div>
+</div>
+<div class="gridview" id="gridview">
+  <h2>七日 — SEVEN DAYS</h2>
+  <p class="glabel">INK DEEPENS AS THE DAY UNFOLDS · RED IS TODAY</p>
+  <div class="week" id="week"></div>
+  <button class="close" id="closeGrid">閉じる — CLOSE</button>
+</div>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- time ---------- */
+const tHH=$("tHH"), tMM=$("tMM"), tSS=$("tSS"), tDay=$("tDay");
+const poem=$("poem"), kanji=$("kanji"), enso=$("enso");
+const POEMS=[
+  ["真夜中の静けさ — the hush after midnight.","夜更けの灯 — a lamp for the late hours.",
+   "暁前 — before the dawn, all is possible.","朝の光 — first light, first tea.",
+   "目覚めの時 — the hour of waking gently.","朝の支度 — morning gathers itself.",
+   "一日の始まり — the day takes its first breath.","働く時 — hours for honest work.",
+   "陽は高く — the sun climbs, so may we.","近づく昼 — noon approaches like a friend.",
+   "正午 — the day stands at its full height.","昼の安らぎ — a pause in the middle.",
+   "昼餌の時 — the simple gift of a meal.","午後の光 — afternoon pours like honey.",
+   "穏やかな時 — unhurried hours, unhurried mind.","陽は傾く — the light begins to lean.",
+   "黄昏前 — the last gold of the afternoon.","夕暮れ — dusk brushes the paper.",
+   "十七時 — lamps are lit one by one.","休息の時 — the hour of setting things down.",
+   "夜のとばり — the curtain of night falls.","晩餐 — warmth of the evening table.",
+   "星が見える — stars appear, small and patient.","夜も更けて — the deep, kind night.",
+   "真夜中 — midnight, the quiet teacher."]];
+function pad(n){return String(n).padStart(2,"0")}
+function draw(){
+  const d=new Date(), h=d.getHours(), m=d.getMinutes(), s=d.getSeconds();
+  tHH.textContent=pad(h); tMM.textContent=pad(m); tSS.textContent=pad(s);
+  tDay.textContent=d.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}).toUpperCase();
+  const line=POEMS[h][m%POEMS[h].length];
+  if (poem.dataset.txt!==line){
+    poem.dataset.txt=line;
+    poem.classList.add("fade");
+    setTimeout(()=>{poem.textContent=line; poem.classList.remove("fade")},700);
+  }
+  const season = h>=0&&h<6?"夢":h<12?"朝":h<18?"風":"月";
+  if (kanji.dataset.k!==season){kanji.dataset.k=season;
+    kanji.style.opacity=0; setTimeout(()=>{kanji.textContent=season; kanji.style.opacity=.055},900);}
+}
+
+/* ---------- enso: drawn + dissolved every minute ---------- */
+let ensoT=0;
+function ensoPath(prog){
+  const R=176, a0=-Math.PI/2, sweep=Math.PI*2*.965;
+  const a1=a0+sweep*prog;
+  const x0=200+R*Math.cos(a0), y0=200+R*Math.sin(a0);
+  const x1=200+R*Math.cos(a1), y1=200+R*Math.sin(a1);
+  const large=sweep*prog>Math.PI?1:0;
+  return `M ${x0.toFixed(1)} ${y0.toFixed(1)} A ${R} ${R} 0 ${large} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+}
+function tickEnso(){
+  const d=new Date();
+  const ms=d.getSeconds()*1000+d.getMilliseconds();
+  const prog=Math.min(1,ms/58000);
+  enso.setAttribute("d",ensoPath(prog));
+  const fade=prog>.93?(1-prog)/.07:1;
+  enso.setAttribute("stroke-opacity",(0.82*fade).toFixed(2));
+}
+
+/* ---------- breath guide ---------- */
+const breathC=$("breathC");
+let breathOn=false, brPhase=0;
+function tickBreath(){
+  if(!breathOn){breathC.setAttribute("opacity",0);return}
+  brPhase+=0.011;
+  const r=34+30*(.5-.5*Math.cos(brPhase));
+  breathC.setAttribute("r",r.toFixed(1));
+  breathC.setAttribute("opacity",(0.10+0.08*Math.sin(brPhase)).toFixed(2));
+}
+
+/* ---------- chime (gesture-gated) ---------- */
+let AC=null, soundOn=false;
+function chime(count){
+  if(!soundOn||!AC) return;
+  try{
+    const t0=AC.currentTime;
+    for(let i=0;i<(count||1);i++){
+      const o=AC.createOscillator(), g=AC.createGain();
+      o.type="sine"; o.frequency.value=523.25*Math.pow(2,(i*3)/12);
+      g.gain.setValueAtTime(0.0001,t0+i*.5);
+      g.gain.exponentialRampToValueAtTime(0.06,t0+i*.5+.02);
+      g.gain.exponentialRampToValueAtTime(0.0001,t0+i*.5+3.2);
+      o.connect(g).connect(AC.destination);
+      o.start(t0+i*.5); o.stop(t0+i*.5+3.3);
+    }
+  }catch(e){}
+}
+function ensureAC(){
+  try{
+    if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==="suspended") AC.resume();
+  }catch(e){}
+}
+let lastHour=-1;
+function hourWatch(){
+  const h=new Date().getHours();
+  if(lastHour!==-1 && h!==lastHour) chime(3);
+  lastHour=h;
+}
+/* ---------- week grid ---------- */
+const gridview=$("gridview"), week=$("week");
+const DAYS=["SUN","MON","TUE","WED","THU","FRI","SAT"];
+function buildWeek(){
+  week.innerHTML="";
+  const now=new Date();
+  const start=new Date(now); start.setDate(now.getDate()-now.getDay());
+  for(let i=0;i<7;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i);
+    const el=document.createElement("div");
+    el.className="day"+(i===now.getDay()?" today":"");
+    let fill=10;
+    if(d<now) fill=82;
+    else if(d.toDateString()===now.toDateString())
+      fill=10+72*((now.getHours()*60+now.getMinutes())/1440);
+    el.innerHTML=`<div class="ink" style="--fill:${fill.toFixed(0)}%;height:${(fill-10).toFixed(0)}%"></div><span class="dnum">${DAYS[i]}<br>${d.getDate()}</span>`;
+    week.appendChild(el);
+  }
+}
+$("seal").addEventListener("click",()=>{buildWeek();gridview.classList.add("open")});
+$("seal").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){buildWeek();gridview.classList.add("open")}});
+$("closeGrid").addEventListener("click",()=>gridview.classList.remove("open"));
+
+/* ---------- ring buttons ---------- */
+const bEnso=$("btnEnso"), bSound=$("btnSound"), bGrid=$("btnGrid"), bBreath=$("btnBreath");
+bSound.addEventListener("click",()=>{
+  ensureAC(); soundOn=!soundOn;
+  bSound.classList.toggle("on",soundOn);
+  if(soundOn) chime(1);
+});
+bBreath.addEventListener("click",()=>{
+  breathOn=!breathOn; bBreath.classList.toggle("on",breathOn);
+  if(breathOn){brPhase=0}
+});
+bGrid.addEventListener("click",()=>{buildWeek();gridview.classList.add("open")});
+let manualProg=null;
+bEnso.addEventListener("click",()=>{
+  /* redraw the enso once, ceremonially */
+  ensureAC(); chime(1);
+  if(reduced) return;
+  const t0=performance.now(), dur=4200;
+  manualProg=1;
+  const step=t=>{
+    const p=Math.min(1,(t-t0)/dur);
+    enso.setAttribute("d",ensoPath(p*p*(3-2*p)));
+    if(p<1) requestAnimationFrame(step); else manualProg=null;
+  };
+  requestAnimationFrame(step);
+});
+
+/* ---------- main loop ---------- */
+let lastSecond=-1;
+function frame(){
+  const d=new Date(), s=d.getSeconds();
+  tickBreath();
+  if(s!==lastSecond){
+    lastSecond=s;
+    draw();
+    hourWatch();
+    if(s===0&&soundOn) chime(1);
+  }
+  if(!reduced && manualProg===null) tickEnso();
+  requestAnimationFrame(frame);
+}
+draw();
+enso.setAttribute("d",ensoPath(reduced?1:new Date().getSeconds()/60));
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
